@@ -2,3 +2,8 @@ from .branch_views import BranchListCreateAPIView, BranchRetrieveUpdateDestroyAP
 from .auth_views import LoginView, AdminOnlyView, SuperAdminOnlyView, UserRegistrationView, AdminRegistrationView, IsAdminOrSuperAdmin, IsSuperAdmin, AdminRegistrationView
 from .refraction_views import RefractionCreateAPIView, RefractionListAPIView, RefractionUpdateAPIView, RefractionDeleteAPIView
 from .refraction_detail_views import RefractionDetailCreateAPIView
+from .brand_views import BrandListCreateView,BrandRetrieveUpdateDeleteView
+from .color_views import ColorListCreateView,ColorRetrieveUpdateDeleteView
+from .code_views import CodeListCreateView,CodeRetrieveUpdateDeleteView
+from .frames_stock_views import FrameStockListCreateView,FrameStockRetrieveUpdateDeleteView
+from .frame_views import FrameListCreateView,FrameRetrieveUpdateDeleteView

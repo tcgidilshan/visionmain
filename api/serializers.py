@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Branch, Refraction,RefractionDetails
+from .models import Branch, Refraction,RefractionDetails,Brand,Color,Code,Frame,FrameStock
 
 class BranchSerializer(serializers.ModelSerializer):
     class Meta:
@@ -26,3 +26,37 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'left_eye_near_sph',
             'remark'
         ]
+        
+class BrandSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Brand
+        fields = ['id', 'name']
+
+class ColorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Color
+        fields = ['id', 'name']
+        
+class CodeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Code
+        fields = ['id', 'name', 'brand']
+        
+class FrameSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Frame
+        fields = [
+            'id',
+            'brand',
+            'code',
+            'color',
+            'price',
+            'size',
+            'species',
+            'image',
+        ]
+        
+class FrameStockSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FrameStock
+        fields = ['id', 'frame', 'qty', 'initial_count']

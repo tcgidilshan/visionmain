@@ -76,4 +76,44 @@ class RefractionDetails(models.Model):
     def __str__(self):
         return f"Details for {self.refraction.customer_full_name}"
     
+#brands
+class Brand(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+
+    def __str__(self):
+        return self.name
     
+#color    
+class Color(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name
+
+#code
+class Code(models.Model):
+    name = models.CharField(max_length=255)
+    brand = models.ForeignKey(Brand, related_name='codes', on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.name
+    
+class Frame(models.Model):
+    brand = models.ForeignKey(Brand, related_name='frames', on_delete=models.CASCADE)
+    code = models.ForeignKey(Code, related_name='frames', on_delete=models.CASCADE)
+    color = models.ForeignKey(Color, related_name='frames', on_delete=models.CASCADE)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    size = models.CharField(max_length=50)
+    species = models.CharField(max_length=100)
+    image = models.CharField(max_length=255, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.brand.name} - {self.code.name} - {self.color.name}"
+    
+class FrameStock(models.Model):
+    frame = models.ForeignKey(Frame, related_name='stocks', on_delete=models.CASCADE)
+    qty = models.IntegerField(default=0)
+    initial_count = models.IntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Frame: {self.frame.id} - Qty: {self.qty}"
