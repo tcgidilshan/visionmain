@@ -7,3 +7,6 @@ from .color_views import ColorListCreateView,ColorRetrieveUpdateDeleteView
 from .code_views import CodeListCreateView,CodeRetrieveUpdateDeleteView
 from .frames_stock_views import FrameStockListCreateView,FrameStockRetrieveUpdateDeleteView
 from .frame_views import FrameListCreateView,FrameRetrieveUpdateDeleteView
+from .power_views import PowerListCreateView,PowerRetrieveUpdateDeleteView
+from .lens_views import LensListCreateView,LensRetrieveUpdateDeleteView
+from .lens_power_views import LensPowerListCreateView,LensPowerRetrieveUpdateDeleteView

@@ -117,3 +117,49 @@ class FrameStock(models.Model):
 
     def __str__(self):
         return f"Frame: {self.frame.id} - Qty: {self.qty}"
+    
+class LenseType(models.Model):
+    name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)  # Allows NULL and empty values
+
+    def __str__(self):
+        return self.name
+    
+class Coating(models.Model):
+    name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)  # Allows NULL and empty values
+
+    def __str__(self):
+        return self.name
+    
+class Lens(models.Model):
+    type = models.ForeignKey(LenseType, related_name='lenses', on_delete=models.CASCADE)
+    coating = models.ForeignKey(Coating, related_name='lenses', on_delete=models.CASCADE)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.type.name} - {self.coating.name} - ${self.price}"
+    
+class LensStock(models.Model):
+    lens = models.ForeignKey(Lens, related_name='stocks', on_delete=models.CASCADE)
+    initial_count = models.IntegerField(null=True, blank=True)  # Allows NULL for optional initial count
+    qty = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"Lens: {self.lens.id} - Qty: {self.qty}"
+    
+class Power(models.Model):
+    name = models.CharField(max_length=255)
+    side = models.CharField(max_length=10, choices=[('left', 'Left'), ('right', 'Right')])
+
+    def __str__(self):
+        return f"{self.name} ({self.side})"
+    
+class LensPower(models.Model):
+    lens = models.ForeignKey(Lens, related_name='lens_powers', on_delete=models.CASCADE)
+    power = models.ForeignKey('Power', related_name='lens_powers', on_delete=models.CASCADE)  # Assuming Power table exists
+    value = models.DecimalField(max_digits=5, decimal_places=2)
+    side = models.CharField(max_length=10, choices=[('left', 'Left'), ('right', 'Right')])
+
+    def __str__(self):
+        return f"Lens: {self.lens.id} - Power: {self.value} ({self.side})"

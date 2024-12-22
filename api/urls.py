@@ -1,7 +1,32 @@
 from django.urls import path
 from .views import LoginView, AdminOnlyView, SuperAdminOnlyView
 from .views import UserRegistrationView, AdminRegistrationView
-from .views import BranchListCreateAPIView, BranchRetrieveUpdateDestroyAPIView, RefractionCreateAPIView, RefractionListAPIView, RefractionUpdateAPIView,RefractionDeleteAPIView,RefractionDetailCreateAPIView,BrandListCreateView,BrandRetrieveUpdateDeleteView,ColorListCreateView,ColorRetrieveUpdateDeleteView,CodeListCreateView,CodeRetrieveUpdateDeleteView,FrameStockListCreateView,FrameStockRetrieveUpdateDeleteView,FrameListCreateView,FrameRetrieveUpdateDeleteView
+from .views import (
+    BranchListCreateAPIView,
+    BranchRetrieveUpdateDestroyAPIView,
+    RefractionCreateAPIView,
+    RefractionListAPIView,
+    RefractionUpdateAPIView,
+    RefractionDeleteAPIView,
+    RefractionDetailCreateAPIView,
+    BrandListCreateView,
+    BrandRetrieveUpdateDeleteView,
+    ColorListCreateView,
+    ColorRetrieveUpdateDeleteView,
+    CodeListCreateView,
+    CodeRetrieveUpdateDeleteView,
+    FrameStockListCreateView,
+    FrameStockRetrieveUpdateDeleteView,
+    FrameListCreateView,
+    FrameRetrieveUpdateDeleteView,
+    PowerListCreateView,
+    PowerRetrieveUpdateDeleteView,
+    LensListCreateView,
+    LensRetrieveUpdateDeleteView,
+    LensPowerListCreateView,
+    LensPowerRetrieveUpdateDeleteView
+    
+)
 # from .views import CustomAuthToken
 
 urlpatterns = [
@@ -27,6 +52,13 @@ urlpatterns = [
     path('frame-stocks/<int:pk>/', FrameStockRetrieveUpdateDeleteView.as_view(), name='frame-stock-detail'),
     path('frames/', FrameListCreateView.as_view(), name='frame-list-create'),
     path('frames/<int:pk>/', FrameRetrieveUpdateDeleteView.as_view(), name='frame-detail'),
+    path('powers/', PowerListCreateView.as_view(), name='power-list-create'),
+    path('powers/<int:pk>/', PowerRetrieveUpdateDeleteView.as_view(), name='power-detail'),
+    path('lenses/', LensListCreateView.as_view(), name='lens-list-create'),
+    path('lenses/<int:pk>/', LensRetrieveUpdateDeleteView.as_view(), name='lens-detail'),
+    path('lens-powers/', LensPowerListCreateView.as_view(), name='lens-power-list-create'),
+    path('lens-powers/<int:pk>/', LensPowerRetrieveUpdateDeleteView.as_view(), name='lens-power-detail'),
+
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

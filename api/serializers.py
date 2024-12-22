@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Branch, Refraction,RefractionDetails,Brand,Color,Code,Frame,FrameStock
+from .models import Branch, Refraction,RefractionDetails,Brand,Color,Code,Frame,FrameStock,LenseType,Coating,Lens,LensStock,Power,LensPower
 
 class BranchSerializer(serializers.ModelSerializer):
     class Meta:
@@ -60,3 +60,33 @@ class FrameStockSerializer(serializers.ModelSerializer):
     class Meta:
         model = FrameStock
         fields = ['id', 'frame', 'qty', 'initial_count']
+        
+class LenseTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LenseType
+        fields = ['id', 'name', 'description']
+        
+class CoatingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Coating
+        fields = ['id', 'name', 'description']
+        
+class LensSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Lens
+        fields = ['id', 'type', 'coating', 'price']
+        
+class LensStockSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LensStock
+        fields = ['id', 'lens', 'initial_count', 'qty']
+        
+class PowerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Power
+        fields = ['id', 'name', 'side']
+        
+class LensPowerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LensPower
+        fields = ['id', 'lens', 'power', 'value', 'side']
