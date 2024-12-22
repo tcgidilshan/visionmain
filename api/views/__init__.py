@@ -10,3 +10,6 @@ from .frame_views import FrameListCreateView,FrameRetrieveUpdateDeleteView
 from .power_views import PowerListCreateView,PowerRetrieveUpdateDeleteView
 from .lens_views import LensListCreateView,LensRetrieveUpdateDeleteView
 from .lens_power_views import LensPowerListCreateView,LensPowerRetrieveUpdateDeleteView
+from .lens_cleaner_views import LensCleanerListCreateView,LensCleanerRetrieveUpdateDeleteView
+from .lens_cleaner_stock_views import LensCleanerStockListCreateView,LensCleanerStockRetrieveUpdateDeleteView
+from .order_views import OrderCreateView

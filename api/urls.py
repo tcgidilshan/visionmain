@@ -24,8 +24,12 @@ from .views import (
     LensListCreateView,
     LensRetrieveUpdateDeleteView,
     LensPowerListCreateView,
-    LensPowerRetrieveUpdateDeleteView
-    
+    LensPowerRetrieveUpdateDeleteView,
+    LensCleanerListCreateView,
+    LensCleanerRetrieveUpdateDeleteView,
+    LensCleanerStockListCreateView,
+    LensCleanerStockRetrieveUpdateDeleteView,
+    OrderCreateView
 )
 # from .views import CustomAuthToken
 
@@ -58,7 +62,11 @@ urlpatterns = [
     path('lenses/<int:pk>/', LensRetrieveUpdateDeleteView.as_view(), name='lens-detail'),
     path('lens-powers/', LensPowerListCreateView.as_view(), name='lens-power-list-create'),
     path('lens-powers/<int:pk>/', LensPowerRetrieveUpdateDeleteView.as_view(), name='lens-power-detail'),
-
+    path('lens-cleaners/', LensCleanerListCreateView.as_view(), name='lens-cleaner-list-create'),
+    path('lens-cleaners/<int:pk>/', LensCleanerRetrieveUpdateDeleteView.as_view(), name='lens-cleaner-detail'),
+    path('lens-cleaner-stocks/', LensCleanerStockListCreateView.as_view(), name='lens-cleaner-stock-list-create'),
+    path('lens-cleaner-stocks/<int:pk>/', LensCleanerStockRetrieveUpdateDeleteView.as_view(), name='lens-cleaner-stock-detail'),
+    path('orders/', OrderCreateView.as_view(), name='order-create'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

@@ -145,7 +145,7 @@ class LensStock(models.Model):
     initial_count = models.IntegerField(null=True, blank=True)  # Allows NULL for optional initial count
     qty = models.IntegerField(default=0)
 
-    def __str__(self):
+    def __str__(self):  
         return f"Lens: {self.lens.id} - Qty: {self.qty}"
     
 class Power(models.Model):
@@ -163,3 +163,72 @@ class LensPower(models.Model):
 
     def __str__(self):
         return f"Lens: {self.lens.id} - Power: {self.value} ({self.side})"
+    
+class LensCleaner(models.Model):
+    name = models.CharField(max_length=255)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return self.name
+    
+class LensCleanerStock(models.Model):
+    lens_cleaner = models.ForeignKey(LensCleaner, related_name='stocks', on_delete=models.CASCADE)
+    initial_count = models.IntegerField(null=True, blank=True)  # Allows NULL for optional initial stock
+    qty = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.lens_cleaner.name} - Qty: {self.qty}"
+    
+class Order(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    customer = models.ForeignKey(Refraction, related_name='orders', on_delete=models.CASCADE)
+    order_date = models.DateTimeField(auto_now_add=True)
+    order_updated_date = models.DateTimeField(auto_now=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    sub_total = models.DecimalField(max_digits=10, decimal_places=2)
+    discount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    total_price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"Order {self.id} - Status: {self.status} - Customer: {self.customer.id}"
+    
+class OrderItem(models.Model):
+    order = models.ForeignKey(Order, related_name='order_items', on_delete=models.CASCADE)
+    lens = models.ForeignKey(Lens, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
+    lens_cleaner = models.ForeignKey(LensCleaner, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
+    frame = models.ForeignKey(Frame, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
+    quantity = models.PositiveIntegerField(default=1)
+    price_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"Order {self.order.id} Item - Subtotal: {self.subtotal}"
+    
+class OrderPayment(models.Model):
+    PAYMENT_METHOD_CHOICES = [
+        ('credit_card', 'Credit Card'),
+        ('cash', 'Cash'),
+        ('online_transfer', 'Online Transfer'),
+    ]
+
+    TRANSACTION_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('success', 'Success'),
+        ('failed', 'Failed'),
+    ]
+
+    order = models.ForeignKey(Order, related_name='payments', on_delete=models.CASCADE)
+    payment_date = models.DateTimeField(auto_now_add=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
+    transaction_status = models.CharField(max_length=20, choices=TRANSACTION_STATUS_CHOICES, default='pending')
+    is_final_payment = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Payment for Order {self.order.id} - Amount: {self.amount}"

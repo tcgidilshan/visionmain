@@ -1,5 +1,25 @@
 from rest_framework import serializers
-from .models import Branch, Refraction,RefractionDetails,Brand,Color,Code,Frame,FrameStock,LenseType,Coating,Lens,LensStock,Power,LensPower
+from .models import (
+    Branch,
+    Refraction,
+    RefractionDetails,
+    Brand,
+    Color,
+    Code,
+    Frame,
+    FrameStock,
+    LenseType,
+    Coating,
+    Lens,
+    LensStock,
+    Power,
+    LensPower,
+    LensCleaner,
+    LensCleanerStock,
+    Order,
+    OrderItem,
+    OrderPayment
+)
 
 class BranchSerializer(serializers.ModelSerializer):
     class Meta:
@@ -90,3 +110,54 @@ class LensPowerSerializer(serializers.ModelSerializer):
     class Meta:
         model = LensPower
         fields = ['id', 'lens', 'power', 'value', 'side']
+        
+class LensCleanerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LensCleaner
+        fields = ['id', 'name', 'price']
+        
+class LensCleanerStockSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LensCleanerStock
+        fields = ['id', 'lens_cleaner', 'initial_count', 'qty']
+        
+class OrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = [
+            'id',
+            'customer',  # References the Refraction table
+            'order_date',
+            'order_updated_date',
+            'status',
+            'sub_total',
+            'discount',
+            'total_price',
+        ]
+        
+class OrderItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderItem
+        fields = [
+            'id',
+            'order',
+            'lens',
+            'lens_cleaner',
+            'frame',
+            'quantity',
+            'price_per_unit',
+            'subtotal',
+        ]
+        
+class OrderPaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderPayment
+        fields = [
+            'id',
+            'order',
+            'payment_date',
+            'amount',
+            'payment_method',
+            'transaction_status',
+            'is_final_payment',
+        ]
