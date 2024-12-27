@@ -47,7 +47,7 @@ class RefractionListAPIView(generics.ListAPIView):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
 
     # Define searchable fields
-    search_fields = ['customer_full_name', 'customer_mobile']
+    search_fields = ['customer_full_name', 'customer_mobile', 'refraction_number']
     ordering_fields = ['refraction_number', 'customer_full_name']
     ordering = ['-refraction_number']  # Default ordering (descending)
     

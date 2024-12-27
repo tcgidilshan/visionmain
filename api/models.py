@@ -188,6 +188,7 @@ class Order(models.Model):
     ]
 
     customer = models.ForeignKey(Refraction, related_name='orders', on_delete=models.CASCADE)
+    refraction = models.ForeignKey(Refraction, null=True, blank=True, on_delete=models.SET_NULL)
     order_date = models.DateTimeField(auto_now_add=True)
     order_updated_date = models.DateTimeField(auto_now=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -207,6 +208,11 @@ class OrderItem(models.Model):
     price_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
 
+    def save(self, *args, **kwargs):
+       # Dynamically calculate subtotal on save
+       self.subtotal = self.quantity * self.price_per_unit
+       super().save(*args, **kwargs)
+
     def __str__(self):
         return f"Order {self.order.id} Item - Subtotal: {self.subtotal}"
     
@@ -223,12 +229,27 @@ class OrderPayment(models.Model):
         ('failed', 'Failed'),
     ]
 
-    order = models.ForeignKey(Order, related_name='payments', on_delete=models.CASCADE)
+    order = models.ForeignKey(Order, related_name='orderpayment_set', on_delete=models.CASCADE)
     payment_date = models.DateTimeField(auto_now_add=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
     transaction_status = models.CharField(max_length=20, choices=TRANSACTION_STATUS_CHOICES, default='pending')
     is_final_payment = models.BooleanField(default=False)
+    is_partial = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Payment for Order {self.order.id} - Amount: {self.amount}"
+    
+class Doctor(models.Model):
+    STATUS_CHOICES = [
+        ('available', 'Available'),
+        ('unavailable', 'Unavailable'),
+    ]
+
+    name = models.CharField(max_length=255)
+    specialization = models.CharField(max_length=255)
+    contact_info = models.CharField(max_length=255, blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available')
+
+    def __str__(self):
+        return f"{self.name} ({self.specialization}) - {self.status}"

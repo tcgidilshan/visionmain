@@ -18,7 +18,8 @@ from .models import (
     LensCleanerStock,
     Order,
     OrderItem,
-    OrderPayment
+    OrderPayment,
+    Doctor
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -119,21 +120,7 @@ class LensCleanerSerializer(serializers.ModelSerializer):
 class LensCleanerStockSerializer(serializers.ModelSerializer):
     class Meta:
         model = LensCleanerStock
-        fields = ['id', 'lens_cleaner', 'initial_count', 'qty']
-        
-class OrderSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Order
-        fields = [
-            'id',
-            'customer',  # References the Refraction table
-            'order_date',
-            'order_updated_date',
-            'status',
-            'sub_total',
-            'discount',
-            'total_price',
-        ]
+        fields = ['id', 'lens_cleaner', 'initial_count', 'qty']       
         
 class OrderItemSerializer(serializers.ModelSerializer):
     class Meta:
@@ -148,6 +135,11 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'price_per_unit',
             'subtotal',
         ]
+
+        def create(self, validated_data):
+        # Calculate the subtotal based on quantity and price per unit
+            validated_data['subtotal'] = validated_data['quantity'] * validated_data['price_per_unit']
+            return super().create(validated_data)
         
 class OrderPaymentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -159,5 +151,30 @@ class OrderPaymentSerializer(serializers.ModelSerializer):
             'amount',
             'payment_method',
             'transaction_status',
+            'is_partial',
             'is_final_payment',
         ]
+
+class OrderSerializer(serializers.ModelSerializer):
+    order_items = OrderItemSerializer(many=True, read_only=True)
+    order_payments = OrderPaymentSerializer(many=True, read_only=True, source='orderpayment_set')
+    refraction = serializers.PrimaryKeyRelatedField(queryset=Refraction.objects.all(), allow_null=True)
+    class Meta:
+        model = Order
+        fields = [
+            'id',
+            'customer',  # References the Refraction table
+            'refraction', # ForeignKey to Refraction
+            'order_date',
+            'order_updated_date',
+            'status',
+            'sub_total',
+            'discount',
+            'total_price',
+            'order_items',
+            'order_payments'
+        ] 
+class DoctorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Doctor
+        fields = ['id', 'name', 'specialization', 'contact_info', 'status']

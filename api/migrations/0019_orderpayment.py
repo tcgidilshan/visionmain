@@ -20,6 +20,7 @@ class Migration(migrations.Migration):
                 ('payment_method', models.CharField(choices=[('credit_card', 'Credit Card'), ('cash', 'Cash'), ('online_transfer', 'Online Transfer')], max_length=20)),
                 ('transaction_status', models.CharField(choices=[('pending', 'Pending'), ('success', 'Success'), ('failed', 'Failed')], default='pending', max_length=20)),
                 ('is_final_payment', models.BooleanField(default=False)),
+                ('is_partial', models.BooleanField(default=False)),
                 ('order', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='payments', to='api.order')),
             ],
         ),

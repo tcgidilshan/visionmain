@@ -13,3 +13,4 @@ from .lens_power_views import LensPowerListCreateView,LensPowerRetrieveUpdateDel
 from .lens_cleaner_views import LensCleanerListCreateView,LensCleanerRetrieveUpdateDeleteView
 from .lens_cleaner_stock_views import LensCleanerStockListCreateView,LensCleanerStockRetrieveUpdateDeleteView
 from .order_views import OrderCreateView
+from .doctor_views import  DoctorListCreateView,DoctorRetrieveUpdateDeleteView

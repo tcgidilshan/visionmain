@@ -15,6 +15,7 @@ class OrderCreateView(APIView):
         try:
             # Step 1: Start transaction
             with transaction.atomic():
+                
                 # Step 2: Validate Stocks
                 order_items_data = request.data.get('order_items', [])
                 if not order_items_data:
@@ -51,14 +52,51 @@ class OrderCreateView(APIView):
                     order_item_serializer.is_valid(raise_exception=True)
                     order_item_serializer.save()
 
-                # Step 5: Create Order Payment
-                payment_data = request.data.get('order_payment')
-                if not payment_data:
-                    raise ValueError("Order payment is required.")
-                payment_data['order'] = order.id
-                order_payment_serializer = OrderPaymentSerializer(data=payment_data)
-                order_payment_serializer.is_valid(raise_exception=True)
-                order_payment_serializer.save()
+                # Step 5: Create Order Payments
+                order_payments_data = request.data.get('order_payments')
+                if not order_payments_data or not isinstance(order_payments_data, list):
+                    raise ValueError("At least one order payment is required.")
+
+                total_payment = 0
+
+                for payment_data in order_payments_data:
+                    # Attach the order ID
+                    payment_data['order'] = order.id
+
+                    # Determine if this payment is partial
+                    if total_payment + payment_data['amount'] < order.total_price:
+                        payment_data['is_partial'] = True
+                    else:
+                        payment_data['is_partial'] = False
+
+                    # Validate and save each payment
+                    order_payment_serializer = OrderPaymentSerializer(data=payment_data)
+                    order_payment_serializer.is_valid(raise_exception=True)
+                    payment_instance = order_payment_serializer.save()  # Save and get the instance
+
+                    # Track the total payment
+                    total_payment += payment_data['amount']
+
+                    # Check if this is the final payment
+                    if total_payment == order.total_price:
+                        payment_instance.is_final_payment = True
+                    else:
+                        payment_instance.is_final_payment = False
+
+                    # Save the final changes to the instance
+                    payment_instance.save()
+
+                # Ensure total payment does not exceed the order total price
+                if total_payment > order.total_price:
+                    raise ValueError("Total payments exceed the order total price.")
+
+                # Refresh the order instance to include related order_payments
+                order.refresh_from_db()
+
+
+                # Ensure total payment does not exceed the order total price
+                if total_payment > order.total_price:
+                    raise ValueError("Total payments exceed the order total price.")
 
                 # Step 6: Adjust Stocks
                 for stock_type, stock, quantity in stock_updates:
@@ -66,11 +104,8 @@ class OrderCreateView(APIView):
                     stock.save()
 
                 # Return successful response
-                return Response({
-                    "order": order_serializer.data,
-                    "order_items": [item for item in order_items_data],
-                    "order_payment": payment_data
-                }, status=status.HTTP_201_CREATED)
+                response_serializer = OrderSerializer(order)
+                return Response(response_serializer.data, status=201)
 
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
