@@ -32,22 +32,38 @@ class RefractionSerializer(serializers.ModelSerializer):
         model = Refraction
         fields = ['id', 'customer_full_name', 'customer_mobile', 'refraction_number']
         read_only_fields = ['refraction_number']  # Auto-generated
-        
+
 class RefractionDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = RefractionDetails
         fields = [
-            'refraction',
-            'hb_rx_right', 'hb_rx_left',
-            'auto_ref', 'ntc', 'va_without_glass',
-            'va_without_ph', 'va_with_glass',
-            'right_eye_dist_sph', 'right_eye_dist_cyl', 'right_eye_dist_axis',
+            'id', 
+            'refraction',  # ForeignKey to Refraction
+            'hb_rx_right_dist', 
+            'hb_rx_left_dist',
+            'hb_rx_right_near',
+            'hb_rx_left_near',
+            'auto_ref_right',
+            'auto_ref_left',
+            'ntc_right',
+            'ntc_left',
+            'va_without_glass_right',
+            'va_without_glass_left',
+            'va_without_ph_right',
+            'va_without_ph_left',
+            'va_with_glass_right',
+            'va_with_glass_left',
+            'right_eye_dist_sph',
+            'right_eye_dist_cyl',
+            'right_eye_dist_axis',
             'right_eye_near_sph',
-            'left_eye_dist_sph', 'left_eye_dist_cyl', 'left_eye_dist_axis',
+            'left_eye_dist_sph',
+            'left_eye_dist_cyl',
+            'left_eye_dist_axis',
             'left_eye_near_sph',
             'remark'
         ]
-        
+  
 class BrandSerializer(serializers.ModelSerializer):
     class Meta:
         model = Brand
