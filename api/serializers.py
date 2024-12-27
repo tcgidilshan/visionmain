@@ -19,7 +19,8 @@ from .models import (
     Order,
     OrderItem,
     OrderPayment,
-    Doctor
+    Doctor,
+    Patient
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -194,3 +195,8 @@ class DoctorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Doctor
         fields = ['id', 'name', 'specialization', 'contact_info', 'status']
+
+class PatientSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Patient
+        fields = ['id', 'name', 'date_of_birth', 'phone_number']

@@ -263,11 +263,19 @@ class Doctor(models.Model):
         ('available', 'Available'),
         ('unavailable', 'Unavailable'),
     ]
-
     name = models.CharField(max_length=255)
     specialization = models.CharField(max_length=255)
     contact_info = models.CharField(max_length=255, blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available')
-
     def __str__(self):
         return f"{self.name} ({self.specialization}) - {self.status}"
+    
+from django.db import models
+
+class Patient(models.Model):
+    name = models.CharField(max_length=50)
+    date_of_birth = models.DateField(null=True, blank=True)
+    phone_number = models.CharField(max_length=15, unique=True)
+
+    def __str__(self):
+        return f"{self.name}"

@@ -31,7 +31,8 @@ from .views import (
     LensCleanerStockRetrieveUpdateDeleteView,
     OrderCreateView,
     DoctorListCreateView,
-    DoctorRetrieveUpdateDeleteView
+    DoctorRetrieveUpdateDeleteView,
+    PatientListView
     
 )
 # from .views import CustomAuthToken
@@ -72,6 +73,7 @@ urlpatterns = [
     path('orders/', OrderCreateView.as_view(), name='order-create'),
     path('doctors/', DoctorListCreateView.as_view(), name='doctor-list-create'),
     path('doctors/<int:pk>/', DoctorRetrieveUpdateDeleteView.as_view(), name='doctor-detail'),
+    path('patients/', PatientListView.as_view(), name='patient-list'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

@@ -25,8 +25,7 @@ SECRET_KEY = 'django-insecure-kcu5_435$20fw^btdzjpe%=h+6ztvlgcq&vk8ddq1ifn7_^le_
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['visionmain-a9804.web.app', '127.0.0.1', 'localhost']
 
 # Application definition
 
