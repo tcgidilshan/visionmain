@@ -3,6 +3,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings
 from rest_framework.authtoken.models import Token as BaseToken
+from django.utils.translation import gettext_lazy as _
 
 class Item(models.Model):
     name = models.CharField(max_length=100)
@@ -264,18 +265,78 @@ class Doctor(models.Model):
         ('unavailable', 'Unavailable'),
     ]
     name = models.CharField(max_length=255)
-    specialization = models.CharField(max_length=255)
     contact_info = models.CharField(max_length=255, blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available')
     def __str__(self):
         return f"{self.name} ({self.specialization}) - {self.status}"
-    
-from django.db import models
 
 class Patient(models.Model):
     name = models.CharField(max_length=50)
     date_of_birth = models.DateField(null=True, blank=True)
     phone_number = models.CharField(max_length=15, unique=True)
+    address = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.name}"
+
+class Schedule(models.Model):
+    class StatusChoices(models.TextChoices):
+        AVAILABLE = 'Available', _('Available')
+        BOOKED = 'Booked', _('Booked')
+        UNAVAILABLE = 'Unavailable', _('Unavailable')
+
+    doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE, related_name='schedules')
+    date = models.DateField()
+    start_time = models.TimeField()
+    status = models.CharField(
+        max_length=20,
+        choices=StatusChoices.choices,
+        default=StatusChoices.AVAILABLE
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.doctor} - {self.date} ({self.start_time}) - {self.status}"
+
+class Appointment(models.Model):
+    class StatusChoices(models.TextChoices):
+        PENDING = 'Pending', _('Pending')
+        CONFIRMED = 'Confirmed', _('Confirmed')
+        COMPLETED = 'Completed', _('Completed')
+        CANCELLED = 'Cancelled', _('Cancelled')
+
+    doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE, related_name='appointments')
+    patient = models.ForeignKey('Patient', on_delete=models.CASCADE, related_name='appointments')
+    schedule = models.ForeignKey('Schedule', on_delete=models.CASCADE, related_name='appointments')
+    date = models.DateField()
+    time = models.TimeField()
+    status = models.CharField(
+        max_length=20,
+        choices=StatusChoices.choices,
+        default=StatusChoices.PENDING
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)  # Amount in LKR
+    channel_no = models.IntegerField(null=True, blank=True) 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Appointment with {self.doctor} for {self.patient} on {self.date} at {self.time}"
+
+class ChannelPayment(models.Model):
+    class PaymentMethods(models.TextChoices):
+        CASH = 'Cash', 'Cash'
+        CARD = 'Card', 'Card'
+
+    appointment = models.ForeignKey('Appointment', on_delete=models.CASCADE, related_name='payments')
+    payment_date = models.DateTimeField(auto_now_add=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_method = models.CharField(max_length=10, choices=PaymentMethods.choices)
+    is_final = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Payment for {self.appointment} - {self.amount} ({self.payment_method})"
+

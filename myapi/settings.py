@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'api',
     'rest_framework.authtoken', 
     'corsheaders',
+    'django_filters',
 ]
 
 REST_FRAMEWORK = {
@@ -49,6 +50,11 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+      'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
 }
 
 
@@ -61,6 +67,13 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware', 
+]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173", 
+    "https://visionmain-a9804.web.app", 
+    "https://visionmain-a9804.firebaseapp.com",
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True

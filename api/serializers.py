@@ -20,7 +20,10 @@ from .models import (
     OrderItem,
     OrderPayment,
     Doctor,
-    Patient
+    Patient,
+    Schedule,
+    Appointment,
+    ChannelPayment
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -199,4 +202,92 @@ class DoctorSerializer(serializers.ModelSerializer):
 class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
-        fields = ['id', 'name', 'date_of_birth', 'phone_number']
+        fields = ['id', 'name', 'date_of_birth', 'phone_number','address']
+
+class ScheduleSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source='doctor.name', read_only=True)  # Include doctor name if needed
+
+    class Meta:
+        model = Schedule
+        fields = [
+            'id',
+            'doctor',  # Doctor ID
+            'doctor_name',  # Doctor Name (Optional, based on `doctor.name`)
+            'date',  # Schedule Date
+            'start_time',  # Start Time
+            'status',  # Schedule Status (e.g., Available, Booked, Unavailable)
+            'created_at',  # Auto-generated creation timestamp
+            'updated_at',  # Auto-generated update timestamp
+        ]
+
+class AppointmentSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source='doctor.name', read_only=True)  # Doctor's name
+    patient_name = serializers.CharField(source='patient.name', read_only=True)  # Patient's name
+    schedule_date = serializers.DateField(source='schedule.date', read_only=True)  # Schedule date
+    schedule_start_time = serializers.TimeField(source='schedule.start_time', read_only=True)  # Schedule start time
+
+    class Meta:
+        model = Appointment
+        fields = [
+            'id',
+            'doctor',  # Doctor ID
+            'doctor_name',  # Doctor's name
+            'patient',  # Patient ID
+            'patient_name',  # Patient's name
+            'schedule',  # Schedule ID
+            'schedule_date',  # Schedule date (from Schedule table)
+            'schedule_start_time',  # Schedule start time (from Schedule table)
+            'date',  # Appointment date
+            'time',  # Appointment time
+            'status',  # Appointment status (Pending, Confirmed, Completed, Cancelled)
+            'amount',  # Channeling fee
+            'channel_no',
+            'created_at',  # Record creation timestamp
+            'updated_at',  # Record update timestamp
+        ]
+
+class ChannelPaymentSerializer(serializers.ModelSerializer):
+    appointment_details = serializers.CharField(source='appointment.id', read_only=True)  # Appointment ID
+    doctor_name = serializers.CharField(source='appointment.doctor.name', read_only=True)  # Doctor's name
+    patient_name = serializers.CharField(source='appointment.patient.name', read_only=True)  # Patient's name
+
+    class Meta:
+        model = ChannelPayment
+        fields = [
+            'id',
+            'appointment',  # Appointment ID
+            'appointment_details',  # Read-only appointment reference
+            'doctor_name',  # Doctor's name (read-only)
+            'patient_name',  # Patient's name (read-only)
+            'payment_date',  # Date and time of payment
+            'amount',  # Payment amount
+            'payment_method',  # Payment method (cash or card)
+            'is_final',  # Whether this is the final payment
+            'created_at',  # Auto-generated timestamp for record creation
+            'updated_at',  # Auto-generated timestamp for record updates
+        ]
+class ChannelListSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source='doctor.name', read_only=True)
+    patient_name = serializers.CharField(source='patient.name', read_only=True)
+    address = serializers.CharField(source='patient.address', read_only=True)
+    contact_number = serializers.CharField(source='patient.phone_number', read_only=True)
+    first_payment = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Appointment
+        fields = [
+            'id',  # Appointment ID (Channel ID)
+            'address',
+            'doctor_name',
+            'contact_number',
+            'patient_name',
+            'channel_no',
+            'first_payment',
+            'date',  # For filtering
+        ]
+
+    def get_first_payment(self, obj):
+        first_payment = obj.payments.first()  # Assuming related_name='payments' for ChannelPayment
+        return first_payment.amount if first_payment else None
+
+
