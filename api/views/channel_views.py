@@ -14,27 +14,38 @@ class ChannelAppointmentView(APIView):
         data = request.data
 
         # Step 1: Validate Input
-        required_fields = ['doctor_id', 'patient_id', 'name', 'address', 'contact_number', 'channel_date', 'time', 'channeling_fee', 'payments']
+        required_fields = ['doctor_id', 'name', 'address', 'contact_number', 'channel_date', 'time', 'channeling_fee', 'payments']
         for field in required_fields:
             if field not in data:
                 return Response({"error": f"{field} is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Step 2: Handle Patient
-            patient, created = Patient.objects.get_or_create(
-                id=data['patient_id'],
-                defaults={
-                    'phone_number': data['contact_number'],
-                    'name': data['name'],
-                    'address': data['address']
-                }
-            )
-
-            if not created:  # Update the existing patient's name and phone number
-                patient.name = data['name']
-                patient.phone_number = data['contact_number']
-                patient.address = data.get('address', patient.address) 
-                patient.save()
+           # Step 2: Handle Patient
+            if 'patient_id' in data and data['patient_id']:  # If patient_id is provided
+                try:
+                    # Attempt to retrieve and update the existing patient
+                    patient = Patient.objects.get(id=data['patient_id'])
+                    patient.name = data['name']
+                    patient.phone_number = data['contact_number']
+                    patient.address = data.get('address', patient.address)
+                    patient.save()
+                    created = False  # Indicate that the patient was not newly created
+                except Patient.DoesNotExist:
+                    # If the provided patient_id does not exist, create a new patient
+                    patient = Patient.objects.create(
+                        id=data['patient_id'],
+                        name=data['name'],
+                        phone_number=data['contact_number'],
+                        address=data.get('address', '')
+                    )
+                    created = True
+            else:  # If patient_id is not provided, create a new patient
+                patient = Patient.objects.create(
+                    name=data['name'],
+                    phone_number=data['contact_number'],
+                    address=data.get('address', '')
+                )
+                created = True
 
             # Step 3: Handle Schedule (Create If Not Exists)
             schedule, created = Schedule.objects.get_or_create(
