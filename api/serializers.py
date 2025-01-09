@@ -197,7 +197,7 @@ class OrderSerializer(serializers.ModelSerializer):
 class DoctorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Doctor
-        fields = ['id', 'name', 'specialization', 'contact_info', 'status']
+        fields = ['id', 'name', 'contact_info', 'status']
 
 class PatientSerializer(serializers.ModelSerializer):
     class Meta:
