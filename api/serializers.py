@@ -117,10 +117,12 @@ class LensSerializer(serializers.ModelSerializer):
         model = Lens
         fields = ['id', 'type', 'coating', 'price']
         
+
 class LensStockSerializer(serializers.ModelSerializer):
     class Meta:
         model = LensStock
-        fields = ['id', 'lens', 'initial_count', 'qty']
+        fields = ['id', 'lens', 'initial_count', 'qty', 'limit', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
         
 class PowerSerializer(serializers.ModelSerializer):
     class Meta:
@@ -303,10 +305,9 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
             'address', 'contact_number', 'schedule', 'date', 'time',
             'status', 'amount', 'channel_no', 'payments'
         ]
-
-class ChannelPaymentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ChannelPayment
-        fields = ['id', 'amount', 'payment_method', 'is_final', 'created_at']
+    def get_payments(self, obj):
+        """Fetch all related payments for this appointment."""
+        payments = ChannelPayment.objects.filter(appointment=obj)  # Related payments
+        return ChannelPaymentSerializer(payments, many=True).data 
 
 

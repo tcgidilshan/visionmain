@@ -163,9 +163,12 @@ class LensStock(models.Model):
     lens = models.ForeignKey(Lens, related_name='stocks', on_delete=models.CASCADE)
     initial_count = models.IntegerField(null=True, blank=True)  # Allows NULL for optional initial count
     qty = models.IntegerField(default=0)
+    limit = models.IntegerField(default=0)  # New column to define stock limit
+    created_at = models.DateTimeField(auto_now_add=True)  # Automatically set on creation
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):  
-        return f"Lens: {self.lens.id} - Qty: {self.qty}"
+        return f"Lens: {self.lens.id} - Qty: {self.qty} - Limit: {self.limit}"
     
 class Power(models.Model):
     name = models.CharField(max_length=255)
@@ -338,5 +341,5 @@ class ChannelPayment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Payment for {self.appointment} - {self.amount} ({self.payment_method})"
+        return f"Payment for {self.appointment.id} - {self.amount} ({self.payment_method})"
 

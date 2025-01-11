@@ -35,7 +35,9 @@ from .views import (
     PatientListView,
     ChannelAppointmentView,
     ChannelListView,
-    AppointmentRetrieveUpdateDeleteView
+    AppointmentRetrieveUpdateDeleteView,
+    LensStockListCreateView,
+    LensStockRetrieveUpdateDeleteView
 )
 # from .views import CustomAuthToken
 
@@ -79,6 +81,8 @@ urlpatterns = [
     path('channel/', ChannelAppointmentView.as_view(), name='channel-appointment'),
     path('channels/', ChannelListView.as_view(), name='channel-list'),
     path('channels/<int:pk>/', AppointmentRetrieveUpdateDeleteView.as_view(), name='appointment-detail'),
+    path('lens-stocks/', LensStockListCreateView.as_view(), name='lens-stock-list-create'),
+    path('lens-stocks/<int:pk>/', LensStockRetrieveUpdateDeleteView.as_view(), name='lens-stock-detail'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 
