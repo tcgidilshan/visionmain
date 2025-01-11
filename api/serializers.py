@@ -289,5 +289,24 @@ class ChannelListSerializer(serializers.ModelSerializer):
     def get_first_payment(self, obj):
         first_payment = obj.payments.first()  # Assuming related_name='payments' for ChannelPayment
         return first_payment.amount if first_payment else None
+class AppointmentDetailSerializer(serializers.ModelSerializer):
+    payments = serializers.SerializerMethodField()  # Custom field for payments
+    doctor_name = serializers.CharField(source='doctor.name', read_only=True)
+    patient_name = serializers.CharField(source='patient.name', read_only=True)
+    address = serializers.CharField(source='patient.address', read_only=True)
+    contact_number = serializers.CharField(source='patient.phone_number', read_only=True)
+
+    class Meta:
+        model = Appointment
+        fields = [
+            'id', 'doctor', 'doctor_name', 'patient', 'patient_name',
+            'address', 'contact_number', 'schedule', 'date', 'time',
+            'status', 'amount', 'channel_no', 'payments'
+        ]
+
+class ChannelPaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ChannelPayment
+        fields = ['id', 'amount', 'payment_method', 'is_final', 'created_at']
 
 

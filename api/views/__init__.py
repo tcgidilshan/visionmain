@@ -15,4 +15,4 @@ from .lens_cleaner_stock_views import LensCleanerStockListCreateView,LensCleaner
 from .order_views import OrderCreateView
 from .doctor_views import  DoctorListCreateView,DoctorRetrieveUpdateDeleteView
 from .patient_views import PatientListView
-from .channel_views import ChannelAppointmentView,ChannelListView
+from .channel_views import ChannelAppointmentView,ChannelListView,AppointmentRetrieveUpdateDeleteView

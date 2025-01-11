@@ -1,9 +1,9 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status,generics
 from django.db import transaction
 from ..models import Doctor, Patient, Schedule, Appointment, ChannelPayment
-from ..serializers import PatientSerializer, ScheduleSerializer, AppointmentSerializer, ChannelPaymentSerializer,ChannelListSerializer
+from ..serializers import PatientSerializer, ScheduleSerializer, AppointmentSerializer, ChannelPaymentSerializer,ChannelListSerializer,AppointmentDetailSerializer
 from rest_framework.generics import ListAPIView
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
@@ -129,3 +129,28 @@ class ChannelListView(ListAPIView):
 
         # Add custom filtering logic if necessary
         return queryset
+    
+class AppointmentRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Appointment.objects.select_related('doctor', 'patient', 'schedule').prefetch_related('payments')  # Use the correct related_name
+    serializer_class = AppointmentDetailSerializer
+
+    def put(self, request, *args, **kwargs):
+        """Handle appointment update"""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+
+        # Update the appointment
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response(serializer.data)
+    def perform_update(self, serializer):
+        """Perform the update and ensure `updated_at` is saved."""
+        serializer.save()
+
+    def delete(self, request, *args, **kwargs):
+        """Handle appointment delete"""
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response({"message": "Appointment deleted successfully"}, status=status.HTTP_204_NO_CONTENT)

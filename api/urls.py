@@ -34,7 +34,8 @@ from .views import (
     DoctorRetrieveUpdateDeleteView,
     PatientListView,
     ChannelAppointmentView,
-    ChannelListView
+    ChannelListView,
+    AppointmentRetrieveUpdateDeleteView
 )
 # from .views import CustomAuthToken
 
@@ -77,6 +78,7 @@ urlpatterns = [
     path('patients/', PatientListView.as_view(), name='patient-list'),
     path('channel/', ChannelAppointmentView.as_view(), name='channel-appointment'),
     path('channels/', ChannelListView.as_view(), name='channel-list'),
+    path('channels/<int:pk>/', AppointmentRetrieveUpdateDeleteView.as_view(), name='appointment-detail'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 
