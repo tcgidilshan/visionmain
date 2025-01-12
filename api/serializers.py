@@ -119,10 +119,18 @@ class LensSerializer(serializers.ModelSerializer):
         
 
 class LensStockSerializer(serializers.ModelSerializer):
+    lens_type = serializers.CharField(source='lens.type.name', read_only=True)  # Assuming Lens has a type field
+    coating = serializers.CharField(source='lens.coating.name', read_only=True)  # Assuming Lens has a coating field
+    powers = serializers.SerializerMethodField()
     class Meta:
         model = LensStock
-        fields = ['id', 'lens', 'initial_count', 'qty', 'limit', 'created_at', 'updated_at']
+        fields = ['id', 'lens', 'lens_type','coating', 'initial_count', 'qty', 'limit', 'powers', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
+
+    def get_powers(self, obj):
+        """Fetch related powers for the lens."""
+        powers = LensPower.objects.filter(lens=obj.lens)  # Assuming LensPower is related to Lens
+        return LensPowerSerializer(powers, many=True).data
         
 class PowerSerializer(serializers.ModelSerializer):
     class Meta:

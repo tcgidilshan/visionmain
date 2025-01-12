@@ -11,10 +11,9 @@ class LensStockListCreateView(APIView):
 
     def get(self, request):
         """
-        Get a list of all LensStock.
-        Filters can be added if necessary.
+        Get a list of all LensStock with related details.
         """
-        lens_stocks = LensStock.objects.select_related('lens').all()
+        lens_stocks = LensStock.objects.select_related('lens__type', 'lens__coating').all()  # Optimize related queries
         serializer = LensStockSerializer(lens_stocks, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
