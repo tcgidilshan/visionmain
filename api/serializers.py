@@ -116,10 +116,15 @@ class CoatingSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'description']
         
 class LensSerializer(serializers.ModelSerializer):
-    brand = serializers.CharField(source='brand.name', read_only=True)  
+    brand = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all())  
     class Meta:
         model = Lens
         fields = ['id', 'type', 'coating', 'price','brand']
+
+    def validate(self, data):
+        if 'brand' not in data:
+            raise serializers.ValidationError("Brand is required.")
+        return data
         
 
 class LensStockSerializer(serializers.ModelSerializer):
