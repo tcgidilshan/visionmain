@@ -4,6 +4,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from ..models import Order, OrderItem, OrderPayment, LensStock, LensCleanerStock, FrameStock
 from ..serializers import OrderSerializer, OrderItemSerializer, OrderPaymentSerializer
+from ..services.order_payment_service import OrderPaymentService
+from ..services.stock_validation_service import StockValidationService
+from ..services.order_service import OrderService
 
 class OrderCreateView(APIView):
 
@@ -16,83 +19,20 @@ class OrderCreateView(APIView):
             # Step 1: Start transaction
             with transaction.atomic():
                 
-                # Step 2: Validate Stocks
+               # Step 1: Validate Stocks Using Service
                 order_items_data = request.data.get('order_items', [])
-                if not order_items_data:
-                    raise ValueError("Order items are required.")
+                stock_updates = StockValidationService.validate_stocks(order_items_data)
 
-                stock_updates = []  # Prepare stock updates
-                for item_data in order_items_data:
-                    if item_data.get('lens'):
-                        stock = LensStock.objects.select_for_update().get(lens__id=item_data['lens'])
-                        if stock.qty < item_data['quantity']:
-                            raise ValueError(f"Insufficient stock for Lens ID {item_data['lens']}.")
-                        stock_updates.append(('lens', stock, item_data['quantity']))
-                    elif item_data.get('lens_cleaner'):
-                        stock = LensCleanerStock.objects.select_for_update().get(lens_cleaner_id=item_data['lens_cleaner'])
-                        if stock.qty < item_data['quantity']:
-                            raise ValueError(f"Insufficient stock for Lens Cleaner ID {item_data['lens_cleaner']}.")
-                        stock_updates.append(('lens_cleaner', stock, item_data['quantity']))
-                    elif item_data.get('frame'):
-                        stock = FrameStock.objects.select_for_update().get(frame_id=item_data['frame'])
-                        if stock.qty < item_data['quantity']:
-                            raise ValueError(f"Insufficient stock for Frame ID {item_data['frame']}.")
-                        stock_updates.append(('frame', stock, item_data['quantity']))
-
-                # Step 3: Create Order
+                # Step 2: Create Order and Order Items Using Service
                 order_data = request.data.get('order')
-                order_serializer = OrderSerializer(data=order_data)
-                order_serializer.is_valid(raise_exception=True)
-                order = order_serializer.save()
-
-                # Step 4: Create Order Items
-                for item_data in order_items_data:
-                    item_data['order'] = order.id
-                    order_item_serializer = OrderItemSerializer(data=item_data)
-                    order_item_serializer.is_valid(raise_exception=True)
-                    order_item_serializer.save()
+                order = OrderService.create_order(order_data, order_items_data)
 
                 # Step 5: Create Order Payments
-                order_payments_data = request.data.get('order_payments')
-                if not order_payments_data or not isinstance(order_payments_data, list):
+                payments_data = request.data.get('order_payments', [])
+                if not payments_data:
                     raise ValueError("At least one order payment is required.")
 
-                total_payment = 0
-
-                for payment_data in order_payments_data:
-                    # Attach the order ID
-                    payment_data['order'] = order.id
-
-                    # Determine if this payment is partial
-                    if total_payment + payment_data['amount'] < order.total_price:
-                        payment_data['is_partial'] = True
-                    else:
-                        payment_data['is_partial'] = False
-
-                    # Validate and save each payment
-                    order_payment_serializer = OrderPaymentSerializer(data=payment_data)
-                    order_payment_serializer.is_valid(raise_exception=True)
-                    payment_instance = order_payment_serializer.save()  # Save and get the instance
-
-                    # Track the total payment
-                    total_payment += payment_data['amount']
-
-                    # Check if this is the final payment
-                    if total_payment == order.total_price:
-                        payment_instance.is_final_payment = True
-                    else:
-                        payment_instance.is_final_payment = False
-
-                    # Save the final changes to the instance
-                    payment_instance.save()
-
-                # Ensure total payment does not exceed the order total price
-                if total_payment > order.total_price:
-                    raise ValueError("Total payments exceed the order total price.")
-
-                # Refresh the order instance to include related order_payments
-                order.refresh_from_db()
-
+                total_payment = OrderPaymentService.process_payments(order, payments_data)
 
                 # Ensure total payment does not exceed the order total price
                 if total_payment > order.total_price:

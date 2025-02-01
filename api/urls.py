@@ -41,7 +41,8 @@ from .views import (
     LensTypeListCreateView,
     LensTypeRetrieveUpdateDeleteView,
     LensCoatingListCreateView,
-    LensCoatingRetrieveUpdateDeleteView
+    LensCoatingRetrieveUpdateDeleteView,
+    ManualOrderCreateView
 )
 # from .views import CustomAuthToken
 
@@ -79,6 +80,7 @@ urlpatterns = [
     path('lens-cleaner-stocks/', LensCleanerStockListCreateView.as_view(), name='lens-cleaner-stock-list-create'),
     path('lens-cleaner-stocks/<int:pk>/', LensCleanerStockRetrieveUpdateDeleteView.as_view(), name='lens-cleaner-stock-detail'),
     path('orders/', OrderCreateView.as_view(), name='order-create'),
+    path("manual-orders/", ManualOrderCreateView.as_view(), name="manual-order-create"),
     path('doctors/', DoctorListCreateView.as_view(), name='doctor-list-create'),
     path('doctors/<int:pk>/', DoctorRetrieveUpdateDeleteView.as_view(), name='doctor-detail'),
     path('patients/', PatientListView.as_view(), name='patient-list'),
@@ -91,6 +93,7 @@ urlpatterns = [
     path('lens-types/<int:pk>/', LensTypeRetrieveUpdateDeleteView.as_view(), name='lens-type-detail'),
     path('lens-coatings/', LensCoatingListCreateView.as_view(), name='lens-coating-list-create'),
     path('lens-coatings/<int:pk>/', LensCoatingRetrieveUpdateDeleteView.as_view(), name='lens-coating-detail'),
+
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

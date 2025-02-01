@@ -2,6 +2,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from ..models import RefractionDetails
 from ..serializers import RefractionDetailsSerializer
+from ..services.refraction_details_service import RefractionDetailsService
 
 
 class RefractionDetailCreateAPIView(generics.CreateAPIView):
@@ -14,15 +15,10 @@ class RefractionDetailCreateAPIView(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         """
-        Override create to handle any specific logic or responses.
+        Override create to use the service for creating refraction details.
         """
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        refraction_details = RefractionDetailsService.create_refraction_details(request.data)
 
-        # Save the validated data
-        refraction_details = serializer.save()
-
-        # Return a custom success response
         return Response(
             {
                 "message": "Refraction details created successfully.",

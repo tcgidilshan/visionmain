@@ -19,3 +19,4 @@ from .channel_views import ChannelAppointmentView,ChannelListView,AppointmentRet
 from .lens_stock_views import LensStockListCreateView,LensStockRetrieveUpdateDeleteView
 from .lens_type_views import LensTypeListCreateView,LensTypeRetrieveUpdateDeleteView
 from .lens_coating_views import LensCoatingListCreateView,LensCoatingRetrieveUpdateDeleteView
+from .manual_order_views import ManualOrderCreateView

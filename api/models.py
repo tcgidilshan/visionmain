@@ -47,11 +47,24 @@ class Refraction(models.Model):
     def __str__(self):
         return f"{self.customer_full_name} - {self.refraction_number}"
     
+class Patient(models.Model):
+    name = models.CharField(max_length=50)
+    date_of_birth = models.DateField(null=True, blank=True)
+    phone_number = models.CharField(max_length=15, unique=True)
+    address = models.TextField(null=True, blank=True)
+    nic = models.CharField(max_length=15, unique=True, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.name}"
+    
 class RefractionDetails(models.Model):
     refraction = models.OneToOneField(
-        Refraction, on_delete=models.CASCADE, related_name="details"
+        Refraction, on_delete=models.CASCADE, related_name="refraction_details",blank=True, null=True
     )
-    
+    patient = models.ForeignKey(
+        Patient, on_delete=models.CASCADE, related_name="refraction_details", blank=True, null=True
+    )
+    is_manual = models.BooleanField(default=False) 
     # Hb Rx
     hb_rx_right_dist = models.CharField(max_length=10, blank=True, null=True)  # Right Eye Hb Rx Dist
     hb_rx_left_dist = models.CharField(max_length=10, blank=True, null=True)   # Left Eye Hb Rx Dist
@@ -93,7 +106,14 @@ class RefractionDetails(models.Model):
     remark = models.CharField(max_length=20, blank=True, null=True)
 
     def __str__(self):
-        return f"Details for {self.refraction.customer_full_name}"
+        if self.is_manual:
+            return f"Manual Refraction Details - ID {self.id}"
+        
+        if self.refraction:
+            return f"Details for {self.refraction.customer_full_name}"
+        
+        return f"Details for Refraction {self.refraction.id if self.refraction else 'N/A'}"
+
 
 #brands
 class Brand(models.Model):
@@ -133,6 +153,7 @@ class FrameStock(models.Model):
     frame = models.ForeignKey(Frame, related_name='stocks', on_delete=models.CASCADE)
     qty = models.IntegerField(default=0)
     initial_count = models.IntegerField(null=True, blank=True)
+    limit = models.IntegerField(default=0) 
 
     def __str__(self):
         return f"Frame: {self.frame.id} - Qty: {self.qty}"
@@ -154,6 +175,7 @@ class Coating(models.Model):
 class Lens(models.Model):
     type = models.ForeignKey(LenseType, related_name='lenses', on_delete=models.CASCADE)
     coating = models.ForeignKey(Coating, related_name='lenses', on_delete=models.CASCADE)
+    brand = models.ForeignKey(Brand, related_name='lenses', on_delete=models.CASCADE)
     price = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self):
@@ -172,16 +194,24 @@ class LensStock(models.Model):
     
 class Power(models.Model):
     name = models.CharField(max_length=255)
-    side = models.CharField(max_length=10, choices=[('left', 'Left'), ('right', 'Right')])
 
     def __str__(self):
-        return f"{self.name} ({self.side})"
+        return f"{self.name}"
     
 class LensPower(models.Model):
+    SIDE_CHOICES = [
+        ('left', 'Left'),
+        ('right', 'Right'),
+    ]
     lens = models.ForeignKey(Lens, related_name='lens_powers', on_delete=models.CASCADE)
     power = models.ForeignKey('Power', related_name='lens_powers', on_delete=models.CASCADE)  # Assuming Power table exists
     value = models.DecimalField(max_digits=5, decimal_places=2)
-    side = models.CharField(max_length=10, choices=[('left', 'Left'), ('right', 'Right')])
+    side = models.CharField(
+        max_length=10,
+        choices=SIDE_CHOICES,
+        null=True, 
+        blank=True 
+    )
 
     def __str__(self):
         return f"Lens: {self.lens.id} - Power: {self.value} ({self.side})"
@@ -209,7 +239,7 @@ class Order(models.Model):
         ('cancelled', 'Cancelled'),
     ]
 
-    customer = models.ForeignKey(Refraction, related_name='orders', on_delete=models.CASCADE)
+    customer = models.ForeignKey(Patient, related_name='orders', on_delete=models.CASCADE)
     refraction = models.ForeignKey(Refraction, null=True, blank=True, on_delete=models.SET_NULL)
     order_date = models.DateTimeField(auto_now_add=True)
     order_updated_date = models.DateTimeField(auto_now=True)
@@ -217,6 +247,8 @@ class Order(models.Model):
     sub_total = models.DecimalField(max_digits=10, decimal_places=2)
     discount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
+    sales_staff_code = models.ForeignKey(CustomUser,related_name='orders',on_delete=models.CASCADE, null=True, blank=True)
+    remark = models.TextField(null=True, blank=True)  # New field
 
     def __str__(self):
         return f"Order {self.id} - Status: {self.status} - Customer: {self.customer.id}"
@@ -272,15 +304,6 @@ class Doctor(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available')
     def __str__(self):
         return f"{self.name} ({self.specialization}) - {self.status}"
-
-class Patient(models.Model):
-    name = models.CharField(max_length=50)
-    date_of_birth = models.DateField(null=True, blank=True)
-    phone_number = models.CharField(max_length=15, unique=True)
-    address = models.TextField(null=True, blank=True)
-
-    def __str__(self):
-        return f"{self.name}"
 
 class Schedule(models.Model):
     class StatusChoices(models.TextChoices):

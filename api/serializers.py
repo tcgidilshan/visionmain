@@ -23,7 +23,8 @@ from .models import (
     Patient,
     Schedule,
     Appointment,
-    ChannelPayment
+    ChannelPayment,
+    CustomUser
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -43,6 +44,7 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
         fields = [
             'id', 
             'refraction',  # ForeignKey to Refraction
+            'patient',  # ForeignKey to patient
             'hb_rx_right_dist', 
             'hb_rx_left_dist',
             'hb_rx_right_near',
@@ -65,7 +67,8 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'left_eye_dist_cyl',
             'left_eye_dist_axis',
             'left_eye_near_sph',
-            'remark'
+            'remark',
+            'is_manual'
         ]
   
 class BrandSerializer(serializers.ModelSerializer):
@@ -100,7 +103,7 @@ class FrameSerializer(serializers.ModelSerializer):
 class FrameStockSerializer(serializers.ModelSerializer):
     class Meta:
         model = FrameStock
-        fields = ['id', 'frame', 'qty', 'initial_count']
+        fields = ['id', 'frame', 'qty', 'initial_count','limit']
         
 class LenseTypeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -113,9 +116,10 @@ class CoatingSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'description']
         
 class LensSerializer(serializers.ModelSerializer):
+    brand = serializers.CharField(source='brand.name', read_only=True)  
     class Meta:
         model = Lens
-        fields = ['id', 'type', 'coating', 'price']
+        fields = ['id', 'type', 'coating', 'price','brand']
         
 
 class LensStockSerializer(serializers.ModelSerializer):
@@ -135,9 +139,14 @@ class LensStockSerializer(serializers.ModelSerializer):
 class PowerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Power
-        fields = ['id', 'name', 'side']
+        fields = ['id', 'name']
         
 class LensPowerSerializer(serializers.ModelSerializer):
+    side = serializers.ChoiceField(
+        choices=[('left', 'Left'), ('right', 'Right')],
+        allow_null=True,  # ✅ Allows NULL values in the API
+        required=False  # ✅ Makes the field optional in requests
+    )
     class Meta:
         model = LensPower
         fields = ['id', 'lens', 'power', 'value', 'side']
@@ -188,7 +197,8 @@ class OrderPaymentSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     order_items = OrderItemSerializer(many=True, read_only=True)
     order_payments = OrderPaymentSerializer(many=True, read_only=True, source='orderpayment_set')
-    refraction = serializers.PrimaryKeyRelatedField(queryset=Refraction.objects.all(), allow_null=True)
+    refraction = serializers.PrimaryKeyRelatedField(queryset=Refraction.objects.all(), allow_null=True, required=False) 
+    sales_staff_code = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all(), allow_null=True, required=False)
     class Meta:
         model = Order
         fields = [
@@ -202,7 +212,9 @@ class OrderSerializer(serializers.ModelSerializer):
             'discount',
             'total_price',
             'order_items',
-            'order_payments'
+            'order_payments',
+            'sales_staff_code',
+            'remark'
         ] 
 class DoctorSerializer(serializers.ModelSerializer):
     class Meta:
@@ -212,7 +224,7 @@ class DoctorSerializer(serializers.ModelSerializer):
 class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
-        fields = ['id', 'name', 'date_of_birth', 'phone_number','address']
+        fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic']
 
 class ScheduleSerializer(serializers.ModelSerializer):
     doctor_name = serializers.CharField(source='doctor.name', read_only=True)  # Include doctor name if needed
