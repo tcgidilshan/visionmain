@@ -18,7 +18,8 @@ class PatientService:
                 "name": patient_data.get("name"),
                 "phone_number": patient_data.get("phone_number"),
                 "address": patient_data.get("address"),
-                "date_of_birth": patient_data.get("dob"),
+                "date_of_birth": patient_data.get("date_of_birth"),
+                "refraction_id": patient_data.get("refraction_id")
             },
         )
 
@@ -26,7 +27,12 @@ class PatientService:
             patient.name = patient_data.get("name", patient.name)
             patient.phone_number = patient_data.get("phone_number", patient.phone_number)
             patient.address = patient_data.get("address", patient.address)
-            patient.dob = patient_data.get("dob", patient.dob)
+            patient.date_of_birth = patient_data.get("date_of_birth", patient.date_of_birth)
+
+             # ✅ Update `refraction_id` only if provided
+            if "refraction_id" in patient_data:
+                patient.refraction_id = patient_data["refraction_id"]
+                
             patient.save()
 
         return patient

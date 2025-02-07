@@ -24,7 +24,8 @@ from .models import (
     Schedule,
     Appointment,
     ChannelPayment,
-    CustomUser
+    CustomUser,
+    Invoice
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -87,13 +88,17 @@ class CodeSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'brand']
         
 class FrameSerializer(serializers.ModelSerializer):
+    brand_name = serializers.CharField(source='brand.name', read_only=True)  # ✅ Get brand name
+    code_name = serializers.CharField(source='code.name', read_only=True)    # ✅ Get code name
+    color_name = serializers.CharField(source='color.name', read_only=True)  # ✅ Get color name
+
     class Meta:
         model = Frame
         fields = [
             'id',
-            'brand',
-            'code',
-            'color',
+            'brand', 'brand_name',  
+            'code', 'code_name',   
+            'color', 'color_name',  
             'price',
             'size',
             'species',
@@ -221,16 +226,40 @@ class OrderSerializer(serializers.ModelSerializer):
             'sales_staff_code',
             'remark'
         ] 
-class DoctorSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Doctor
-        fields = ['id', 'name', 'contact_info', 'status']
 
 class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
-        fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic']
+        fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic','refraction_id']
 
+class InvoiceSerializer(serializers.ModelSerializer):
+    customer = serializers.PrimaryKeyRelatedField(source='order.customer', read_only=True)  # ✅ Fetch customer ID
+    customer_details = PatientSerializer(source='order.customer', read_only=True)  # ✅ Full customer details
+    refraction_details = RefractionSerializer(source='order.refraction', read_only=True)  # ✅ Refraction details (if exists)
+    order_details = OrderSerializer(source='order', read_only=True)  # ✅ Full order details
+    order_items = OrderItemSerializer(source='order.order_items', many=True, read_only=True)  # ✅ Fetch order items
+    order_payments = OrderPaymentSerializer(source='order.orderpayment_set', many=True, read_only=True)  # ✅ Fetch order payments
+
+    class Meta:
+        model = Invoice
+        fields = [
+            'id',
+            'order',       # Order ID (ForeignKey)
+            'customer',    # ✅ Customer ID (from Order)
+            'customer_details',  # ✅ Full customer details
+            'refraction_details',  # ✅ Full refraction details (if available)
+            'invoice_type',  # "factory" or "manual"
+            'daily_invoice_no',  # Unique daily number for factory invoices
+            'invoice_date',
+            'order_details',  # ✅ Full order details (optional)
+            'order_items',  # ✅ All order items
+            'order_payments'  # ✅ All order payments
+        ]
+
+class DoctorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Doctor
+        fields = ['id', 'name', 'contact_info', 'status']
 class ScheduleSerializer(serializers.ModelSerializer):
     doctor_name = serializers.CharField(source='doctor.name', read_only=True)  # Include doctor name if needed
 

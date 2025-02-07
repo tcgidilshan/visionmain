@@ -53,6 +53,9 @@ class Patient(models.Model):
     phone_number = models.CharField(max_length=15, unique=True)
     address = models.TextField(null=True, blank=True)
     nic = models.CharField(max_length=15, unique=True, null=True, blank=True)
+    refraction = models.ForeignKey(
+        Refraction, null=True, blank=True, on_delete=models.SET_NULL, related_name="patients"
+    )  # ✅ Added refraction_id (nullable)
 
     def __str__(self):
         return f"{self.name}"
@@ -252,6 +255,34 @@ class Order(models.Model):
 
     def __str__(self):
         return f"Order {self.id} - Status: {self.status} - Customer: {self.customer.id}"
+    
+class Invoice(models.Model):
+    INVOICE_TYPES = [
+        ('factory', 'Factory Invoice'),  # Linked to an order with refraction
+        ('manual', 'Manual Invoice')  # Linked to an order without refraction
+    ]
+
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="invoice")
+    invoice_type = models.CharField(max_length=10, choices=INVOICE_TYPES)  # ✅ Identifies invoice type
+    daily_invoice_no = models.IntegerField(null=True, blank=True)  # ✅ Factory invoices get a daily number
+    invoice_date = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['invoice_date', 'daily_invoice_no']  # Ensures daily numbering uniqueness
+
+    def save(self, *args, **kwargs):
+        """ Auto-generate `daily_invoice_no` for factory invoices per day """
+        if self.invoice_type == 'factory' and not self.daily_invoice_no:
+            today_count = Invoice.objects.filter(
+                invoice_type='factory',
+                invoice_date__date=self.invoice_date.date()
+            ).count()
+            self.daily_invoice_no = today_count + 1  # Start from 1 each day
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Invoice {self.id} - {self.invoice_type} - Order {self.order.id}"
+
     
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name='order_items', on_delete=models.CASCADE)

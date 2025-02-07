@@ -42,7 +42,8 @@ from .views import (
     LensTypeRetrieveUpdateDeleteView,
     LensCoatingListCreateView,
     LensCoatingRetrieveUpdateDeleteView,
-    ManualOrderCreateView
+    ManualOrderCreateView,
+    InvoiceDetailView
 )
 # from .views import CustomAuthToken
 
@@ -81,6 +82,7 @@ urlpatterns = [
     path('lens-cleaner-stocks/<int:pk>/', LensCleanerStockRetrieveUpdateDeleteView.as_view(), name='lens-cleaner-stock-detail'),
     path('orders/', OrderCreateView.as_view(), name='order-create'),
     path("manual-orders/", ManualOrderCreateView.as_view(), name="manual-order-create"),
+    path('invoices/<int:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'), #invoice
     path('doctors/', DoctorListCreateView.as_view(), name='doctor-list-create'),
     path('doctors/<int:pk>/', DoctorRetrieveUpdateDeleteView.as_view(), name='doctor-detail'),
     path('patients/', PatientListView.as_view(), name='patient-list'),
