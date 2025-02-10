@@ -120,10 +120,15 @@ class RefractionDetails(models.Model):
 
 #brands
 class Brand(models.Model):
+    BRAND_TYPES = [
+        ('frame', 'Frame Brand'),
+        ('lens', 'Lens Brand'),
+        ('both', 'Both Frame & Lens')
+    ]
     name = models.CharField(max_length=255, unique=True)
-
+    brand_type = models.CharField(max_length=10, choices=BRAND_TYPES, default='both')
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.get_brand_type_display()})"
     
 #color    
 class Color(models.Model):

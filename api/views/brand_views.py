@@ -4,58 +4,44 @@ from rest_framework.views import APIView
 from ..models import Brand
 from ..serializers import BrandSerializer
 
-# List and Create
+# ✅ List and Create Brands with Filtering
 class BrandListCreateView(generics.ListCreateAPIView):
-    queryset = Brand.objects.all()
+    """
+    API to list and create brands.
+    Supports filtering by brand_type (?brand_type=frame/lens/both).
+    """
     serializer_class = BrandSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def list(self, request, *args, **kwargs):
+    def get_queryset(self):
         """
-        Override list to add custom behavior if needed.
+        Filter brands by type if provided in query parameters.
         """
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        queryset = Brand.objects.all()
+        brand_type = self.request.query_params.get("brand_type", None)
 
-    def create(self, request, *args, **kwargs):
-        """
-        Override create to handle additional logic if needed.
-        """
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        if brand_type in ["frame", "lens", "both"]:  # ✅ Apply filtering
+            queryset = queryset.filter(brand_type=brand_type)
 
-# Retrieve, Update, Delete
+        return queryset
+
+
+# ✅ Retrieve, Update, and Delete a Brand
 class BrandRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    API to retrieve, update, or delete a brand.
+    """
     queryset = Brand.objects.all()
     serializer_class = BrandSerializer
     permission_classes = [permissions.IsAuthenticated]
-
-    def retrieve(self, request, *args, **kwargs):
-        """
-        Retrieve a single brand.
-        """
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data)
 
     def update(self, request, *args, **kwargs):
         """
-        Update an existing brand.
+        Update an existing brand (supports partial updates).
         """
-        partial = kwargs.pop('partial', False)
+        partial = kwargs.pop('partial', False)  # ✅ Allows PATCH requests
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         return Response(serializer.data)
-
-    def destroy(self, request, *args, **kwargs):
-        """
-        Delete a brand.
-        """
-        instance = self.get_object()
-        self.perform_destroy(instance)
-        return Response(status=status.HTTP_204_NO_CONTENT)

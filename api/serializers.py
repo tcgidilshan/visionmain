@@ -75,7 +75,7 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
 class BrandSerializer(serializers.ModelSerializer):
     class Meta:
         model = Brand
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'brand_type'] 
 
 class ColorSerializer(serializers.ModelSerializer):
     class Meta:
