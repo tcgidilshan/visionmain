@@ -1,7 +1,7 @@
 from .branch_views import BranchListCreateAPIView, BranchRetrieveUpdateDestroyAPIView
 from .auth_views import LoginView, AdminOnlyView, SuperAdminOnlyView, UserRegistrationView, AdminRegistrationView, IsAdminOrSuperAdmin, IsSuperAdmin, AdminRegistrationView
 from .refraction_views import RefractionCreateAPIView, RefractionListAPIView, RefractionUpdateAPIView, RefractionDeleteAPIView
-from .refraction_detail_views import RefractionDetailCreateAPIView
+from .refraction_detail_views import RefractionDetailCreateAPIView,RefractionDetailRetrieveUpdateDeleteView
 from .brand_views import BrandListCreateView,BrandRetrieveUpdateDeleteView
 from .color_views import ColorListCreateView,ColorRetrieveUpdateDeleteView
 from .code_views import CodeListCreateView,CodeRetrieveUpdateDeleteView
@@ -21,3 +21,4 @@ from .lens_type_views import LensTypeListCreateView,LensTypeRetrieveUpdateDelete
 from .lens_coating_views import LensCoatingListCreateView,LensCoatingRetrieveUpdateDeleteView
 from .manual_order_views import ManualOrderCreateView
 from .Invoice_detail_view import InvoiceDetailView
+from .order_update_view import OrderUpdateView

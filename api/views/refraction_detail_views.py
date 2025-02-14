@@ -26,3 +26,57 @@ class RefractionDetailCreateAPIView(generics.CreateAPIView):
             },
             status=status.HTTP_201_CREATED
         )
+    
+class RefractionDetailRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    API View to Retrieve, Update, and Delete RefractionDetails by refraction ID.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, refraction_id):
+        """
+        Retrieve RefractionDetails by refraction_id.
+        """
+        try:
+            refraction_details = RefractionDetails.objects.get(refraction_id=refraction_id)
+            serializer = RefractionDetailsSerializer(refraction_details)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except RefractionDetails.DoesNotExist:
+            return Response({"error": "Refraction details not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    def put(self, request, refraction_id):
+        """
+        Update RefractionDetails.
+        """
+        try:
+            refraction_details = RefractionDetails.objects.get(refraction_id=refraction_id)
+            serializer = RefractionDetailsSerializer(refraction_details, data=request.data, partial=False)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except RefractionDetails.DoesNotExist:
+            return Response({"error": "Refraction details not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    def patch(self, request, refraction_id):
+        """
+        Partially update RefractionDetails.
+        """
+        try:
+            refraction_details = RefractionDetails.objects.get(refraction_id=refraction_id)
+            serializer = RefractionDetailsSerializer(refraction_details, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except RefractionDetails.DoesNotExist:
+            return Response({"error": "Refraction details not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, refraction_id):
+        """
+        Delete RefractionDetails.
+        """
+        try:
+            refraction_details = RefractionDetails.objects.get(refraction_id=refraction_id)
+            refraction_details.delete()
+            return Response({"message": "Refraction details deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+        except RefractionDetails.DoesNotExist:
+            return Response({"error": "Refraction details not found."}, status=status.HTTP_404_NOT_FOUND)

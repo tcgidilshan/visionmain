@@ -43,7 +43,10 @@ from .views import (
     LensCoatingListCreateView,
     LensCoatingRetrieveUpdateDeleteView,
     ManualOrderCreateView,
-    InvoiceDetailView
+    InvoiceDetailView,
+    OrderUpdateView,
+    RefractionDetailRetrieveUpdateDeleteView
+
 )
 # from .views import CustomAuthToken
 
@@ -60,6 +63,7 @@ urlpatterns = [
     path('refractions/<int:pk>/update/', RefractionUpdateAPIView.as_view(), name='refraction-update'),
     path('refractions/<int:pk>/delete/', RefractionDeleteAPIView.as_view(), name='refraction-delete'),
     path('refraction-details/create/', RefractionDetailCreateAPIView.as_view(), name='refraction-details-create'),
+      path('refractions/<int:refraction_id>/', RefractionDetailRetrieveUpdateDeleteView.as_view(), name='refraction-details'),
     path('brands/', BrandListCreateView.as_view(), name='brand-list-create'),
     path('brands/<int:pk>/', BrandRetrieveUpdateDeleteView.as_view(), name='brand-detail'),
     path('colors/', ColorListCreateView.as_view(), name='color-list-create'),
@@ -81,6 +85,7 @@ urlpatterns = [
     path('lens-cleaner-stocks/', LensCleanerStockListCreateView.as_view(), name='lens-cleaner-stock-list-create'),
     path('lens-cleaner-stocks/<int:pk>/', LensCleanerStockRetrieveUpdateDeleteView.as_view(), name='lens-cleaner-stock-detail'),
     path('orders/', OrderCreateView.as_view(), name='order-create'),
+    path('orders/<int:pk>/', OrderUpdateView.as_view(), name='order-update'),
     path("manual-orders/", ManualOrderCreateView.as_view(), name="manual-order-create"),
     path('invoices/<int:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'), #invoice
     path('doctors/', DoctorListCreateView.as_view(), name='doctor-list-create'),
