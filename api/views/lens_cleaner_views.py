@@ -2,11 +2,13 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from ..models import LensCleaner
 from ..serializers import LensCleanerSerializer
+from rest_framework.permissions import IsAuthenticated
 
 # List and Create Lens Cleaners
 class LensCleanerListCreateView(generics.ListCreateAPIView):
-    queryset = LensCleaner.objects.all()
+    queryset = LensCleaner.objects.filter(is_active=True)  # ✅ Prefetch related stocks
     serializer_class = LensCleanerSerializer
+    permission_classes = [IsAuthenticated] 
 
     def list(self, request, *args, **kwargs):
         """
@@ -27,8 +29,9 @@ class LensCleanerListCreateView(generics.ListCreateAPIView):
 
 # Retrieve, Update, and Delete Lens Cleaners
 class LensCleanerRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = LensCleaner.objects.all()
+    queryset = LensCleaner.objects.prefetch_related('stocks').all()  # ✅ Prefetch related stocks
     serializer_class = LensCleanerSerializer
+    permission_classes = [IsAuthenticated] 
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -44,6 +47,8 @@ class LensCleanerRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView)
         """
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
+        is_active = request.data.get("is_active", instance.is_active) 
+        instance.is_active = is_active
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -51,8 +56,10 @@ class LensCleanerRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView)
 
     def destroy(self, request, *args, **kwargs):
         """
-        Delete a lens cleaner.
+        Override delete to implement soft deletion.
         """
         instance = self.get_object()
-        instance.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        instance.is_active = False  # ✅ Soft delete instead of removing
+        instance.save()
+        return Response({"message": "Lens Cleaner marked as inactive."}, status=status.HTTP_200_OK)
+

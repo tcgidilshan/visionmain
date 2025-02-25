@@ -160,16 +160,49 @@ class LensPowerSerializer(serializers.ModelSerializer):
     class Meta:
         model = LensPower
         fields = ['id', 'lens', 'power', 'value', 'side']
-        
-class LensCleanerSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = LensCleaner
-        fields = ['id', 'name', 'price']
-        
+
 class LensCleanerStockSerializer(serializers.ModelSerializer):
     class Meta:
         model = LensCleanerStock
-        fields = ['id', 'lens_cleaner', 'initial_count', 'qty']       
+        fields = ['id', 'initial_count', 'qty'] 
+        
+class LensCleanerSerializer(serializers.ModelSerializer):
+    """
+    Serializer for LensCleaner with Stock.
+    """
+    stocks = LensCleanerStockSerializer(many=True, required=False)  # ✅ Stock can be updated without IDs
+
+    class Meta:
+        model = LensCleaner
+        fields = ['id', 'name', 'price', 'stocks','is_active']
+
+    def update(self, instance, validated_data):
+        """
+        Override update to handle stock updates without requiring an ID.
+        """
+        stocks_data = validated_data.pop('stocks', [])  # ✅ Extract stock data
+        instance.name = validated_data.get('name', instance.name)
+        instance.price = validated_data.get('price', instance.price)
+        instance.save()
+
+        # ✅ Check if stock exists for this lens cleaner
+        existing_stock = instance.stocks.first()  # Since there's only **one stock entry per cleaner**
+
+        if stocks_data:
+            stock_data = stocks_data[0]  # We only expect **one stock entry**
+            if existing_stock:
+                # ✅ Update existing stock
+                existing_stock.initial_count = stock_data.get('initial_count', existing_stock.initial_count)
+                existing_stock.qty = stock_data.get('qty', existing_stock.qty)
+                existing_stock.save()
+            else:
+                # ✅ Create new stock entry (no existing stock)
+                LensCleanerStock.objects.create(lens_cleaner=instance, **stock_data)
+
+        # ✅ REFRESH `instance` TO LOAD UPDATED STOCK VALUES
+        instance.refresh_from_db()  # 🔥 This ensures we return the updated stock in the response
+
+        return instance
         
 class OrderItemSerializer(serializers.ModelSerializer):
     class Meta:
