@@ -8,9 +8,9 @@ from ..services.order_payment_service import OrderPaymentService
 from ..services.stock_validation_service import StockValidationService
 from ..services.order_service import OrderService
 from ..services.patient_service import PatientService
+from ..services.Invoice_service import InvoiceService
 
 class OrderCreateView(APIView):
-
     @transaction.atomic
     def post(self, request, *args, **kwargs):
         """
@@ -36,7 +36,10 @@ class OrderCreateView(APIView):
                 order_data["customer"] = patient.id  # ✅ Automatically assign the newly created patient
                 order = OrderService.create_order(order_data, order_items_data)
 
-                # Step 5: Create Order Payments
+                # ✅ Step 5: Generate Invoice Based on New Scenario
+                InvoiceService.create_invoice(order)
+
+                # Step 6: Create Order Payments
                 payments_data = request.data.get('order_payments', [])
                 if not payments_data:
                     raise ValueError("At least one order payment is required.")
@@ -47,7 +50,7 @@ class OrderCreateView(APIView):
                 if total_payment > order.total_price:
                     raise ValueError("Total payments exceed the order total price.")
 
-                # Step 6: Adjust Stocks
+                # Step 7: Adjust Stocks
                 for stock_type, stock, quantity in stock_updates:
                     stock.qty -= quantity
                     stock.save()

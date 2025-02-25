@@ -46,7 +46,7 @@ from .views import (
     InvoiceDetailView,
     OrderUpdateView,
     RefractionDetailRetrieveUpdateDeleteView,
-    LensSearchAPIView
+    LensSearchView
 
 )
 # from .views import CustomAuthToken
@@ -89,6 +89,7 @@ urlpatterns = [
     path('orders/<int:pk>/', OrderUpdateView.as_view(), name='order-update'),
     path("manual-orders/", ManualOrderCreateView.as_view(), name="manual-order-create"),
     path('invoices/<int:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'), #invoice
+    path('invoices/', InvoiceDetailView.as_view(), name='invoice-by-order'),  # ✅ Filter by order_id
     path('doctors/', DoctorListCreateView.as_view(), name='doctor-list-create'),
     path('doctors/<int:pk>/', DoctorRetrieveUpdateDeleteView.as_view(), name='doctor-detail'),
     path('patients/', PatientListView.as_view(), name='patient-list'),
@@ -97,7 +98,7 @@ urlpatterns = [
     path('channels/<int:pk>/', AppointmentRetrieveUpdateDeleteView.as_view(), name='appointment-detail'),
     path('lens-stocks/', LensStockListCreateView.as_view(), name='lens-stock-list-create'),
     path('lens-stocks/<int:pk>/', LensStockRetrieveUpdateDeleteView.as_view(), name='lens-stock-detail'),
-    path("lenses/search/", LensSearchAPIView.as_view(), name="lens-search"),
+    path("lenses/search/", LensSearchView.as_view(), name="lens-search"),
     path('lens-types/', LensTypeListCreateView.as_view(), name='lens-type-list-create'),
     path('lens-types/<int:pk>/', LensTypeRetrieveUpdateDeleteView.as_view(), name='lens-type-detail'),
     path('lens-coatings/', LensCoatingListCreateView.as_view(), name='lens-coating-list-create'),
