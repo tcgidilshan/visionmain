@@ -205,23 +205,37 @@ class LensCleanerSerializer(serializers.ModelSerializer):
         return instance
         
 class OrderItemSerializer(serializers.ModelSerializer):
+    lens_name = serializers.CharField(source="lens.type.name", read_only=True)  # ✅ Get lens type name
+    frame_name = serializers.CharField(source="frame.code", read_only=True)  # ✅ Get frame code (or name)
+    lens_cleaner_name = serializers.CharField(source="lens_cleaner.name", read_only=True)  # ✅ Get cleaner name
+    lens_powers = serializers.SerializerMethodField()  # ✅ Custom field for lens powers
+
     class Meta:
         model = OrderItem
         fields = [
             'id',
             'order',
-            'lens',
-            'lens_cleaner',
-            'frame',
+            'lens', 'lens_name',  # ✅ Return lens name
+            'frame', 'frame_name',  # ✅ Return frame name
+            'lens_cleaner', 'lens_cleaner_name',  # ✅ Return lens cleaner name
             'quantity',
             'price_per_unit',
             'subtotal',
+            'lens_powers',  # ✅ Include lens powers
         ]
 
-        def create(self, validated_data):
-        # Calculate the subtotal based on quantity and price per unit
-            validated_data['subtotal'] = validated_data['quantity'] * validated_data['price_per_unit']
-            return super().create(validated_data)
+    def get_lens_powers(self, obj):
+        """ ✅ Fetch lens powers for the given lens. """
+        if obj.lens:
+            powers = obj.lens.lens_powers.all()
+            return LensPowerSerializer(powers, many=True).data
+        return []
+
+    def create(self, validated_data):
+        """ ✅ Auto-calculate subtotal before saving. """
+        validated_data['subtotal'] = validated_data['quantity'] * validated_data['price_per_unit']
+        return super().create(validated_data)
+
         
 class OrderPaymentSerializer(serializers.ModelSerializer):
     class Meta:
