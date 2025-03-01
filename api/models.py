@@ -28,9 +28,17 @@ class CustomUser(AbstractUser):
     
 #refractions
 class Refraction(models.Model):
+    patient = models.ForeignKey(
+        'Patient', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name="refractions"
+    )
     customer_full_name = models.CharField(max_length=255)
     customer_mobile = models.CharField(max_length=15)
     refraction_number = models.CharField(max_length=10, unique=True, blank=True)
+    nic = models.CharField(max_length=12, null=True, blank=True)
 
     def save(self, *args, **kwargs):
         # Generate refraction_number automatically if not set
@@ -45,12 +53,13 @@ class Refraction(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.customer_full_name} - {self.refraction_number}"
+        return f"{self.customer_full_name} - Refraction ID: {self.id} - {self.refraction_number} - Patient: {self.patient.name if self.patient else 'No Patient'}"
+
     
 class Patient(models.Model):
     name = models.CharField(max_length=50)
     date_of_birth = models.DateField(null=True, blank=True)
-    phone_number = models.CharField(max_length=15, unique=True)
+    phone_number = models.CharField(null=True, blank=True,max_length=15, unique=True)
     address = models.TextField(null=True, blank=True)
     nic = models.CharField(max_length=15, unique=True, null=True, blank=True)
     refraction = models.ForeignKey(
@@ -107,6 +116,7 @@ class RefractionDetails(models.Model):
     left_eye_near_sph = models.CharField(max_length=10, blank=True, null=True)
 
     remark = models.CharField(max_length=20, blank=True, null=True)
+    note = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
         if self.is_manual:

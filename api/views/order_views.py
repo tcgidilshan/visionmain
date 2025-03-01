@@ -2,13 +2,14 @@ from django.db import transaction
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from ..models import Order, OrderItem, OrderPayment, LensStock, LensCleanerStock, FrameStock
+from ..models import Order, OrderItem, OrderPayment, LensStock, LensCleanerStock, FrameStock,RefractionDetails,Refraction
 from ..serializers import OrderSerializer, OrderItemSerializer, OrderPaymentSerializer
 from ..services.order_payment_service import OrderPaymentService
 from ..services.stock_validation_service import StockValidationService
 from ..services.order_service import OrderService
 from ..services.patient_service import PatientService
 from ..services.Invoice_service import InvoiceService
+from ..services.refraction_details_service import RefractionDetailsService
 
 class OrderCreateView(APIView):
     @transaction.atomic
@@ -26,20 +27,50 @@ class OrderCreateView(APIView):
                     return Response({"error": "Patient details are required."}, status=status.HTTP_400_BAD_REQUEST)
                 
                 patient = PatientService.create_or_update_patient(patient_data)  # ✅ Create or update patient
+
+                # ✅ If refraction_id is provided, update patient_id in Refraction table
+                refraction_id = patient_data.get("refraction_id")
+                if refraction_id:
+                    try:
+                        refraction = Refraction.objects.get(id=refraction_id)
+                        refraction.patient = patient  # ✅ Assign the patient
+                        refraction.save()
+                    except Refraction.DoesNotExist:
+                        return Response({"error": "Refraction record not found."}, status=status.HTTP_400_BAD_REQUEST)
+
+                # ✅ Step 4: Create Refraction Details (Only if provided)
+                refraction_details_data = request.data.get("refraction_details")
+                refraction_details = None
+                if refraction_details_data: 
+                    refraction_details_data["patient"] = patient.id  # ✅ Assign the patient ID
+                    refraction_details = RefractionDetailsService.create_refraction_details(refraction_details_data)
+
+                else:
+                    # ✅ No new refraction details provided -> Find & update existing one
+                    refraction_id = patient.refraction_id  # Get `refraction_id` from Patient
+                    if refraction_id:
+                        try:
+                            # ✅ Find the existing refraction details for the patient's refraction_id
+                            refraction_details = RefractionDetails.objects.get(refraction_id=refraction_id)
+                            # ✅ Update the patient_id column in that row
+                            refraction_details.patient_id = patient.id
+                            refraction_details.save()
+                        except RefractionDetails.DoesNotExist:
+                            pass  # ✅ If no existing refraction details, do nothing
                 
-                # Step 3: Validate Stocks Using Service
+                # Step 5: Validate Stocks Using Service
                 order_items_data = request.data.get('order_items', [])
                 stock_updates = StockValidationService.validate_stocks(order_items_data)
 
-                # Step 4: Create Order and Order Items Using Service
+                # Step 6: Create Order and Order Items Using Service
                 order_data = request.data.get('order')
                 order_data["customer"] = patient.id  # ✅ Automatically assign the newly created patient
                 order = OrderService.create_order(order_data, order_items_data)
 
-                # ✅ Step 5: Generate Invoice Based on New Scenario
+                # ✅ Step 7: Generate Invoice Based on New Scenario
                 InvoiceService.create_invoice(order)
 
-                # Step 6: Create Order Payments
+                # Step 8: Create Order Payments
                 payments_data = request.data.get('order_payments', [])
                 if not payments_data:
                     raise ValueError("At least one order payment is required.")
@@ -50,7 +81,7 @@ class OrderCreateView(APIView):
                 if total_payment > order.total_price:
                     raise ValueError("Total payments exceed the order total price.")
 
-                # Step 7: Adjust Stocks
+                # Step 9: Adjust Stocks
                 for stock_type, stock, quantity in stock_updates:
                     stock.qty -= quantity
                     stock.save()

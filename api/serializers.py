@@ -36,7 +36,7 @@ class BranchSerializer(serializers.ModelSerializer):
 class RefractionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Refraction
-        fields = ['id', 'customer_full_name', 'customer_mobile', 'refraction_number']
+        fields = ['id', 'customer_full_name', 'customer_mobile', 'refraction_number', 'nic']
         read_only_fields = ['refraction_number']  # Auto-generated
 
 class RefractionDetailsSerializer(serializers.ModelSerializer):
@@ -69,6 +69,7 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'left_eye_dist_axis',
             'left_eye_near_sph',
             'remark',
+            'note',
             'is_manual'
         ]
   
