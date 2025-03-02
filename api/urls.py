@@ -19,6 +19,7 @@ from .views import (
     FrameStockRetrieveUpdateDeleteView,
     FrameListCreateView,
     FrameRetrieveUpdateDeleteView,
+    FrameColorListView,
     PowerListCreateView,
     PowerRetrieveUpdateDeleteView,
     LensListCreateView,
@@ -47,7 +48,6 @@ from .views import (
     OrderUpdateView,
     RefractionDetailRetrieveUpdateDeleteView,
     LensSearchView
-
 )
 # from .views import CustomAuthToken
 
@@ -75,6 +75,7 @@ urlpatterns = [
     path('frame-stocks/<int:pk>/', FrameStockRetrieveUpdateDeleteView.as_view(), name='frame-stock-detail'),
     path('frames/', FrameListCreateView.as_view(), name='frame-list-create'),
     path('frames/<int:pk>/', FrameRetrieveUpdateDeleteView.as_view(), name='frame-detail'),
+    path("frames/colors/", FrameColorListView.as_view(), name="frame-colors"),
     path('powers/', PowerListCreateView.as_view(), name='power-list-create'),
     path('powers/<int:pk>/', PowerRetrieveUpdateDeleteView.as_view(), name='power-detail'),
     path('lenses/', LensListCreateView.as_view(), name='lens-list-create'),
