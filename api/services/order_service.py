@@ -2,7 +2,9 @@ from ..models import Order, OrderItem, LensStock, LensCleanerStock, FrameStock,L
 from ..serializers import OrderSerializer, OrderItemSerializer
 from django.db import transaction
 from ..services.order_payment_service import OrderPaymentService
-
+from ..services.external_lens_service import ExternalLensService
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 
 class OrderService:
     """
@@ -24,6 +26,22 @@ class OrderService:
         # Step 2: Create Order Items
         order_items = []
         for item_data in order_items_data:
+            # Step 2.1: Check if external lens data exists in order item
+            external_lens_data = item_data.get('external_lens_data')  # Assume request includes `external_lens_data`
+            if external_lens_data:
+                # Create the External Lens
+                lens_data = external_lens_data.get('lens')
+                powers_data = external_lens_data.get('powers', [])
+
+                               # ✅ Validate ExternalLens data first
+                if not lens_data:
+                    raise ValidationError({'external_lens_data': 'Lens data is required for external lenses.'})
+
+                # ✅ Create External Lens and assign ID
+                created_lens = ExternalLensService.create_external_lens(lens_data, powers_data)
+                item_data['external_lens'] = created_lens['external_lens']['id']
+
+
             item_data['order'] = order.id  # Attach the created order
             order_item_serializer = OrderItemSerializer(data=item_data)
             order_item_serializer.is_valid(raise_exception=True)
