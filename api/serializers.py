@@ -279,6 +279,7 @@ class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
         fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic','refraction_id']
+        
 
 class InvoiceSerializer(serializers.ModelSerializer):
     customer = serializers.PrimaryKeyRelatedField(source='order.customer', read_only=True)  # ✅ Fetch customer ID

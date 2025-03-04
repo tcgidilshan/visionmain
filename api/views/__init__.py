@@ -14,7 +14,7 @@ from .lens_cleaner_views import LensCleanerListCreateView,LensCleanerRetrieveUpd
 from .lens_cleaner_stock_views import LensCleanerStockListCreateView,LensCleanerStockRetrieveUpdateDeleteView
 from .order_views import OrderCreateView
 from .doctor_views import  DoctorListCreateView,DoctorRetrieveUpdateDeleteView
-from .patient_views import PatientListView
+from .patient_views import PatientListView, PatientUpdateView
 from .channel_views import ChannelAppointmentView,ChannelListView,AppointmentRetrieveUpdateDeleteView
 from .lens_stock_views import LensStockListCreateView,LensStockRetrieveUpdateDeleteView
 from .lens_type_views import LensTypeListCreateView,LensTypeRetrieveUpdateDeleteView
