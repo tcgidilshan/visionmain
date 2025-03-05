@@ -12,7 +12,6 @@ class Item(models.Model):
     def __str__(self):
         return self.name
 
-    
 class Branch(models.Model):
     branch_name = models.CharField(max_length=255)  # Name of the branch
     location = models.TextField()  # Branch location (address or details)
@@ -22,7 +21,6 @@ class Branch(models.Model):
     def __str__(self):
         return self.branch_name
     
-
 class CustomUser(AbstractUser):
     mobile = models.CharField(max_length=15, blank=True, null=True)
     
@@ -55,7 +53,6 @@ class Refraction(models.Model):
     def __str__(self):
         return f"{self.customer_full_name} - Refraction ID: {self.id} - {self.refraction_number} - Patient: {self.patient.name if self.patient else 'No Patient'}"
 
-    
 class Patient(models.Model):
     name = models.CharField(max_length=50)
     date_of_birth = models.DateField(null=True, blank=True)
@@ -126,7 +123,6 @@ class RefractionDetails(models.Model):
             return f"Details for {self.refraction.customer_full_name}"
         
         return f"Details for Refraction {self.refraction.id if self.refraction else 'N/A'}"
-
 
 #brands
 class Brand(models.Model):
@@ -232,8 +228,7 @@ class LensPower(models.Model):
     )
 
     def __str__(self):
-        return f"Lens: {self.lens.id} - Power: {self.value} ({self.side})"
-    
+        return f"Lens: {self.lens.id} - Power: {self.value} ({self.side})" 
 class LensCleaner(models.Model):
     name = models.CharField(max_length=255)
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -272,6 +267,33 @@ class Order(models.Model):
     def __str__(self):
         return f"Order {self.id} - Status: {self.status} - Customer: {self.customer.id}"
     
+class ExternalLens(models.Model):
+    type = models.ForeignKey(LenseType, related_name='external_lenses', on_delete=models.CASCADE)
+    coating = models.ForeignKey(Coating, related_name='external_lenses', on_delete=models.CASCADE)
+    brand = models.ForeignKey(Brand, related_name='external_lenses', on_delete=models.CASCADE)
+    price = models.DecimalField(max_digits=10, decimal_places=2)  # ✅ Manually entered price
+
+    def __str__(self):
+        return f"{self.brand.name} {self.type.name} ({self.coating.name}) - LKR {self.price}"
+    
+class ExternalLensPower(models.Model):
+    SIDE_CHOICES = [
+        ('left', 'Left'),
+        ('right', 'Right'),
+    ]
+    external_lens = models.ForeignKey(ExternalLens, related_name='external_lens_powers', on_delete=models.CASCADE)
+    power = models.ForeignKey('Power', related_name='external_lens_powers', on_delete=models.CASCADE)  # Assuming Power table exists
+    value = models.DecimalField(max_digits=5, decimal_places=2)
+    side = models.CharField(
+        max_length=10,
+        choices=SIDE_CHOICES,
+        null=True, 
+        blank=True 
+    )
+
+    def __str__(self):
+        return f"Lens: {self.external_lens} - Power: {self.value} ({self.side})"
+    
 class Invoice(models.Model):
     INVOICE_TYPES = [
         ('factory', 'Factory Invoice'),  # Linked to an order with refraction
@@ -303,11 +325,13 @@ class Invoice(models.Model):
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name='order_items', on_delete=models.CASCADE)
     lens = models.ForeignKey(Lens, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
+    external_lens = models.ForeignKey(ExternalLens, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
     lens_cleaner = models.ForeignKey(LensCleaner, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
     frame = models.ForeignKey(Frame, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
     quantity = models.PositiveIntegerField(default=1)
     price_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+    is_non_stock = models.BooleanField(default=False)  # ✅ Mark Non-Stock Items
 
     def save(self, *args, **kwargs):
        # Dynamically calculate subtotal on save

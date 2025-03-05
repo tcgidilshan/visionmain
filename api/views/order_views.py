@@ -60,10 +60,15 @@ class OrderCreateView(APIView):
                 
                 # Step 5: Validate Stocks Using Service
                 order_items_data = request.data.get('order_items', [])
-                stock_updates = StockValidationService.validate_stocks(order_items_data)
+                stock_items = [item for item in order_items_data if not item.get('is_non_stock', False)]  # 🔥 Filter only stock-based items (exclude is_non_stock=True)
+                stock_updates = StockValidationService.validate_stocks(stock_items) if stock_items else [] # 🔍 Validate stock only for stock items
 
                 # Step 6: Create Order and Order Items Using Service
                 order_data = request.data.get('order')
+
+                if not order_data:
+                    return Response({"error": "The 'order' field is required."}, status=status.HTTP_400_BAD_REQUEST)
+                
                 order_data["customer"] = patient.id  # ✅ Automatically assign the newly created patient
                 order = OrderService.create_order(order_data, order_items_data)
 
@@ -81,10 +86,8 @@ class OrderCreateView(APIView):
                 if total_payment > order.total_price:
                     raise ValueError("Total payments exceed the order total price.")
 
-                # Step 9: Adjust Stocks
-                for stock_type, stock, quantity in stock_updates:
-                    stock.qty -= quantity
-                    stock.save()
+               # Step 9: Adjust Stocks (Only for Stock Items)
+                StockValidationService.adjust_stocks(stock_updates)
 
                 # Return successful response
                 response_serializer = OrderSerializer(order)
