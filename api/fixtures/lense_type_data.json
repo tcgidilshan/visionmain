@@ -1,0 +1,23 @@
+[
+  {
+    "model": "api.lensetype",
+    "fields": {
+      "name": "Single Vision",
+      "description": "Lenses designed to correct either distance or reading vision."
+    }
+  },
+  {
+    "model": "api.lensetype",
+    "fields": {
+      "name": "Bifocal",
+      "description": "Lenses with two distinct optical powers for distance and reading."
+    }
+  },
+  {
+    "model": "api.lensetype",
+    "fields": {
+      "name": "Progressive",
+      "description": "Lenses that gradually change optical power for near, intermediate, and distance vision."
+    }
+  }
+]

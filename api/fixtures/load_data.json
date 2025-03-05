@@ -1,0 +1,229 @@
+[
+  {
+    "model": "api.power",
+    "fields": {
+      "name": "sph"
+    }
+  },
+  {
+    "model": "api.power",
+    "fields": {
+      "name": "cyl"
+    }
+  },
+  {
+    "model": "api.power",
+    "fields": {
+      "name": "add"
+    }
+  },
+  {
+    "model": "api.lensetype",
+    "fields": {
+      "name": "Single Vision",
+      "description": "Lenses designed to correct either distance or reading vision."
+    }
+  },
+  {
+    "model": "api.lensetype",
+    "fields": {
+      "name": "Progressive",
+      "description": "Lenses that gradually change optical power for near, intermediate, and distance vision."
+    }
+  },
+  {
+    "model": "api.lensetype",
+    "fields": {
+      "name": "Bifocal",
+      "description": "Lenses with two distinct optical powers for distance and reading."
+    }
+  },
+
+  {
+    "model": "api.coating",
+    "fields": {
+      "name": "Anti-Reflective",
+      "description": "Reduces glare and reflections for clearer vision."
+    }
+  },
+  {
+    "model": "api.coating",
+    "fields": {
+      "name": "UV Protection",
+      "description": "Blocks harmful UV rays to protect eyes."
+    }
+  },
+  {
+    "model": "api.coating",
+    "fields": {
+      "name": "Scratch-Resistant",
+      "description": "Helps prevent scratches and extends lens durability."
+    }
+  },
+  {
+    "model": "api.brand",
+    "fields": {
+      "name": "1 Essilor",
+      "brand_type": "lens"
+    }
+  },
+  {
+    "model": "api.brand",
+    "fields": {
+      "name": "2 Zeiss",
+      "brand_type": "lens"
+    }
+  },
+  {
+    "model": "api.brand",
+    "fields": {
+      "name": "3 Hoya",
+      "brand_type": "lens"
+    }
+  },
+  {
+    "model": "api.brand",
+    "fields": {
+      "name": "4 Nikon",
+      "brand_type": "lens"
+    }
+  },
+  {
+    "model": "api.brand",
+    "fields": {
+      "name": "5 Rodenstock",
+      "brand_type": "lens"
+    }
+  },
+  {
+    "model": "api.brand",
+    "fields": {
+      "name": "1f Ray-Ban",
+      "brand_type": "frame"
+    }
+  },
+  {
+    "model": "api.brand",
+    "fields": {
+      "name": "2f Oakley",
+      "brand_type": "frame"
+    }
+  },
+  {
+    "model": "api.brand",
+    "fields": {
+      "name": "3f Gucci",
+      "brand_type": "frame"
+    }
+  },
+  {
+    "model": "api.brand",
+    "fields": {
+      "name": "4f Prada",
+      "brand_type": "frame"
+    }
+  },
+  {
+    "model": "api.brand",
+    "fields": {
+      "name": "5f Tom Ford",
+      "brand_type": "frame"
+    }
+  },
+
+  {
+    "model": "api.color",
+    "fields": {
+      "name": "Red"
+    }
+  },
+  {
+    "model": "api.color",
+    "fields": {
+      "name": "Blue"
+    }
+  },
+  {
+    "model": "api.color",
+    "fields": {
+      "name": "Green"
+    }
+  },
+  {
+    "model": "api.color",
+    "fields": {
+      "name": "Black"
+    }
+  },
+  {
+    "model": "api.color",
+    "fields": {
+      "name": "White"
+    }
+  },
+  {
+    "model": "api.color",
+    "fields": {
+      "name": "Yellow"
+    }
+  },
+  {
+    "model": "api.color",
+    "fields": {
+      "name": "Purple"
+    }
+  },
+  {
+    "model": "api.color",
+    "fields": {
+      "name": "Pink"
+    }
+  },
+  {
+    "model": "api.color",
+    "fields": {
+      "name": "Gray"
+    }
+  },
+  {
+    "model": "api.color",
+    "fields": {
+      "name": "Orange"
+    }
+  },
+  {
+    "model": "api.code",
+    "fields": {
+      "name": "6f Ray-Ban",
+      "brand": 6
+    }
+  },
+  {
+    "model": "api.code",
+    "fields": {
+      "name": "7f Oakley",
+      "brand": 7
+    }
+  },
+  {
+    "model": "api.code",
+    "fields": {
+      "name": "8f Gucci",
+      "brand": 8
+    }
+  },
+  {
+    "model": "api.code",
+    "fields": {
+      "name": "9f Prada",
+      "brand": 9
+    }
+  },
+  {
+    "model": "api.code",
+    "fields": {
+      "name": "10f Tom Ford",
+      "brand": 10
+    }
+  }
+]
