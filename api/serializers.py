@@ -73,6 +73,9 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'remark',
             'note',
             'is_manual',
+            'pd',
+            'h',
+            'shuger'
         ]
   
 class BrandSerializer(serializers.ModelSerializer):

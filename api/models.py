@@ -115,6 +115,11 @@ class RefractionDetails(models.Model):
     remark = models.CharField(max_length=20, blank=True, null=True)
     note = models.CharField(max_length=100, blank=True, null=True)
 
+    #new Changes
+    pd=models.CharField(max_length=10,blank=True,null=True)
+    h=models.CharField(max_length=10,blank=True,null=True)
+    shuger=models.BooleanField(default=False)
+
     def __str__(self):
         if self.is_manual:
             return f"Manual Refraction Details - ID {self.id}"
@@ -284,7 +289,7 @@ class ExternalLensPower(models.Model):
     ]
     external_lens = models.ForeignKey(ExternalLens, related_name='external_lens_powers', on_delete=models.CASCADE)
     power = models.ForeignKey('Power', related_name='external_lens_powers', on_delete=models.CASCADE)  # Assuming Power table exists
-    value = models.DecimalField(max_digits=5, decimal_places=2)
+    value = models.DecimalField(max_digits=5, decimal_places=2,)
     side = models.CharField(
         max_length=10,
         choices=SIDE_CHOICES,
