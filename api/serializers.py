@@ -337,8 +337,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
     customer_details = PatientSerializer(source='order.customer', read_only=True)  # ✅ Full customer details
     refraction_details = RefractionSerializer(source='order.refraction', read_only=True)  # ✅ Refraction details (if exists)
     order_details = OrderSerializer(source='order', read_only=True)  # ✅ Full order details
-    order_items = OrderItemSerializer(source='order.order_items', many=True, read_only=True)  # ✅ Fetch order items
-    order_payments = OrderPaymentSerializer(source='order.orderpayment_set', many=True, read_only=True)  # ✅ Fetch order payments
 
     class Meta:
         model = Invoice
@@ -352,8 +350,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'daily_invoice_no',  # Unique daily number for factory invoices
             'invoice_date',
             'order_details',  # ✅ Full order details (optional)
-            'order_items',  # ✅ All order items
-            'order_payments'  # ✅ All order payments
         ]
 
 class DoctorSerializer(serializers.ModelSerializer):

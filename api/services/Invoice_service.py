@@ -1,6 +1,8 @@
 from datetime import date
 from django.db.models import Max
 from ..models import Invoice, RefractionDetails
+from rest_framework.exceptions import NotFound
+from ..serializers import InvoiceSerializer,RefractionDetailsSerializer
 
 class InvoiceService:
     """
@@ -37,3 +39,42 @@ class InvoiceService:
             daily_invoice_no=daily_invoice_no,  # Only for factory invoices
         )
         return invoice
+    
+    @staticmethod
+    def get_invoice_by_order_id(order_id):
+        """
+        Retrieve an invoice by order_id and include refraction_details manually.
+        """
+        try:
+            # ✅ Fetch the invoice, order, and refraction
+            invoice = (
+                Invoice.objects
+                .select_related('order__refraction')  # ✅ Load related refraction
+                .get(order_id=order_id)
+            )
+
+            # ✅ Manually fetch refraction_details using refraction_id
+            refraction_details = RefractionDetails.objects.filter(refraction=invoice.order.refraction).first()
+
+            # ✅ Serialize the invoice
+            invoice_data = InvoiceSerializer(invoice).data  
+
+            # ✅ Serialize refraction_details manually if it exists
+            invoice_data["refraction_details"] = RefractionDetailsSerializer(refraction_details).data if refraction_details else None  
+
+            return invoice_data
+
+        except Invoice.DoesNotExist:
+            raise NotFound("No invoice found for this order.")
+
+    @staticmethod
+    def get_invoice_by_id(invoice_id):
+        """
+        Retrieve an invoice by invoice_id.
+        If no invoice is found, raises a NotFound exception.
+        """
+        try:
+            return Invoice.objects.get(id=invoice_id)
+        except Invoice.DoesNotExist:
+            raise NotFound("Invoice not found.")
+

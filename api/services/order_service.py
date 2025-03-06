@@ -1,5 +1,5 @@
-from ..models import Order, OrderItem, LensStock, LensCleanerStock, FrameStock,Lens,LensCleaner,Frame
-from ..serializers import OrderSerializer, OrderItemSerializer
+from ..models import Order, OrderItem, LensStock, LensCleanerStock, FrameStock,Lens,LensCleaner,Frame,ExternalLens
+from ..serializers import OrderSerializer, OrderItemSerializer, ExternalLensSerializer
 from django.db import transaction
 from ..services.order_payment_service import OrderPaymentService
 from ..services.external_lens_service import ExternalLensService
@@ -66,69 +66,68 @@ class OrderService:
             order.remark = order_data.get('remark', order.remark)
             order.save()  # ✅ Save updated order
 
-            # ✅ Step 2: Update Order Items & Adjust Stock
+            # ✅ Step 2: Update Order Items & External Lenses
             existing_items = {item.id: item for item in order.order_items.all()}  # Get current items
 
             for item_data in order_items_data:
                 item_id = item_data.get('id')
 
-                # ✅ Fetch instances for ForeignKey fields
-                lens_instance = Lens.objects.get(id=item_data['lens']) if 'lens' in item_data else None
-                frame_instance = Frame.objects.get(id=item_data['frame']) if 'frame' in item_data else None
-                cleaner_instance = LensCleaner.objects.get(id=item_data['lens_cleaner']) if 'lens_cleaner' in item_data else None
+                # ✅ Handle External Lens Data
+                external_lens_data = item_data.get('external_lens_data', None)
+
+                if external_lens_data:
+                    lens_data = external_lens_data.get("lens", None)
+                    powers_data = external_lens_data.get("powers", [])
+
+                    if not lens_data:
+                        raise ValidationError({"external_lens_data": "Lens data is required for external lenses."})
+
+                    # ✅ If `external_lens` exists in order item, update it
+                    if item_data.get("external_lens"):
+                        existing_lens = ExternalLens.objects.get(id=item_data["external_lens"])
+                        lens_serializer = ExternalLensSerializer(existing_lens, data=lens_data, partial=True)
+
+                        if lens_serializer.is_valid():
+                            lens_serializer.save()
+                            print(f"✅ Updated External Lens: {existing_lens.id}")
+                        else:
+                            raise ValidationError(lens_serializer.errors)
+
+                    else:
+                        # ✅ Otherwise, create a new external lens
+                        created_lens = ExternalLensService.create_external_lens(lens_data, powers_data)
+                        item_data["external_lens"] = created_lens["external_lens"]["id"]
+                        print(f"✅ Created New External Lens: {created_lens['external_lens']['id']}")
 
                 if item_id and item_id in existing_items:
-                    # ✅ Update Existing Item
+                    # ✅ Update Existing Order Item
                     existing_item = existing_items.pop(item_id)
                     existing_item.quantity = item_data['quantity']
                     existing_item.price_per_unit = item_data['price_per_unit']
                     existing_item.subtotal = item_data['subtotal']
 
-                    # ✅ Assign ForeignKey instances properly
-                    existing_item.lens = lens_instance
-                    existing_item.frame = frame_instance
-                    existing_item.lens_cleaner = cleaner_instance
+                    # ✅ Assign External Lens if Updated
+                    if "external_lens" in item_data:
+                        existing_item.external_lens_id = item_data["external_lens"]
 
                     existing_item.save()
 
                 else:
-                    # ✅ Add New Item (Validate Stock First)
-                    stock_item = OrderService.validate_and_get_stock(item_data)
-                    if stock_item.qty < item_data['quantity']:
-                        raise ValueError(f"Insufficient stock for item {item_data}")
-
+                    # ✅ Add New Order Item
                     new_item = OrderItem.objects.create(
                         order=order,
                         quantity=item_data['quantity'],
                         price_per_unit=item_data['price_per_unit'],
                         subtotal=item_data['subtotal'],
-                        lens=lens_instance,
-                        frame=frame_instance,
-                        lens_cleaner=cleaner_instance
+                        external_lens_id=item_data.get("external_lens")
                     )
-                    stock_item.qty -= item_data['quantity']
-                    stock_item.save()
 
-            # ✅ Step 3: Remove Deleted Items & Restore Stock
-                for deleted_item in existing_items.values():
-                    # ✅ Ensure OrderItem has an ID before deleting
-                    if deleted_item.id:
-                        stock_item = OrderService.validate_and_get_stock({
-                            "lens": deleted_item.lens.id if deleted_item.lens else None,
-                            "frame": deleted_item.frame.id if deleted_item.frame else None,
-                            "lens_cleaner": deleted_item.lens_cleaner.id if deleted_item.lens_cleaner else None,
-                        })
-                        
-                        stock_item.qty += deleted_item.quantity  # Restore stock
-                        stock_item.save()
-                        deleted_item.delete()  # ✅ Only delete if it exists in DB
-                    else:
-                        print(f"Skipping delete for OrderItem with no ID: {deleted_item}")
-
-
+            # ✅ Step 3: Remove Deleted Items
+            for deleted_item in existing_items.values():
+                deleted_item.delete()
 
             # ✅ Step 4: Handle Payments
-            total_payment = OrderPaymentService.process_payments(order, payments_data)
+            total_payment = OrderPaymentService.update_process_payments(order, payments_data)
 
             # ✅ Step 5: Validate Payments (Ensure it doesn’t exceed total_price)
             if total_payment > order.total_price:
@@ -136,36 +135,8 @@ class OrderService:
 
             return order  # ✅ Return the updated order
 
-        except Lens.DoesNotExist:
-            raise ValueError("Invalid Lens ID. Lens does not exist.")
-        except Frame.DoesNotExist:
-            raise ValueError("Invalid Frame ID. Frame does not exist.")
-        except LensCleaner.DoesNotExist:
-            raise ValueError("Invalid Lens Cleaner ID. Lens Cleaner does not exist.")
+        except ExternalLens.DoesNotExist:
+            raise ValueError("Invalid External Lens ID. External Lens does not exist.")
         except Exception as e:
             transaction.set_rollback(True)
             raise ValueError(f"Order update failed: {str(e)}")
-
-    @staticmethod
-    def validate_and_get_stock(item_data):
-        """ Helper function to get stock based on item type and handle missing stocks properly """
-        try:
-            if 'lens' in item_data and item_data['lens']:
-                lens_id = item_data['lens'].id if hasattr(item_data['lens'], 'id') else item_data['lens']
-                return LensStock.objects.select_for_update().get(lens_id=lens_id)
-            elif 'lens_cleaner' in item_data and item_data['lens_cleaner']:
-                cleaner_id = item_data['lens_cleaner'].id if hasattr(item_data['lens_cleaner'], 'id') else item_data['lens_cleaner']
-                return LensCleanerStock.objects.select_for_update().get(lens_cleaner_id=cleaner_id)
-            elif 'frame' in item_data and item_data['frame']:
-                frame_id = item_data['frame'].id if hasattr(item_data['frame'], 'id') else item_data['frame']
-                return FrameStock.objects.select_for_update().get(frame_id=frame_id)
-            else:
-                raise ValueError("Invalid item type.")
-        except LensStock.DoesNotExist:
-            raise ValueError(f"LensStock not found for Lens ID {lens_id}.")
-        except LensCleanerStock.DoesNotExist:
-            raise ValueError(f"LensCleanerStock not found for Cleaner ID {cleaner_id}.")
-        except FrameStock.DoesNotExist:
-            raise ValueError(f"FrameStock not found for Frame ID {frame_id}.")
-
-
