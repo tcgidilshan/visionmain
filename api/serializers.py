@@ -128,10 +128,11 @@ class CoatingSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'description']
         
 class LensSerializer(serializers.ModelSerializer):
-    brand = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all())  
+    brand = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all())
+    brand_name = serializers.CharField(source='brand.name', read_only=True)  # ✅ Get brand name  
     class Meta:
         model = Lens
-        fields = ['id', 'type', 'coating', 'price','brand']
+        fields = ['id', 'type', 'coating', 'price','brand', 'brand_name']
 
     def validate(self, data):
         if 'brand' not in data:

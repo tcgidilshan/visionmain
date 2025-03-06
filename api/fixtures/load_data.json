@@ -18,6 +18,12 @@
     }
   },
   {
+    "model": "api.power",
+    "fields": {
+      "name": "axis"
+    }
+  },
+  {
     "model": "api.lensetype",
     "fields": {
       "name": "Single Vision",
