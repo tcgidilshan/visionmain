@@ -34,6 +34,7 @@ from .views import (
     DoctorListCreateView,
     DoctorRetrieveUpdateDeleteView,
     PatientListView,
+    PatientUpdateView,# Added by Lahiru
     ChannelAppointmentView,
     ChannelListView,
     AppointmentRetrieveUpdateDeleteView,
@@ -94,6 +95,7 @@ urlpatterns = [
     path('doctors/', DoctorListCreateView.as_view(), name='doctor-list-create'),
     path('doctors/<int:pk>/', DoctorRetrieveUpdateDeleteView.as_view(), name='doctor-detail'),
     path('patients/', PatientListView.as_view(), name='patient-list'),
+    path('patients/<int:pk>/', PatientUpdateView.as_view(), name='patient-update'),# Added by Lahiru to update patient need review
     path('channel/', ChannelAppointmentView.as_view(), name='channel-appointment'),
     path('channels/', ChannelListView.as_view(), name='channel-list'),
     path('channels/<int:pk>/', AppointmentRetrieveUpdateDeleteView.as_view(), name='appointment-detail'),

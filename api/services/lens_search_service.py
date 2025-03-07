@@ -25,17 +25,28 @@ class LensSearchService:
         # ✅ Step 2: Check Power Values for Each Side (SPH, CYL, ADD)
         for lens in lenses:
             lens_powers = lens.lens_powers.all()  # ✅ Use related_name="lens_powers"
-
+            if type_id == 2:# //! CRITICAL CHECK 2 == PROGRESIVE LENSE
+                
             # ✅ Validate LEFT Eye Powers
-            has_sph_left = sph_left is None or lens_powers.filter(power__name="SPH", value=sph_left, side="left").exists()
-            has_cyl_left = cyl_left is None or lens_powers.filter(power__name="CYL", value=cyl_left, side="left").exists()
-            has_add_left = add_left is None or lens_powers.filter(power__name="ADD", value=add_left, side="left").exists()
+                has_sph_left = sph_left is None or lens_powers.filter(power__name="SPH", value=sph_left, side="left").exists()
+                has_cyl_left = cyl_left is None or lens_powers.filter(power__name="CYL", value=cyl_left, side="left").exists()
+                has_add_left = add_left is None or lens_powers.filter(power__name="ADD", value=add_left, side="left").exists()
 
             # ✅ Validate RIGHT Eye Powers
-            has_sph_right = sph_right is None or lens_powers.filter(power__name="SPH", value=sph_right, side="right").exists()
-            has_cyl_right = cyl_right is None or lens_powers.filter(power__name="CYL", value=cyl_right, side="right").exists()
-            has_add_right = add_right is None or lens_powers.filter(power__name="ADD", value=add_right, side="right").exists()
+                has_sph_right = sph_right is None or lens_powers.filter(power__name="SPH", value=sph_right, side="right").exists()
+                has_cyl_right = cyl_right is None or lens_powers.filter(power__name="CYL", value=cyl_right, side="right").exists()
+                has_add_right = add_right is None or lens_powers.filter(power__name="ADD", value=add_right, side="right").exists()
 
+
+            else:
+                has_sph_left = sph_left is None or lens_powers.filter(power__name="SPH", value=sph_left,side__isnull=True).exists()
+                has_cyl_left = cyl_left is None or lens_powers.filter(power__name="CYL", value=cyl_left, side__isnull=True).exists()
+                has_add_left = add_left is None or lens_powers.filter(power__name="ADD", value=add_left, side__isnull=True).exists()
+
+            # ✅ Validate RIGHT Eye Powers
+                has_sph_right = sph_right is None or lens_powers.filter(power__name="SPH", value=sph_right,side__isnull=True ).exists()
+                has_cyl_right = cyl_right is None or lens_powers.filter(power__name="CYL", value=cyl_right,side__isnull=True).exists()
+                has_add_right = add_right is None or lens_powers.filter(power__name="ADD", value=add_right,side__isnull=True ).exists()
             # ✅ If all power values match for both sides, check stock
             if has_sph_left and has_cyl_left and has_add_left and has_sph_right and has_cyl_right and has_add_right:
                 stock = LensStock.objects.filter(lens=lens, qty__gt=0).first()

@@ -73,6 +73,9 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'remark',
             'note',
             'is_manual',
+            'pd',
+            'h',
+            'shuger'
         ]
   
 class BrandSerializer(serializers.ModelSerializer):
@@ -128,10 +131,13 @@ class CoatingSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'description']
         
 class LensSerializer(serializers.ModelSerializer):
-    brand = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all())  
+    brand = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all())
+    brand_name = serializers.CharField(source='brand.name', read_only=True)  # ✅ Get brand name  
+    type_name = serializers.CharField(source='type.name', read_only=True)  # ✅ Get brand name 
+    coating_name = serializers.CharField(source='coating.name', read_only=True)  # ✅ Get brand name 
     class Meta:
         model = Lens
-        fields = ['id', 'type', 'coating', 'price','brand']
+        fields = ['id', 'type', 'coating', 'price','brand', 'brand_name','type_name','coating_name']
 
     def validate(self, data):
         if 'brand' not in data:
@@ -227,7 +233,8 @@ class OrderItemSerializer(serializers.ModelSerializer):
     lens_powers = serializers.SerializerMethodField()  # ✅ Custom field for lens powers
     external_lens_powers = serializers.SerializerMethodField()  # ✅ Custom field for external lens powers
     is_non_stock = serializers.BooleanField(default=False) 
-
+    lens_detail = LensSerializer(source="lens", read_only=True)
+    frame_detail = FrameSerializer(source="frame", read_only=True)
     class Meta:
         model = OrderItem
         fields = [
@@ -242,7 +249,9 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'subtotal',
             'lens_powers',  # ✅ Include lens powers
             'external_lens_powers',
-            'is_non_stock' 
+            'is_non_stock' ,
+            'lens_detail',
+            'frame_detail'
         ]
 
     def get_lens_powers(self, obj):
@@ -326,6 +335,7 @@ class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
         fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic','refraction_id']
+        
 
 class InvoiceSerializer(serializers.ModelSerializer):
     customer = serializers.PrimaryKeyRelatedField(source='order.customer', read_only=True)  # ✅ Fetch customer ID

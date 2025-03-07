@@ -1,0 +1,5 @@
+[
+  { "model": "api.power", "fields": { "name": "sph" } },
+  { "model": "api.power", "fields": { "name": "cyl" } },
+  { "model": "api.power", "fields": { "name": "add" } }
+]
