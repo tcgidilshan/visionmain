@@ -110,6 +110,11 @@ class OrderService:
                     if "external_lens" in item_data:
                         existing_item.external_lens_id = item_data["external_lens"]
 
+                    # ✅ Assign other IDs 
+                    existing_item.lens_id = item_data.get("lens", existing_item.lens_id)
+                    existing_item.frame_id = item_data.get("frame", existing_item.frame_id)
+                    existing_item.lens_cleaner_id = item_data.get("lens_cleaner", existing_item.lens_cleaner_id)
+
                     existing_item.save()
 
                 else:
@@ -119,7 +124,10 @@ class OrderService:
                         quantity=item_data['quantity'],
                         price_per_unit=item_data['price_per_unit'],
                         subtotal=item_data['subtotal'],
-                        external_lens_id=item_data.get("external_lens")
+                        external_lens_id=item_data.get("external_lens"),
+                        lens_id=item_data.get("lens"),  # ✅ Store lens_id
+                        frame_id=item_data.get("frame"),  # ✅ frame_id
+                        lens_cleaner_id=item_data.get("lens_cleaner")  # ✅ lens_cleaner_id
                     )
 
             # ✅ Step 3: Remove Deleted Items
