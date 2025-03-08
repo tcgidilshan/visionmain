@@ -341,9 +341,14 @@ class ExternalLensSerializer(serializers.ModelSerializer):
         ]
 
 class PatientSerializer(serializers.ModelSerializer):
+    refraction_number = serializers.SerializerMethodField()
     class Meta:
         model = Patient
-        fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic','refraction_id']
+        fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic','refraction_id','refraction_number']
+    def get_refraction_number(self, obj):
+        # Fetch the related Refraction instance using refraction_id
+        refraction = Refraction.objects.filter(id=obj.refraction_id).first()
+        return refraction.refraction_number if refraction else None
         
 
 class InvoiceSerializer(serializers.ModelSerializer):
