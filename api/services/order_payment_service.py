@@ -1,4 +1,4 @@
-from ..models import OrderPayment
+from ..models import OrderPayment,Order
 from ..serializers import OrderPaymentSerializer
 
 class OrderPaymentService:
@@ -72,3 +72,34 @@ class OrderPaymentService:
             raise ValueError("Total payments exceed the order total price.")
 
         return total_payment
+    
+    @staticmethod
+    def get_payments(order_id=None, invoice_id=None):
+        """
+        Fetch payments for a given order ID or invoice ID.
+        """
+        try:
+            # ✅ Fetch order using order_id or invoice_id
+            if order_id:
+                order = Order.objects.get(id=order_id)
+            elif invoice_id:
+                order = Order.objects.get(invoice_id=invoice_id)
+            else:
+                return {"error": "Order ID or Invoice ID is required."}
+
+            # ✅ Get payments related to the order
+            payments = order.orderpayment_set.all()
+
+            # ✅ Serialize payment data
+            payment_serializer = OrderPaymentSerializer(payments, many=True)
+
+            return {
+                "message": "Payments fetched successfully.",
+                "payments": payment_serializer.data
+            }
+
+        except Order.DoesNotExist:
+            return {"error": "Order not found."}
+        except Exception as e:
+            return {"error": f"An error occurred: {str(e)}"}
+
