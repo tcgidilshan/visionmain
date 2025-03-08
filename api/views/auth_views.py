@@ -75,6 +75,7 @@ class IsAdminOrSuperAdmin(permissions.BasePermission):
 
     
 class UserRegistrationView(APIView):
+    permission_classes = [AllowAny] 
     def post(self, request):
         username = request.data.get('username')
         password = request.data.get('password')
