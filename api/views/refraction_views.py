@@ -35,7 +35,6 @@ class RefractionCreateAPIView(generics.CreateAPIView):
 class RefractionPagination(PageNumberPagination):
     page_size = 10  # Customize as needed
 
-
 class RefractionListAPIView(generics.ListAPIView):
     """
     API View to List All Refractions with Pagination, Filtering, and Search
@@ -50,7 +49,7 @@ class RefractionListAPIView(generics.ListAPIView):
     search_fields = ['customer_full_name', 'customer_mobile', 'refraction_number']
     ordering_fields = ['refraction_number', 'customer_full_name']
     ordering = ['-refraction_number']  # Default ordering (descending)
-    
+
 #update
 class RefractionUpdateAPIView(generics.UpdateAPIView):
     """
@@ -81,8 +80,7 @@ class RefractionUpdateAPIView(generics.UpdateAPIView):
             return Response(
                 {"error": "Invalid data", "details": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST,
-            )
-            
+            )           
 #delete
 class RefractionDeleteAPIView(generics.DestroyAPIView):
     """

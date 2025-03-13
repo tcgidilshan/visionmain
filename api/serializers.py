@@ -27,7 +27,9 @@ from .models import (
     CustomUser,
     Invoice,
     ExternalLens,
-    ExternalLensPower
+    ExternalLensPower,
+    OtherItem,
+    OtherItemStock
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -473,5 +475,18 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
         """Fetch all related payments for this appointment."""
         payments = ChannelPayment.objects.filter(appointment=obj)  # Related payments
         return ChannelPaymentSerializer(payments, many=True).data 
+class OtherItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OtherItem
+        fields = ['id', 'name', 'price', 'is_active']
+class OtherItemStockSerializer(serializers.ModelSerializer):
+    other_item = OtherItemSerializer(read_only=True)  # ✅ Nested serialization for better readability
+    other_item_id = serializers.PrimaryKeyRelatedField(
+        queryset=OtherItem.objects.all(), source='other_item', write_only=True
+    )
+
+    class Meta:
+        model = OtherItemStock
+        fields = ['id', 'other_item', 'other_item_id', 'initial_count', 'qty']
 
 
