@@ -27,3 +27,4 @@ from .frame_color_views import FrameColorListView
 from .payment_view import PaymentView
 from .other_item_views import OtherItemListCreateView,OtherItemRetrieveUpdateDeleteView
 from .user_views import CreateUserView
+from .code_check_views import UserCodeCheckView,AdminCodeCheckView
