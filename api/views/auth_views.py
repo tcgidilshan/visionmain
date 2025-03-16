@@ -6,7 +6,7 @@ from rest_framework import status
 from django.contrib.auth import get_user_model
 from rest_framework.permissions import AllowAny
 from rest_framework.exceptions import PermissionDenied
-from ..models import Branch
+from ..models import Branch,UserBranch
 from ..serializers import BranchSerializer
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
@@ -96,22 +96,60 @@ class AdminRegistrationView(APIView):
     permission_classes = [AllowAny]  # Modify this as needed for extra security
 
     def post(self, request):
-        username = request.data.get('username')
-        password = request.data.get('password')
-        email = request.data.get('email')
+        username = request.data.get("username")
+        password = request.data.get("password")
+        email = request.data.get("email")
+        first_name = request.data.get("first_name", "")
+        last_name = request.data.get("last_name", "")
+        mobile = request.data.get("mobile", None)
+        user_code = request.data.get("user_code", None)
 
-        if not username or not password or not email:
-            return Response({"error": "All fields are required!"}, status=status.HTTP_400_BAD_REQUEST)
+        if not username or not password or not email or not user_code:
+            return Response({"error": "Username, password, email, and user_code are required!"}, status=status.HTTP_400_BAD_REQUEST)
 
         if User.objects.filter(username=username).exists():
             return Response({"error": "Username already exists!"}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "Email already exists!"}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(user_code=user_code).exists():
+            return Response({"error": "User code already exists!"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create an admin user
-        admin_user = User.objects.create_user(username=username, password=password, email=email)
-        admin_user.is_staff = True
+        # ✅ Create an admin user
+        admin_user = User.objects.create_user(
+            username=username,
+            password=password,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            mobile=mobile,
+            user_code=user_code,
+        )
+        admin_user.is_staff = True  # ✅ Admin permissions
+        admin_user.is_superuser = True  # ✅ Optional: Give superuser rights
         admin_user.save()
 
-        return Response({"message": "Admin user registered successfully!"}, status=status.HTTP_201_CREATED)
+        # ✅ Assign user to all branches
+        all_branches = Branch.objects.all()
+        user_branches = [UserBranch(user=admin_user, branch=branch) for branch in all_branches]
+        UserBranch.objects.bulk_create(user_branches)  # ✅ Efficient batch insert
+
+        return Response(
+            {
+                "message": "Admin user registered successfully!",
+                "user": {
+                    "id": admin_user.id,
+                    "username": admin_user.username,
+                    "email": admin_user.email,
+                    "first_name": admin_user.first_name,
+                    "last_name": admin_user.last_name,
+                    "mobile": admin_user.mobile,
+                    "user_code": admin_user.user_code,
+                    "branches_assigned": [branch.id for branch in all_branches]
+                }
+            },
+            status=status.HTTP_201_CREATED
+        )
+
     
     
 

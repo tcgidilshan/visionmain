@@ -12,5 +12,5 @@ class BranchListCreateAPIView(generics.ListCreateAPIView):
 class BranchRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Branch.objects.only('id', 'branch_name', 'location')
     serializer_class = BranchSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
     
