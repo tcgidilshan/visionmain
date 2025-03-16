@@ -66,7 +66,6 @@ class OtherItemListCreateView(generics.ListCreateAPIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class OtherItemRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     """
     API View to retrieve, update, or delete a specific OtherItem with stock.

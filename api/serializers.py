@@ -29,7 +29,8 @@ from .models import (
     ExternalLens,
     ExternalLensPower,
     OtherItem,
-    OtherItemStock
+    OtherItemStock,
+    UserBranch
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -493,5 +494,14 @@ class OtherItemStockSerializer(serializers.ModelSerializer):
     class Meta:
         model = OtherItemStock
         fields = ['id', 'other_item', 'other_item_id', 'initial_count', 'qty']
+
+class UserBranchSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())  # Accepts user ID
+    branch = serializers.PrimaryKeyRelatedField(queryset=Branch.objects.all())  # Accepts branch ID
+
+    class Meta:
+        model = UserBranch
+        fields = ['id', 'user', 'branch', 'assigned_at']
+        read_only_fields = ['assigned_at']
 
 

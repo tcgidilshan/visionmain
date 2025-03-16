@@ -51,7 +51,8 @@ from .views import (
     LensSearchView,
     PaymentView,
     OtherItemListCreateView,
-    OtherItemRetrieveUpdateDeleteView
+    OtherItemRetrieveUpdateDeleteView,
+    CreateUserView
 )
 # from .views import CustomAuthToken
 
@@ -63,6 +64,7 @@ urlpatterns = [
     path('register/admin/', AdminRegistrationView.as_view(), name='admin-registration'),
     path('branches/', BranchListCreateAPIView.as_view(), name='branch-list-create'),
     path('branches/<int:pk>/', BranchRetrieveUpdateDestroyAPIView.as_view(), name='branch-detail'),
+    path("users/create/", CreateUserView.as_view(), name="create-user"), 
     path('refractions/create/', RefractionCreateAPIView.as_view(), name='refraction-create'),
     path('refractions/', RefractionListAPIView.as_view(), name='refraction-list'),
     path('refractions/<int:pk>/update/', RefractionUpdateAPIView.as_view(), name='refraction-update'),

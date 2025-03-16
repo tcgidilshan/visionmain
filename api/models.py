@@ -23,6 +23,10 @@ class Branch(models.Model):
     
 class CustomUser(AbstractUser):
     mobile = models.CharField(max_length=15, blank=True, null=True)
+    user_code = models.CharField(max_length=10, null=True, blank=True) 
+
+    def __str__(self):
+        return f"{self.username} ({self.user_code})"
     
 #refractions
 class Refraction(models.Model):
@@ -458,3 +462,14 @@ class OtherItemStock(models.Model):
 
     def __str__(self):
         return f"{self.other_item.name} - Initial: {self.initial_count}, Current: {self.qty}"
+    
+class UserBranch(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="user_branches")
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="branch_users")  # ✅ Fixed related_name
+    assigned_at = models.DateTimeField(auto_now_add=True)  # Timestamp when assigned
+
+    class Meta:
+        unique_together = ('user', 'branch')  # Prevents duplicate user-branch assignments
+
+    def __str__(self):
+        return f"{self.user.username} - {self.branch.name}"
