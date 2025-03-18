@@ -33,3 +33,41 @@ class CreateUserView(generics.CreateAPIView):
             )
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class UpdateUserView(generics.UpdateAPIView):
+    """
+    API View to update a user's details.
+    """
+
+    def put(self, request, user_id):
+        try:
+            data = request.data
+            user = UserService.update_user(
+                user_id=user_id,
+                username=data.get("username"),
+                email=data.get("email"),
+                user_code=data.get("user_code"),
+                mobile=data.get("mobile"),
+                first_name=data.get("first_name"),
+                last_name=data.get("last_name"),
+                branch_ids=data.get("branch_ids", [])
+            )
+
+            return Response(
+                {
+                    "message": "User updated successfully",
+                    "user": {
+                        "id": user.id,
+                        "username": user.username,
+                        "email": user.email,
+                        "user_code": user.user_code,
+                        "mobile": user.mobile,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                        "branches_assigned": [ub.branch.id for ub in user.user_branches.all()]
+                    }
+                },
+                status=status.HTTP_200_OK
+            )
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

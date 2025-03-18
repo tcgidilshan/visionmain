@@ -54,7 +54,8 @@ from .views import (
     OtherItemRetrieveUpdateDeleteView,
     CreateUserView,
     UserCodeCheckView,
-    AdminCodeCheckView
+    AdminCodeCheckView,
+    UpdateUserView
 )
 # from .views import CustomAuthToken
 
@@ -67,6 +68,7 @@ urlpatterns = [
     path('branches/', BranchListCreateAPIView.as_view(), name='branch-list-create'),
     path('branches/<int:pk>/', BranchRetrieveUpdateDestroyAPIView.as_view(), name='branch-detail'),
     path("users/create/", CreateUserView.as_view(), name="create-user"), 
+    path("users/update/<int:user_id>/", UpdateUserView.as_view(), name="update-user"),
     path("user/check-code/", UserCodeCheckView.as_view(), name="check-user-code"),
     path("admin/check-code/", AdminCodeCheckView.as_view(), name="check-user-code"),
     path('refractions/create/', RefractionCreateAPIView.as_view(), name='refraction-create'),
