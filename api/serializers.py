@@ -499,10 +499,10 @@ class UserBranchSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())  # Accepts user ID
     branch = serializers.PrimaryKeyRelatedField(queryset=Branch.objects.all())  # Accepts branch ID
     user_username = serializers.CharField(source="user.username", read_only=True)
-    branch_details = BranchSerializer(source="branch", read_only=True)
+
     class Meta:
         model = UserBranch
-        fields = ['id', 'user', 'branch', 'assigned_at',"user_username","branch_details"]
+        fields = ['id', 'user', 'branch', 'assigned_at',"user_username",]
         read_only_fields = ['assigned_at']
 
 
