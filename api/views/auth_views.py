@@ -106,7 +106,6 @@ class AdminRegistrationView(APIView):
 
         if not username or not password or not email or not user_code:
             return Response({"error": "Username, password, email, and user_code are required!"}, status=status.HTTP_400_BAD_REQUEST)
-
         if User.objects.filter(username=username).exists():
             return Response({"error": "Username already exists!"}, status=status.HTTP_400_BAD_REQUEST)
         if User.objects.filter(email=email).exists():

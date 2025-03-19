@@ -2,7 +2,8 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from ..services.user_service import UserService
 from django.contrib.auth import get_user_model
-
+from ..serializers import UserBranchSerializer
+from ..models import UserBranch
 CustomUser = get_user_model()
 
 class CreateUserView(generics.CreateAPIView):
@@ -71,3 +72,12 @@ class UpdateUserView(generics.UpdateAPIView):
             )
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+class GetAllUsersView(generics.ListAPIView):
+    """
+    API View to get all user-branch assignments.
+    """
+    queryset = UserBranch.objects.all()
+    serializer_class = UserBranchSerializer
+ 
+    
