@@ -173,6 +173,7 @@ class Frame(models.Model):
         return f"{self.brand.name} - {self.code.name} - {self.color.name}"
     
 class FrameStock(models.Model):
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="frame_stocks", null=True, blank=True)
     frame = models.ForeignKey(Frame, related_name='stocks', on_delete=models.CASCADE)
     qty = models.IntegerField(default=0)
     initial_count = models.IntegerField(null=True, blank=True)
