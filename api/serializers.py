@@ -115,9 +115,15 @@ class FrameSerializer(serializers.ModelSerializer):
         ]
         
 class FrameStockSerializer(serializers.ModelSerializer):
+    branch_id = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(),  # Ensures valid branch selection
+        source="branch",  # Maps to `branch` field in the model
+        required=False  # Makes it optional in requests
+    )
+    branch_name = serializers.CharField(source="branch.branch_name", read_only=True) 
     class Meta:
         model = FrameStock
-        fields = ['id', 'frame', 'qty', 'initial_count','limit']
+        fields = ['id', 'frame', 'qty', 'initial_count','limit','branch_id','branch_name']
         
 class LenseTypeSerializer(serializers.ModelSerializer):
     class Meta:
