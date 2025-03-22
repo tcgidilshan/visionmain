@@ -51,7 +51,7 @@ class RefractionListAPIView(generics.ListAPIView):
     ordering = ['-refraction_number']  # Default ordering (descending)
 
 #update
-class RefractionUpdateAPIView(generics.UpdateAPIView):
+class RefractionUpdateAPIView(generics.RetrieveUpdateAPIView):
     """
     API View to Update an Existing Refraction Record
     """

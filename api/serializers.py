@@ -496,10 +496,16 @@ class OtherItemStockSerializer(serializers.ModelSerializer):
     other_item_id = serializers.PrimaryKeyRelatedField(
         queryset=OtherItem.objects.all(), source='other_item', write_only=True
     )
+    branch_id = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(),  # Ensures valid branch selection
+        source="branch",  # Maps to `branch` field in the model
+        required=False  # Makes it optional in requests
+    )
+    branch_name = serializers.CharField(source="branch.branch_name", read_only=True) 
 
     class Meta:
         model = OtherItemStock
-        fields = ['id', 'other_item', 'other_item_id', 'initial_count', 'qty']
+        fields = ['id', 'other_item', 'other_item_id', 'initial_count', 'qty', 'branch_name','branch_id']	
 
 class UserBranchSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())  # Accepts user ID
