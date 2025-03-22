@@ -72,11 +72,12 @@ MIDDLEWARE = [
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5174", 
+    "http://localhost:5173", 
     "https://visionmain-a9804.web.app", 
     "https://visionmain-a9804.firebaseapp.com",
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
 
 ROOT_URLCONF = 'myapi.urls'
 

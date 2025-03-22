@@ -458,12 +458,13 @@ class OtherItem(models.Model):
         return f"{self.name} - ${self.price} - {'Active' if self.is_active else 'Inactive'}"
     
 class OtherItemStock(models.Model):
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="other_item_stocks", null=True, blank=True)
     other_item = models.ForeignKey(OtherItem, on_delete=models.CASCADE, related_name="stocks")
     initial_count = models.PositiveIntegerField()
     qty = models.PositiveIntegerField()
 
     def __str__(self):
-        return f"{self.other_item.name} - Initial: {self.initial_count}, Current: {self.qty}"
+        return f"{self.other_item.name} - Initial: {self.initial_count}, Current: {self.qty} "
     
 class UserBranch(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="user_branches")

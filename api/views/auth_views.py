@@ -32,12 +32,23 @@ class LoginView(APIView):
 
         if user is not None:
             token, created = Token.objects.get_or_create(user=user)
+            branches = UserBranch.objects.filter(user_id=user.id).select_related("branch")
+            branch_details = [
+                {
+                    "id": ub.branch.id,
+                    "branch_name": ub.branch.branch_name,  # Change this to `ub.branch.branch_name` if your model uses `branch_name`
+                    "location": ub.branch.location,  # Include other fields if needed
+                }
+                for ub in branches
+            ]
+
             return Response({
                 "message": "Login successful",
                 "token": token.key,
                 "username": user.username,
                 "is_staff": user.is_staff,
                 "is_superuser": user.is_superuser,
+                "branches": branch_details
             })
         else:
             return Response(
@@ -106,7 +117,6 @@ class AdminRegistrationView(APIView):
 
         if not username or not password or not email or not user_code:
             return Response({"error": "Username, password, email, and user_code are required!"}, status=status.HTTP_400_BAD_REQUEST)
-
         if User.objects.filter(username=username).exists():
             return Response({"error": "Username already exists!"}, status=status.HTTP_400_BAD_REQUEST)
         if User.objects.filter(email=email).exists():

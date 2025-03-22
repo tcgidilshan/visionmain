@@ -55,7 +55,7 @@ from .views import (
     CreateUserView,
     UserCodeCheckView,
     AdminCodeCheckView,
-    UpdateUserView
+    UpdateUserView,GetAllUsersView,GetSingleUserView
 )
 # from .views import CustomAuthToken
 
@@ -69,11 +69,13 @@ urlpatterns = [
     path('branches/<int:pk>/', BranchRetrieveUpdateDestroyAPIView.as_view(), name='branch-detail'),
     path("users/create/", CreateUserView.as_view(), name="create-user"), 
     path("users/update/<int:user_id>/", UpdateUserView.as_view(), name="update-user"),
+    path("users/get/<int:user_id>/", GetSingleUserView.as_view(), name="get-single-user"),
+    path("users/", GetAllUsersView.as_view(), name="get-all-users"),
     path("user/check-code/", UserCodeCheckView.as_view(), name="check-user-code"),
     path("admin/check-code/", AdminCodeCheckView.as_view(), name="check-user-code"),
     path('refractions/create/', RefractionCreateAPIView.as_view(), name='refraction-create'),
     path('refractions/', RefractionListAPIView.as_view(), name='refraction-list'),
-    path('refractions/<int:pk>/update/', RefractionUpdateAPIView.as_view(), name='refraction-update'),
+    path('refractions/<int:pk>/update/', RefractionUpdateAPIView.as_view(), name='refraction-update'),#Update Retrive
     path('refractions/<int:pk>/delete/', RefractionDeleteAPIView.as_view(), name='refraction-delete'),
     path('refraction-details/create/', RefractionDetailCreateAPIView.as_view(), name='refraction-details-create'),
     path('refractions/<int:refraction_id>/', RefractionDetailRetrieveUpdateDeleteView.as_view(), name='refraction-details'),
