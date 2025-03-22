@@ -12,59 +12,73 @@ class LensListCreateView(generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        List all lenses with their stock and powers.
+        List all lenses with their branch-wise stock and powers.
         """
         lenses = self.get_queryset()
         data = []
+
         for lens in lenses:
-            stock = lens.stocks.first()  # Assuming one stock per lens
-            powers = lens.lens_powers.all()  # Fetch related lens powers
-            stock_data = LensStockSerializer(stock).data if stock else None
+            stocks = lens.stocks.all()  # ✅ Multiple stocks (for different branches)
+            powers = lens.lens_powers.all()
+
+            stock_data = LensStockSerializer(stocks, many=True).data
             powers_data = LensPowerSerializer(powers, many=True).data
             lens_data = LensSerializer(lens).data
+
             lens_data['stock'] = stock_data
             lens_data['powers'] = powers_data
+
             data.append(lens_data)
+
         return Response(data)
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         """
         Create a new lens, its stock (with initial_count), and powers.
+        Supports multiple branch-wise stocks.
         """
         lens_data = request.data.get('lens')
-        stock_data = request.data.get('stock')
-        powers_data = request.data.get('powers')
+        stock_data_list = request.data.get('stock', [])  # ✅ Accept list of stocks
+        powers_data = request.data.get('powers', [])
 
-        # Validate initial stock data
-        if not stock_data or 'initial_count' not in stock_data:
-            return Response(
-                {"error": "initial_count is required for creating stock."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Create Lens
+        # ✅ Create Lens
         lens_serializer = self.get_serializer(data=lens_data)
         lens_serializer.is_valid(raise_exception=True)
         lens = lens_serializer.save()
 
-        # Create Stock
-        stock_data['lens'] = lens.id
-        stock_serializer = LensStockSerializer(data=stock_data)
-        stock_serializer.is_valid(raise_exception=True)
-        stock_serializer.save()
+        # ✅ Process branch-wise stock
+        created_stocks = []
+        if isinstance(stock_data_list, list):
+            for stock_data in stock_data_list:
+                if 'initial_count' not in stock_data:
+                    return Response(
+                        {"error": "initial_count is required for each stock entry."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                stock_data['lens'] = lens.id
+                stock_serializer = LensStockSerializer(data=stock_data)
+                stock_serializer.is_valid(raise_exception=True)
+                created_stocks.append(stock_serializer.save())
+        else:
+            return Response(
+                {"error": "Stock data must be a list."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # Create Powers
+        # ✅ Process powers
+        created_powers = []
         for power_data in powers_data:
             power_data['lens'] = lens.id
             power_serializer = LensPowerSerializer(data=power_data)
             power_serializer.is_valid(raise_exception=True)
-            power_serializer.save()
+            created_powers.append(power_serializer.save())
 
-        # Prepare Response
+        # ✅ Prepare response
         response_data = lens_serializer.data
-        response_data['stock'] = stock_serializer.data
-        response_data['powers'] = powers_data
+        response_data['stock'] = LensStockSerializer(created_stocks, many=True).data
+        response_data['powers'] = powers_data  # original request payload, or serialize if needed
+
         return Response(response_data, status=status.HTTP_201_CREATED)
 
 
@@ -75,26 +89,92 @@ class LensRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         """
-        Retrieve a lens with its stock and powers.
+        Retrieve a lens with all its stock entries and powers.
         """
         lens = self.get_object()
-        stock = lens.stocks.first()  # Assuming one stock per lens
-        powers = lens.lens_powers.all()  # Fetch related lens powers
+        stocks = lens.stocks.all()  # May include multiple branch-wise stock records
+        powers = lens.lens_powers.all()  # All related powers for the lens
+
         lens_data = LensSerializer(lens).data
-        lens_data['stock'] = LensStockSerializer(stock).data if stock else None
+        lens_data['stock'] = LensStockSerializer(stocks, many=True).data if stocks else []
         lens_data['powers'] = LensPowerSerializer(powers, many=True).data
+
         return Response(lens_data)
+
 
     @transaction.atomic
     def update(self, request, *args, **kwargs):
         """
-        Update lens details. Stock and powers updates handled separately.
+        Update lens details, along with optional branch-wise stocks and powers.
         """
         lens = self.get_object()
-        lens_serializer = self.get_serializer(lens, data=request.data, partial=True)
+        lens_serializer = self.get_serializer(lens, data=request.data.get("lens", {}), partial=True)
         lens_serializer.is_valid(raise_exception=True)
         lens_serializer.save()
-        return Response(lens_serializer.data)
+
+        # Process stock updates
+        stock_data_list = request.data.get("stock", [])
+        updated_stocks = []
+
+        if isinstance(stock_data_list, list):
+            for stock_data in stock_data_list:
+                if "initial_count" not in stock_data:
+                    return Response(
+                        {"error": "initial_count is required for each stock entry."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                branch_id = stock_data.get("branch_id")
+                if not branch_id:
+                    return Response(
+                        {"error": "branch_id is required for stock updates."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # ✅ Check if stock exists for this lens + branch
+                stock_instance = lens.stocks.filter(branch_id=branch_id).first()
+
+                stock_data["lens"] = lens.id
+                if stock_instance:
+                    # Update
+                    stock_serializer = LensStockSerializer(stock_instance, data=stock_data, partial=True)
+                else:
+                    # Create
+                    stock_serializer = LensStockSerializer(data=stock_data)
+
+                stock_serializer.is_valid(raise_exception=True)
+                updated_stocks.append(stock_serializer.save())
+
+        # Process power updates
+        powers_data = request.data.get("powers", [])
+        updated_powers = []
+
+        for power_data in powers_data:
+            if not power_data.get("power"):
+                return Response({"error": "Each power entry must include 'power' field."}, status=400)
+
+            power_data["lens"] = lens.id
+
+            # Update if side + power already exist, else create
+            existing_power = lens.lens_powers.filter(
+                power_id=power_data["power"],
+                side=power_data.get("side")
+            ).first()
+
+            if existing_power:
+                power_serializer = LensPowerSerializer(existing_power, data=power_data, partial=True)
+            else:
+                power_serializer = LensPowerSerializer(data=power_data)
+
+            power_serializer.is_valid(raise_exception=True)
+            updated_powers.append(power_serializer.save())
+
+        # Final response
+        response_data = lens_serializer.data
+        response_data["stocks"] = LensStockSerializer(updated_stocks, many=True).data
+        response_data["powers"] = LensPowerSerializer(updated_powers, many=True).data
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
     def destroy(self, request, *args, **kwargs):
         """

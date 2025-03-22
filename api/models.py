@@ -207,6 +207,7 @@ class Lens(models.Model):
     
 class LensStock(models.Model):
     lens = models.ForeignKey(Lens, related_name='stocks', on_delete=models.CASCADE)
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="stocks", null=True, blank=True)
     initial_count = models.IntegerField(null=True, blank=True)  # Allows NULL for optional initial count
     qty = models.IntegerField(default=0)
     limit = models.IntegerField(default=0)  # New column to define stock limit
