@@ -13,20 +13,24 @@ class LensListCreateView(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         """
         List all lenses with their branch-wise stock and powers.
+        If branch_id is passed, only show stock for that branch.
         """
+        branch_id = request.query_params.get('branch_id', None)
         lenses = self.get_queryset()
         data = []
 
         for lens in lenses:
-            stocks = lens.stocks.all()  # ✅ Multiple stocks (for different branches)
+            # 🔍 Filter stock by branch if branch_id is provided
+            if branch_id:
+                stocks = lens.stocks.filter(branch_id=branch_id)
+            else:
+                stocks = lens.stocks.all()
+
             powers = lens.lens_powers.all()
 
-            stock_data = LensStockSerializer(stocks, many=True).data
-            powers_data = LensPowerSerializer(powers, many=True).data
             lens_data = LensSerializer(lens).data
-
-            lens_data['stock'] = stock_data
-            lens_data['powers'] = powers_data
+            lens_data['stock'] = LensStockSerializer(stocks, many=True).data
+            lens_data['powers'] = LensPowerSerializer(powers, many=True).data
 
             data.append(lens_data)
 
@@ -89,18 +93,28 @@ class LensRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         """
-        Retrieve a lens with all its stock entries and powers.
+        Retrieve a lens with optional branch-specific stock and full powers.
         """
+        branch_id = request.query_params.get('branch_id')
         lens = self.get_object()
-        stocks = lens.stocks.all()  # May include multiple branch-wise stock records
-        powers = lens.lens_powers.all()  # All related powers for the lens
 
+        # Full lens info
         lens_data = LensSerializer(lens).data
-        lens_data['stock'] = LensStockSerializer(stocks, many=True).data if stocks else []
+
+        # Filter stocks by branch if param is present
+        if branch_id:
+            stocks = lens.stocks.filter(branch_id=branch_id)
+        else:
+            stocks = lens.stocks.all()
+
+        # Add filtered stocks to response
+        lens_data['stock'] = LensStockSerializer(stocks, many=True).data
+
+        # Powers are always complete
+        powers = lens.lens_powers.all()
         lens_data['powers'] = LensPowerSerializer(powers, many=True).data
 
         return Response(lens_data)
-
 
     @transaction.atomic
     def update(self, request, *args, **kwargs):
@@ -185,3 +199,4 @@ class LensRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         lens.lens_powers.all().delete()  # Delete associated powers
         lens.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
