@@ -73,11 +73,10 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'left_eye_dist_cyl',
             'left_eye_dist_axis',
             'left_eye_near_sph',
-            'remark',
+            'refraction_remark',
+            'prescription'
             'note',
             'is_manual',
-            'pd',
-            'h',
             'shuger'
         ]
   

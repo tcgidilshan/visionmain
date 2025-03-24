@@ -115,13 +115,11 @@ class RefractionDetails(models.Model):
     left_eye_dist_cyl = models.CharField(max_length=10, blank=True, null=True)
     left_eye_dist_axis = models.CharField(max_length=10, blank=True, null=True)
     left_eye_near_sph = models.CharField(max_length=10, blank=True, null=True)
-
-    remark = models.CharField(max_length=20, blank=True, null=True)
+    prescription = models.BooleanField(default=False)
     note = models.CharField(max_length=100, blank=True, null=True)
 
     #new Changes
-    pd=models.CharField(max_length=10,blank=True,null=True)
-    h=models.CharField(max_length=10,blank=True,null=True)
+    refraction_remark = models.CharField(max_length=100, blank=True, null=True)
     shuger=models.BooleanField(default=False)
 
     def __str__(self):
