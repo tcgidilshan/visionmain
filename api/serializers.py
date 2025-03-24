@@ -155,9 +155,15 @@ class LensStockSerializer(serializers.ModelSerializer):
     lens_type = serializers.CharField(source='lens.type.name', read_only=True)  # Assuming Lens has a type field
     coating = serializers.CharField(source='lens.coating.name', read_only=True)  # Assuming Lens has a coating field
     powers = serializers.SerializerMethodField()
+    branch_id = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(),  # Ensures valid branch selection
+        source="branch",  # Maps to `branch` field in the model
+        required=False  # Makes it optional in requests
+    )
+    branch_name = serializers.CharField(source="branch.branch_name", read_only=True) 
     class Meta:
         model = LensStock
-        fields = ['id', 'lens', 'lens_type','coating', 'initial_count', 'qty', 'limit', 'powers', 'created_at', 'updated_at']
+        fields = ['id', 'lens','branch_id','branch_name', 'lens_type','coating', 'initial_count', 'qty', 'limit', 'powers', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
 
     def get_powers(self, obj):
