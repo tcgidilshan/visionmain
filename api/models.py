@@ -66,7 +66,8 @@ class Patient(models.Model):
     refraction = models.ForeignKey(
         Refraction, null=True, blank=True, on_delete=models.SET_NULL, related_name="patients"
     )  # ✅ Added refraction_id (nullable)
-
+    #new feature
+    patient_note=models.CharField(max_length=100,null=True,blank=True)
     def __str__(self):
         return f"{self.name}"
     
@@ -115,10 +116,10 @@ class RefractionDetails(models.Model):
     left_eye_dist_cyl = models.CharField(max_length=10, blank=True, null=True)
     left_eye_dist_axis = models.CharField(max_length=10, blank=True, null=True)
     left_eye_near_sph = models.CharField(max_length=10, blank=True, null=True)
-    prescription = models.BooleanField(default=False)
     note = models.CharField(max_length=100, blank=True, null=True)
 
     #new Changes
+    prescription = models.BooleanField(default=False)
     refraction_remark = models.CharField(max_length=100, blank=True, null=True)
     shuger=models.BooleanField(default=False)
 

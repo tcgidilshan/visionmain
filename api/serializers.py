@@ -74,7 +74,7 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'left_eye_dist_axis',
             'left_eye_near_sph',
             'refraction_remark',
-            'prescription'
+            'prescription',
             'note',
             'is_manual',
             'shuger'
@@ -358,7 +358,7 @@ class PatientSerializer(serializers.ModelSerializer):
     refraction_number = serializers.SerializerMethodField()
     class Meta:
         model = Patient
-        fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic','refraction_id','refraction_number']
+        fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic','patient_note','refraction_id','refraction_number']
     def get_refraction_number(self, obj):
         # Fetch the related Refraction instance using refraction_id
         refraction = Refraction.objects.filter(id=obj.refraction_id).first()
