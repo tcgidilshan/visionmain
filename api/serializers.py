@@ -340,6 +340,11 @@ class OrderSerializer(serializers.ModelSerializer):
         ] 
 
 class ExternalLensSerializer(serializers.ModelSerializer):
+    branch_id = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(),  # Ensures valid branch selection
+        source="branch",  # Maps to `branch` field in the model
+        required=False  # Makes it optional in requests
+    )
     brand_name = serializers.CharField(source="brand.name", read_only=True)  # ✅ Fetch Brand Name
     type_name = serializers.CharField(source="type.name", read_only=True)  # ✅ Fetch Lens Type Name
     coating_name = serializers.CharField(source="coating.name", read_only=True)  # ✅ Fetch Coating Name
@@ -352,6 +357,7 @@ class ExternalLensSerializer(serializers.ModelSerializer):
             "type", "type_name",  # ✅ Return ID & Name
             "coating", "coating_name",  # ✅ Return ID & Name
             "price",  # ✅ Manually Entered Price
+            "branch_id"
         ]
 
 class PatientSerializer(serializers.ModelSerializer):

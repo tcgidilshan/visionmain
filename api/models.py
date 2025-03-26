@@ -279,6 +279,7 @@ class Order(models.Model):
         return f"Order {self.id} - Status: {self.status} - Customer: {self.customer.id}"
     
 class ExternalLens(models.Model):
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="external_lenses", null=True, blank=True)
     type = models.ForeignKey(LenseType, related_name='external_lenses', on_delete=models.CASCADE)
     coating = models.ForeignKey(Coating, related_name='external_lenses', on_delete=models.CASCADE)
     brand = models.ForeignKey(Brand, related_name='external_lenses', on_delete=models.CASCADE)
