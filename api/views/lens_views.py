@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from django.db import transaction
 from ..models import Lens, LensStock, LensPower
 from ..serializers import LensSerializer, LensStockSerializer, LensPowerSerializer
-
+from ..services.branch_protection_service import BranchProtectionsService
 # List and Create Lenses (with stock and powers)
 class LensListCreateView(generics.ListCreateAPIView):
     queryset = Lens.objects.all()
@@ -95,17 +95,13 @@ class LensRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         """
         Retrieve a lens with optional branch-specific stock and full powers.
         """
-        branch_id = request.query_params.get('branch_id')
+        branch = BranchProtectionsService.validate_branch_id(request)
         lens = self.get_object()
 
         # Full lens info
         lens_data = LensSerializer(lens).data
 
-        # Filter stocks by branch if param is present
-        if branch_id:
-            stocks = lens.stocks.filter(branch_id=branch_id)
-        else:
-            stocks = lens.stocks.all()
+        stocks = lens.stocks.filter(branch_id=branch.id)
 
         # Add filtered stocks to response
         lens_data['stock'] = LensStockSerializer(stocks, many=True).data

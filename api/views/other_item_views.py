@@ -3,7 +3,8 @@ from rest_framework.response import Response
 from ..models import OtherItem, OtherItemStock
 from rest_framework.pagination import PageNumberPagination
 from ..serializers import OtherItemSerializer, OtherItemStockSerializer
-
+from rest_framework.exceptions import ValidationError
+from ..services.branch_protection_service import BranchProtectionsService
 class CustomPagination(PageNumberPagination):
     """
     Custom pagination class for paginating OtherItem results.
@@ -28,7 +29,9 @@ class OtherItemListCreateView(generics.ListCreateAPIView):
         """
         List paginated OtherItems with stock data.
         """
-        queryset = self.filter_queryset(self.get_queryset())  # Apply search & ordering filters
+        queryset = self.filter_queryset(self.get_queryset())
+        branch = BranchProtectionsService.validate_branch_id(request)
+        queryset = self.filter_queryset(self.get_queryset()).filter(stocks__branch_id=branch.id)
         paginated_queryset = self.paginate_queryset(queryset)
 
         response_data = [

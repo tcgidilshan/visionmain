@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from ..models import Frame, FrameStock
 from ..serializers import FrameSerializer, FrameStockSerializer
 from django.db import transaction
-
+from ..services.branch_protection_service import BranchProtectionsService
 # List and Create Frames (with stock)
 class FrameListCreateView(generics.ListCreateAPIView):
     queryset = Frame.objects.all()
@@ -14,7 +14,9 @@ class FrameListCreateView(generics.ListCreateAPIView):
         """
         List all frames along with their stock details across different branches.
         """
-        frames = self.get_queryset()
+        branch = BranchProtectionsService.validate_branch_id(request)
+        frames = self.get_queryset().filter(stocks__branch_id=branch.id).distinct()
+
         data = []
 
         for frame in frames:
