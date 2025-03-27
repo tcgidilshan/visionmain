@@ -7,7 +7,7 @@ class LensSearchService:
     """
 
     @staticmethod
-    def find_matching_lens(brand_id, type_id, coating_id, sph_left, sph_right, cyl_left, cyl_right, add_left, add_right):
+    def find_matching_lens( brand_id, type_id, coating_id, sph, cyl, add, side, branch_id):
         """
         Searches for an exact lens match based on brand, type, coating, and power values.
         Supports left/right separation.
@@ -23,34 +23,39 @@ class LensSearchService:
         )
 
         # ✅ Step 2: Check Power Values for Each Side (SPH, CYL, ADD)
+        
         for lens in lenses:
-            lens_powers = lens.lens_powers.all()  # ✅ Use related_name="lens_powers"
-            if type_id == 2:# //! CRITICAL CHECK 2 == PROGRESIVE LENSE
-                
-            # ✅ Validate LEFT Eye Powers
-                has_sph_left = sph_left is None or lens_powers.filter(power__name="SPH", value=sph_left, side="left").exists()
-                has_cyl_left = cyl_left is None or lens_powers.filter(power__name="CYL", value=cyl_left, side="left").exists()
-                has_add_left = add_left is None or lens_powers.filter(power__name="ADD", value=add_left, side="left").exists()
+            lens_powers = lens.lens_powers.all()
 
-            # ✅ Validate RIGHT Eye Powers
-                has_sph_right = sph_right is None or lens_powers.filter(power__name="SPH", value=sph_right, side="right").exists()
-                has_cyl_right = cyl_right is None or lens_powers.filter(power__name="CYL", value=cyl_right, side="right").exists()
-                has_add_right = add_right is None or lens_powers.filter(power__name="ADD", value=add_right, side="right").exists()
-
-
+            # Determine if the lens has the required SPH
+            if sph is not None:
+                has_sph = lens_powers.filter(power__name="SPH", value=sph).exists()
             else:
-                has_sph_left = sph_left is None or lens_powers.filter(power__name="SPH", value=sph_left,side__isnull=True).exists()
-                has_cyl_left = cyl_left is None or lens_powers.filter(power__name="CYL", value=cyl_left, side__isnull=True).exists()
-                has_add_left = add_left is None or lens_powers.filter(power__name="ADD", value=add_left, side__isnull=True).exists()
+                # Lens should not have any SPH power
+                has_sph = not lens_powers.filter(power__name="SPH").exists()
 
-            # ✅ Validate RIGHT Eye Powers
-                has_sph_right = sph_right is None or lens_powers.filter(power__name="SPH", value=sph_right,side__isnull=True ).exists()
-                has_cyl_right = cyl_right is None or lens_powers.filter(power__name="CYL", value=cyl_right,side__isnull=True).exists()
-                has_add_right = add_right is None or lens_powers.filter(power__name="ADD", value=add_right,side__isnull=True ).exists()
-            # ✅ If all power values match for both sides, check stock
-            if has_sph_left and has_cyl_left and has_add_left and has_sph_right and has_cyl_right and has_add_right:
-                stock = LensStock.objects.filter(lens=lens, qty__gt=0).first()
+            # Determine if the lens has the required CYL
+            if cyl is not None:
+                has_cyl = lens_powers.filter(power__name="CYL", value=cyl).exists()
+            else:
+                # Lens should not have any CYL power
+                has_cyl = not lens_powers.filter(power__name="CYL").exists()
+
+            # Determine if the lens has the required ADD
+            if add is not None:
+                has_add = lens_powers.filter(power__name="ADD", value=add).exists()
+            else:
+                # Lens should not have any ADD power
+                has_add = not lens_powers.filter(power__name="ADD").exists()
+
+            # Check if all specifications are met
+            if has_sph and has_cyl and has_add:
+                stock = LensStock.objects.filter(
+                    lens=lens,
+                    branch_id=branch_id,
+                    qty__gt=0
+                ).first()
                 if stock:
-                    return lens, stock  # ✅ Exact match found, return immediately
+                    return lens, stock
 
         return None, None  # ❌ No matching lens found
