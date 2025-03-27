@@ -73,11 +73,10 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'left_eye_dist_cyl',
             'left_eye_dist_axis',
             'left_eye_near_sph',
-            'remark',
+            'refraction_remark',
+            'prescription',
             'note',
             'is_manual',
-            'pd',
-            'h',
             'shuger'
         ]
   
@@ -341,6 +340,11 @@ class OrderSerializer(serializers.ModelSerializer):
         ] 
 
 class ExternalLensSerializer(serializers.ModelSerializer):
+    branch_id = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(),  # Ensures valid branch selection
+        source="branch",  # Maps to `branch` field in the model
+        required=False  # Makes it optional in requests
+    )
     brand_name = serializers.CharField(source="brand.name", read_only=True)  # ✅ Fetch Brand Name
     type_name = serializers.CharField(source="type.name", read_only=True)  # ✅ Fetch Lens Type Name
     coating_name = serializers.CharField(source="coating.name", read_only=True)  # ✅ Fetch Coating Name
@@ -353,13 +357,14 @@ class ExternalLensSerializer(serializers.ModelSerializer):
             "type", "type_name",  # ✅ Return ID & Name
             "coating", "coating_name",  # ✅ Return ID & Name
             "price",  # ✅ Manually Entered Price
+            "branch_id"
         ]
 
 class PatientSerializer(serializers.ModelSerializer):
     refraction_number = serializers.SerializerMethodField()
     class Meta:
         model = Patient
-        fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic','refraction_id','refraction_number']
+        fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic','patient_note','refraction_id','refraction_number']
     def get_refraction_number(self, obj):
         # Fetch the related Refraction instance using refraction_id
         refraction = Refraction.objects.filter(id=obj.refraction_id).first()
@@ -498,7 +503,6 @@ class OtherItemSerializer(serializers.ModelSerializer):
         model = OtherItem
         fields = ['id', 'name', 'price', 'is_active']
 class OtherItemStockSerializer(serializers.ModelSerializer):
-    other_item = OtherItemSerializer(read_only=True)  # ✅ Nested serialization for better readability
     other_item_id = serializers.PrimaryKeyRelatedField(
         queryset=OtherItem.objects.all(), source='other_item', write_only=True
     )
@@ -507,11 +511,9 @@ class OtherItemStockSerializer(serializers.ModelSerializer):
         source="branch",  # Maps to `branch` field in the model
         required=False  # Makes it optional in requests
     )
-    branch_name = serializers.CharField(source="branch.branch_name", read_only=True) 
-
     class Meta:
         model = OtherItemStock
-        fields = ['id', 'other_item', 'other_item_id', 'initial_count', 'qty', 'branch_name','branch_id']	
+        fields = ['id', 'other_item_id', 'initial_count', 'qty','branch_id','limit']	
 
 class UserBranchSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())  # Accepts user ID

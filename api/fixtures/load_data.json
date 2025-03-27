@@ -231,5 +231,19 @@
       "name": "10f Tom Ford",
       "brand": 10
     }
+  },
+  {
+    "model": "api.Branch",
+    "fields": {
+      "branch_name": "Mathugama",
+      "location": "Mathugama"
+    }
+  },
+  {
+    "model": "api.UserBranch",
+    "fields": {
+      "user": 1,
+      "branch": 1
+    }
   }
 ]

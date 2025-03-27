@@ -75,10 +75,10 @@ urlpatterns = [
     path("admin/check-code/", AdminCodeCheckView.as_view(), name="check-user-code"),
     path('refractions/create/', RefractionCreateAPIView.as_view(), name='refraction-create'),
     path('refractions/', RefractionListAPIView.as_view(), name='refraction-list'),
-    path('refractions/<int:pk>/update/', RefractionUpdateAPIView.as_view(), name='refraction-update'),#Update Retrive
+    path('refractions/<int:pk>/update/', RefractionUpdateAPIView.as_view(), name='refraction-update'),#Update Retrive refraction NUmber
     path('refractions/<int:pk>/delete/', RefractionDeleteAPIView.as_view(), name='refraction-delete'),
     path('refraction-details/create/', RefractionDetailCreateAPIView.as_view(), name='refraction-details-create'),
-    path('refractions/<int:refraction_id>/', RefractionDetailRetrieveUpdateDeleteView.as_view(), name='refraction-details'),
+    path('refraction-details/<int:refraction_id>/', RefractionDetailRetrieveUpdateDeleteView.as_view(), name='refraction-details'),
     path('brands/', BrandListCreateView.as_view(), name='brand-list-create'),
     path('brands/<int:pk>/', BrandRetrieveUpdateDeleteView.as_view(), name='brand-detail'),
     path('colors/', ColorListCreateView.as_view(), name='color-list-create'),
@@ -123,7 +123,6 @@ urlpatterns = [
     path('lens-types/<int:pk>/', LensTypeRetrieveUpdateDeleteView.as_view(), name='lens-type-detail'),
     path('lens-coatings/', LensCoatingListCreateView.as_view(), name='lens-coating-list-create'),
     path('lens-coatings/<int:pk>/', LensCoatingRetrieveUpdateDeleteView.as_view(), name='lens-coating-detail'),
-
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 
