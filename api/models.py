@@ -30,6 +30,7 @@ class CustomUser(AbstractUser):
     
 #refractions
 class Refraction(models.Model):
+    unique_together = ('refraction_number', 'branch')
     patient = models.ForeignKey(
         'Patient', 
         on_delete=models.SET_NULL, 
@@ -37,21 +38,29 @@ class Refraction(models.Model):
         blank=True, 
         related_name="refractions"
     )
+    branch = models.ForeignKey(
+        'Branch',
+        on_delete=models.CASCADE,
+        related_name='refractions',
+        null=True,
+        blank=True
+    )
     customer_full_name = models.CharField(max_length=255)
     customer_mobile = models.CharField(max_length=15)
-    refraction_number = models.CharField(max_length=10, unique=True, blank=True)
+    refraction_number = models.CharField(max_length=10, blank=True)
     nic = models.CharField(max_length=12, null=True, blank=True)
 
     def save(self, *args, **kwargs):
-        # Generate refraction_number automatically if not set
-        if not self.refraction_number:
-            last_refraction = Refraction.objects.all().order_by('-id').first()
-            if last_refraction:
+        # Generate refraction_number per branch if not set
+        if not self.refraction_number and self.branch:
+            last_refraction = Refraction.objects.filter(branch=self.branch).order_by('-id').first()
+            
+            if last_refraction and last_refraction.refraction_number.isdigit():
                 last_number = int(last_refraction.refraction_number)
-                new_number = str(last_number + 1).zfill(3)
+                self.refraction_number = str(last_number + 1).zfill(3)
             else:
-                new_number = "000"  # Starting number
-            self.refraction_number = new_number
+                self.refraction_number = "001"
+
         super().save(*args, **kwargs)
 
     def __str__(self):

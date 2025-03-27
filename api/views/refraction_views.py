@@ -37,18 +37,34 @@ class RefractionPagination(PageNumberPagination):
 
 class RefractionListAPIView(generics.ListAPIView):
     """
-    API View to List All Refractions with Pagination, Filtering, and Search
+    API View to list all Refractions with pagination, search, ordering,
+    and optional filtering by branch_id.
     """
-    queryset = Refraction.objects.only('id', 'customer_full_name', 'customer_mobile', 'refraction_number')
     serializer_class = RefractionSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = RefractionPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
 
-    # Define searchable fields
+    # Fields searchable via ?search=
     search_fields = ['customer_full_name', 'customer_mobile', 'refraction_number']
+
+    # Fields orderable via ?ordering=
     ordering_fields = ['refraction_number', 'customer_full_name']
-    ordering = ['-refraction_number']  # Default ordering (descending)
+    ordering = ['-refraction_number']  # Default ordering (latest first)
+
+    def get_queryset(self):
+        """
+        Optionally filter by branch_id using ?branch_id=<id>
+        """
+        queryset = Refraction.objects.only(
+            'id', 'customer_full_name', 'customer_mobile', 'refraction_number', 'branch_id'
+        )
+
+        branch_id = self.request.query_params.get("branch_id")
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+
+        return queryset
 
 #update
 class RefractionUpdateAPIView(generics.RetrieveUpdateAPIView):
