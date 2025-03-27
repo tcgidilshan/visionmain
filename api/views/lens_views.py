@@ -15,6 +15,7 @@ class LensListCreateView(generics.ListCreateAPIView):
         List all lenses with their branch-wise stock and powers.
         If branch_id is passed, only show stock for that branch.
         """
+        BranchProtectionsService.validate_branch_id(request)
         branch_id = request.query_params.get('branch_id', None)
         lenses = self.get_queryset()
         data = []

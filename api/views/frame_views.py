@@ -15,12 +15,12 @@ class FrameListCreateView(generics.ListCreateAPIView):
         List all frames along with their stock details across different branches.
         """
         branch = BranchProtectionsService.validate_branch_id(request)
-        frames = self.get_queryset().filter(stocks__branch_id=branch.id).distinct()
+        frames = self.get_queryset()
 
         data = []
 
         for frame in frames:
-            stocks = frame.stocks.all()  # ✅ Get all stock entries for this frame
+            stocks = frame.stocks.filter(branch_id=branch.id)  # ✅ Get all stock entries for this frame
             stock_data = FrameStockSerializer(stocks, many=True).data  # ✅ Ensure many=True
 
             frame_data = FrameSerializer(frame).data
@@ -74,8 +74,9 @@ class FrameRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         """
         Retrieve a frame along with its stock details.
         """
+        branch=BranchProtectionsService.validate_branch_id(request)
         frame = self.get_object()
-        stock = frame.stocks.all()  # Assuming one stock per frame
+        stock = frame.stocks.filter(branch_id=branch.id)
         frame_data = FrameSerializer(frame).data
         frame_data["stock"] = FrameStockSerializer(stock, many=True).data 
         return Response(frame_data)

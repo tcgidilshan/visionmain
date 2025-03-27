@@ -503,7 +503,6 @@ class OtherItemSerializer(serializers.ModelSerializer):
         model = OtherItem
         fields = ['id', 'name', 'price', 'is_active']
 class OtherItemStockSerializer(serializers.ModelSerializer):
-    other_item = OtherItemSerializer(read_only=True)  # ✅ Nested serialization for better readability
     other_item_id = serializers.PrimaryKeyRelatedField(
         queryset=OtherItem.objects.all(), source='other_item', write_only=True
     )
@@ -512,11 +511,9 @@ class OtherItemStockSerializer(serializers.ModelSerializer):
         source="branch",  # Maps to `branch` field in the model
         required=False  # Makes it optional in requests
     )
-    branch_name = serializers.CharField(source="branch.branch_name", read_only=True) 
-
     class Meta:
         model = OtherItemStock
-        fields = ['id', 'other_item', 'other_item_id', 'initial_count', 'qty', 'branch_name','branch_id']	
+        fields = ['id', 'other_item_id', 'initial_count', 'qty','branch_id','limit']	
 
 class UserBranchSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())  # Accepts user ID

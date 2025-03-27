@@ -462,6 +462,7 @@ class OtherItemStock(models.Model):
     other_item = models.ForeignKey(OtherItem, on_delete=models.CASCADE, related_name="stocks")
     initial_count = models.PositiveIntegerField()
     qty = models.PositiveIntegerField()
+    limit = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return f"{self.other_item.name} - Initial: {self.initial_count}, Current: {self.qty} "
