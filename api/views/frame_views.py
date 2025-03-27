@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from ..models import Frame, FrameStock
 from ..serializers import FrameSerializer, FrameStockSerializer
 from django.db import transaction
-
+from ..services.branch_protection_service import BranchProtectionsService
 # List and Create Frames (with stock)
 class FrameListCreateView(generics.ListCreateAPIView):
     queryset = Frame.objects.all()
@@ -13,27 +13,22 @@ class FrameListCreateView(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         """
         List all frames along with their stock details across different branches.
-        If branch_id is provided, only return stock entries for that branch.
         """
-        branch_id = request.query_params.get("branch_id")
+        branch = BranchProtectionsService.validate_branch_id(request)
         frames = self.get_queryset()
+
         data = []
 
         for frame in frames:
-            # 🔍 Filter stock per branch if provided
-            if branch_id:
-                stocks = frame.stocks.filter(branch_id=branch_id)
-            else:
-                stocks = frame.stocks.all()
+            stocks = frame.stocks.filter(branch_id=branch.id)  # ✅ Get all stock entries for this frame
+            stock_data = FrameStockSerializer(stocks, many=True).data  # ✅ Ensure many=True
 
-            stock_data = FrameStockSerializer(stocks, many=True).data
             frame_data = FrameSerializer(frame).data
-            frame_data["stock"] = stock_data
+            frame_data["stock"] = stock_data  # ✅ Store all stock records as a list
 
             data.append(frame_data)
 
         return Response(data, status=status.HTTP_200_OK)
-
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
@@ -78,22 +73,13 @@ class FrameRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     def retrieve(self, request, *args, **kwargs):
         """
         Retrieve a frame along with its stock details.
-        Supports optional filtering by branch_id.
         """
-        branch_id = request.query_params.get("branch_id")
+        branch=BranchProtectionsService.validate_branch_id(request)
         frame = self.get_object()
-
-        # 🔍 Filter stock by branch if branch_id is provided
-        if branch_id:
-            stock = frame.stocks.filter(branch_id=branch_id)
-        else:
-            stock = frame.stocks.all()
-
+        stock = frame.stocks.filter(branch_id=branch.id)
         frame_data = FrameSerializer(frame).data
-        frame_data["stock"] = FrameStockSerializer(stock, many=True).data
-
+        frame_data["stock"] = FrameStockSerializer(stock, many=True).data 
         return Response(frame_data)
-
 
     @transaction.atomic
     def update(self, request, *args, **kwargs):

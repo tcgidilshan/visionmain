@@ -3,7 +3,8 @@ from rest_framework.response import Response
 from ..models import OtherItem, OtherItemStock
 from rest_framework.pagination import PageNumberPagination
 from ..serializers import OtherItemSerializer, OtherItemStockSerializer
-
+from rest_framework.exceptions import ValidationError
+from ..services.branch_protection_service import BranchProtectionsService
 class CustomPagination(PageNumberPagination):
     """
     Custom pagination class for paginating OtherItem results.
@@ -28,13 +29,14 @@ class OtherItemListCreateView(generics.ListCreateAPIView):
         """
         List paginated OtherItems with stock data.
         """
-        queryset = self.filter_queryset(self.get_queryset())  # Apply search & ordering filters
+        queryset = self.filter_queryset(self.get_queryset())
+        branch = BranchProtectionsService.validate_branch_id(request)
         paginated_queryset = self.paginate_queryset(queryset)
 
         response_data = [
             {
                 "item": OtherItemSerializer(item).data,
-                "stock": OtherItemStockSerializer(item.stocks.all(), many=True).data
+                "stock": OtherItemStockSerializer(item.stocks.filter(branch_id=branch.id), many=True).data
             }
             for item in paginated_queryset
         ]
@@ -77,8 +79,10 @@ class OtherItemRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         """
         Retrieve an item along with stock info.
         """
+
         instance = self.get_object()
-        stock_serializer = OtherItemStockSerializer(instance.stocks.all(), many=True)
+        branch=BranchProtectionsService.validate_branch_id(request)
+        stock_serializer = OtherItemStockSerializer(instance.stocks.filter(branch_id=branch.id), many=True)
 
         return Response(
             {
@@ -91,24 +95,44 @@ class OtherItemRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         """
         Update an item and its stock details.
         """
-        instance = self.get_object()
-        other_item_serializer = OtherItemSerializer(instance, data=request.data, partial=True)
+
+        other_item = self.get_object()
+        other_item_serializer = self.get_serializer(other_item, data=request.data.get("item",{}), partial=True)
         other_item_serializer.is_valid(raise_exception=True)
         other_item_serializer.save()
 
-        stock_data = request.data.get("stock", None)
-        stock_serializer = None
-        if stock_data:
-            stock_instance, created = OtherItemStock.objects.get_or_create(other_item=instance)
-            stock_serializer = OtherItemStockSerializer(stock_instance, data=stock_data, partial=True)
-            stock_serializer.is_valid(raise_exception=True)
-            stock_serializer.save()
+        stock_data_list = request.data.get("stock", [])
+        updated_stocks = []
 
+        if isinstance(stock_data_list, list):
+            for stock_data in stock_data_list:
+                if "initial_count" not in stock_data:
+                    return Response(
+                        {"error": "initial_count is required for all stock entries."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                branch_id = stock_data.get("branch_id")
+                if not branch_id:
+                    return Response(
+                        {"error": "branch_id is required for stock updates."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                # ✅ Check if stock exists for this lens + branch
+                stock_instance = other_item.stocks.filter(branch_id=branch_id).first()
+                stock_data["item"] = other_item.id  # Link stock to item
+                if stock_instance:
+                    stock_serializer = OtherItemStockSerializer(stock_instance, data=stock_data, partial=True)
+                else:
+                    stock_serializer = OtherItemStockSerializer(data=stock_data)
+                
+                stock_serializer.is_valid(raise_exception=True)
+                updated_stocks.append(stock_serializer.save())
+               
         return Response(
             {
                 "message": "OtherItem and stock updated successfully",
                 "item": other_item_serializer.data,
-                "stock": stock_serializer.data if stock_serializer else None
+                "stock": OtherItemStockSerializer(updated_stocks, many=True).data  # ✅ Return updated stock list
             },
             status=status.HTTP_200_OK
         )

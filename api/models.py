@@ -66,7 +66,8 @@ class Patient(models.Model):
     refraction = models.ForeignKey(
         Refraction, null=True, blank=True, on_delete=models.SET_NULL, related_name="patients"
     )  # ✅ Added refraction_id (nullable)
-
+    #new feature
+    patient_note=models.CharField(max_length=100,null=True,blank=True)
     def __str__(self):
         return f"{self.name}"
     
@@ -115,13 +116,11 @@ class RefractionDetails(models.Model):
     left_eye_dist_cyl = models.CharField(max_length=10, blank=True, null=True)
     left_eye_dist_axis = models.CharField(max_length=10, blank=True, null=True)
     left_eye_near_sph = models.CharField(max_length=10, blank=True, null=True)
-
-    remark = models.CharField(max_length=20, blank=True, null=True)
     note = models.CharField(max_length=100, blank=True, null=True)
 
     #new Changes
-    pd=models.CharField(max_length=10,blank=True,null=True)
-    h=models.CharField(max_length=10,blank=True,null=True)
+    prescription = models.BooleanField(default=False)
+    refraction_remark = models.CharField(max_length=100, blank=True, null=True)
     shuger=models.BooleanField(default=False)
 
     def __str__(self):
@@ -287,6 +286,7 @@ class Order(models.Model):
         return f"Order {self.id} - Status: {self.status} - Customer: {self.customer.id}"
     
 class ExternalLens(models.Model):
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="external_lenses", null=True, blank=True)
     type = models.ForeignKey(LenseType, related_name='external_lenses', on_delete=models.CASCADE)
     coating = models.ForeignKey(Coating, related_name='external_lenses', on_delete=models.CASCADE)
     brand = models.ForeignKey(Brand, related_name='external_lenses', on_delete=models.CASCADE)
@@ -469,6 +469,7 @@ class OtherItemStock(models.Model):
     other_item = models.ForeignKey(OtherItem, on_delete=models.CASCADE, related_name="stocks")
     initial_count = models.PositiveIntegerField()
     qty = models.PositiveIntegerField()
+    limit = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return f"{self.other_item.name} - Initial: {self.initial_count}, Current: {self.qty} "
