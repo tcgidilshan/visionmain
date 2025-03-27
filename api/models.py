@@ -251,11 +251,18 @@ class LensCleaner(models.Model):
     
 class LensCleanerStock(models.Model):
     lens_cleaner = models.ForeignKey(LensCleaner, related_name='stocks', on_delete=models.CASCADE)
+    branch = models.ForeignKey(
+        'Branch',
+        on_delete=models.CASCADE,
+        related_name='lens_cleaner_stocks',
+        null=True,
+        blank=True
+    )
     initial_count = models.IntegerField(null=True, blank=True)  # Allows NULL for optional initial stock
     qty = models.IntegerField(default=0)
 
     def __str__(self):
-        return f"{self.lens_cleaner.name} - Qty: {self.qty}"
+        return f"{self.lens_cleaner.name} - Qty: {self.qty} - Branch: {self.branch.branch_name if self.branch else 'N/A'}"
     
 class Order(models.Model):
     STATUS_CHOICES = [

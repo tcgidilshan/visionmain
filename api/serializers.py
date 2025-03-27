@@ -200,9 +200,13 @@ class ExternalLensPowerSerializer(serializers.ModelSerializer):
         fields = ['id', 'external_lens', 'power', 'value', 'side', 'power_name']
 
 class LensCleanerStockSerializer(serializers.ModelSerializer):
+    branch_id = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(), source="branch", required=False
+    )
+    branch_name = serializers.CharField(source="branch.branch_name", read_only=True)
     class Meta:
         model = LensCleanerStock
-        fields = ['id', 'initial_count', 'qty'] 
+        fields = ['id', 'initial_count', 'qty', 'initial_count', 'branch_id', 'branch_name']
         
 class LensCleanerSerializer(serializers.ModelSerializer):
     """
