@@ -129,6 +129,7 @@ class RefractionDetails(models.Model):
 
     #new Changes
     prescription = models.BooleanField(default=False)
+    cataract = models.BooleanField(default=False)
     refraction_remark = models.CharField(max_length=100, blank=True, null=True)
     shuger=models.BooleanField(default=False)
 
@@ -296,8 +297,15 @@ class Order(models.Model):
     discount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
     sales_staff_code = models.ForeignKey(CustomUser,related_name='orders',on_delete=models.CASCADE, null=True, blank=True)
-    remark = models.TextField(null=True, blank=True)  # New field
-
+    order_remark = models.TextField(null=True, blank=True)  # New field
+    pd = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True) 
+    height = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True) 
+    right_height = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True) 
+    left_height = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True) 
+    left_pd = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True) 
+    right_pd = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True) 
+    fitting_on_collection=models.BooleanField(default=False)
+    on_hold=models.BooleanField(default=False)
     def __str__(self):
         return f"Order {self.id} - Status: {self.status} - Customer: {self.customer.id}"
     

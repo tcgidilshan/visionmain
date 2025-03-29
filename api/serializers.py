@@ -81,7 +81,8 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'prescription',
             'note',
             'is_manual',
-            'shuger'
+            'shuger',
+            'cataract',
         ]
   
 class BrandSerializer(serializers.ModelSerializer):
@@ -147,6 +148,7 @@ class LensSerializer(serializers.ModelSerializer):
     brand_name = serializers.CharField(source='brand.name', read_only=True)  # ✅ Get brand name  
     type_name = serializers.CharField(source='type.name', read_only=True)  # ✅ Get brand name 
     coating_name = serializers.CharField(source='coating.name', read_only=True)  # ✅ Get brand name 
+
     class Meta:
         model = Lens
         fields = ['id', 'type', 'coating', 'price','brand', 'brand_name','type_name','coating_name']
@@ -186,9 +188,10 @@ class LensPowerSerializer(serializers.ModelSerializer):
         allow_null=True,  # ✅ Allows NULL values in the API
         required=False  # ✅ Makes the field optional in requests
     )
+    power_name=serializers.CharField(source='power.name', read_only=True)
     class Meta:
         model = LensPower
-        fields = ['id', 'lens', 'power', 'value', 'side']
+        fields = ['id', 'lens', 'power', 'value', 'side','power_name']
 
 class ExternalLensPowerSerializer(serializers.ModelSerializer):
     side = serializers.ChoiceField(
@@ -250,15 +253,12 @@ class LensCleanerSerializer(serializers.ModelSerializer):
         return instance
         
 class OrderItemSerializer(serializers.ModelSerializer):
-    lens_name = serializers.CharField(source="lens.type.name", read_only=True)  # ✅ Get lens type name
-    type_name = serializers.CharField(source="external_lens.type.name", read_only=True)  # ✅ Get lens type name
     type_id = serializers.CharField(source="external_lens.type.id", read_only=True)  # ✅ Get lens type name
-    coating_name = serializers.CharField(source="external_lens.coating.name", read_only=True)  # ✅ Get lens coating name
-    coating_id = serializers.IntegerField(source="external_lens.coating.id", read_only=True)
+    type_name = serializers.CharField(source="external_lens.type.name", read_only=True)
+    coating_name = serializers.CharField(source="external_lens.coating.name", read_only=True)
     brand_name = serializers.CharField(source="external_lens.brand.name", read_only=True)  # ✅ Get lens brand name
+    coating_id = serializers.IntegerField(source="external_lens.coating.id", read_only=True)
     brand_id = serializers.CharField(source="external_lens.brand.id", read_only=True)  # ✅ Get lens brand name
-    frame_name = serializers.CharField(source="frame.code", read_only=True)  # ✅ Get frame name
-    lens_cleaner_name = serializers.CharField(source="lens_cleaner.name", read_only=True)  # ✅ Get cleaner name
     lens_powers = serializers.SerializerMethodField()  # ✅ Custom field for lens powers
     external_lens_powers = serializers.SerializerMethodField()  # ✅ Custom field for external lens powers
     is_non_stock = serializers.BooleanField(default=False) 
@@ -269,13 +269,11 @@ class OrderItemSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'order',
-            'lens', 'lens_name',  # ✅ Return lens name
-            'external_lens','type_name','type_id',
-            'frame', 'frame_name',  # ✅ Return frame name
-            'lens_cleaner', 'lens_cleaner_name',  # ✅ Return lens cleaner name
-            'coating_name',
+            'lens', 
+            'external_lens','type_id',
+            'frame',   # ✅ Return frame name
+            'lens_cleaner',       
             'coating_id',
-            'brand_name',
             'brand_id',
             'quantity',
             'price_per_unit',
@@ -284,7 +282,10 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'external_lens_powers',
             'is_non_stock' ,
             'lens_detail',
-            'frame_detail'
+            'frame_detail',
+            'type_name',
+            'coating_name',
+            'brand_name',
         ]
 
     def get_lens_powers(self, obj):
@@ -351,6 +352,15 @@ class OrderSerializer(serializers.ModelSerializer):
             'remark', 
             'branch_id', 
             'branch_name',
+            'order_remark',
+            'pd',
+            'height',
+            'right_height',
+            'left_height',
+            'left_pd',
+            'right_pd',
+            'fitting_on_collection',
+            'on_hold'
         ] 
 
 class ExternalLensSerializer(serializers.ModelSerializer):
