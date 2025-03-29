@@ -4,6 +4,8 @@ from django.contrib.auth.models import User
 from django.conf import settings
 from rest_framework.authtoken.models import Token as BaseToken
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
+from django.db import transaction
 
 class Item(models.Model):
     name = models.CharField(max_length=100)
@@ -345,25 +347,55 @@ class Invoice(models.Model):
 
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="invoice")
     invoice_type = models.CharField(max_length=10, choices=INVOICE_TYPES)  # ✅ Identifies invoice type
-    daily_invoice_no = models.IntegerField(null=True, blank=True)  # ✅ Factory invoices get a daily number
+    daily_invoice_no = models.CharField(max_length=10,null=True, blank=True)  # ✅ Factory invoices get a daily number
+    invoice_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
     invoice_date = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ['invoice_date', 'daily_invoice_no']  # Ensures daily numbering uniqueness
 
     def save(self, *args, **kwargs):
-        """ Auto-generate `daily_invoice_no` for factory invoices per day """
-        if self.invoice_type == 'factory' and not self.daily_invoice_no:
-            today_count = Invoice.objects.filter(
-                invoice_type='factory',
-                invoice_date__date=self.invoice_date.date()
-            ).count()
-            self.daily_invoice_no = today_count + 1  # Start from 1 each day
+        """
+        Auto-generate formatted invoice number using:
+        - First 3 letters of branch name from order.branch
+        - Day from invoice_date
+        - 4-digit sequence from daily_invoice_no
+        Example: MAT280001
+        """
+        if self.invoice_type == 'factory':
+            if not self.invoice_date:
+                self.invoice_date = timezone.now()
+
+            invoice_day = self.invoice_date.date() if hasattr(self.invoice_date, 'date') else self.invoice_date
+
+            if not self.daily_invoice_no or not self.invoice_number:
+                with transaction.atomic():
+                    # 🔒 Lock similar invoices
+                    similar_invoices = Invoice.objects.select_for_update().filter(
+                        invoice_type='factory',
+                        order__branch=self.order.branch,
+                        invoice_date__date=invoice_day
+                    )
+
+                    today_count = similar_invoices.count() + 1  # Correctly increments the number
+                    self.daily_invoice_no = today_count  
+
+                    # Build invoice number
+                    branch_code = self.order.branch.branch_name[:3].upper()
+                    day_str = self.invoice_date.strftime("%d")
+                    sequence = str(self.daily_invoice_no).zfill(4)
+                    self.invoice_number = f"{branch_code}{day_str}{sequence}"
+
+                    # Save safely inside transaction
+                    super().save(*args, **kwargs)
+                    return  # prevent double save
+
+        # Default save fallback
         super().save(*args, **kwargs)
+
 
     def __str__(self):
         return f"Invoice {self.id} - {self.invoice_type} - Order {self.order.id}"
-
     
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name='order_items', on_delete=models.CASCADE)
