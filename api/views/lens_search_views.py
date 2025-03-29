@@ -17,28 +17,30 @@ class LensSearchView(APIView):
         brand_id = request.query_params.get("brand_id")
         type_id = request.query_params.get("type_id")
         coating_id = request.query_params.get("coating_id")
-        sph_left = request.query_params.get("sph_left")
-        sph_right = request.query_params.get("sph_right")
-        cyl_left = request.query_params.get("cyl_left")
-        cyl_right = request.query_params.get("cyl_right")
-        add_left = request.query_params.get("add_left")
-        add_right = request.query_params.get("add_right")
+        sph = request.query_params.get("sph")
+        cyl = request.query_params.get("cyl")
+        add = request.query_params.get("add")
+        side = request.query_params.get("side")
+        branch_id = request.query_params.get("branch_id")
+
+        
 
         # ✅ Validate required fields
         if not (brand_id and type_id and coating_id):
             return Response({"error": "Brand, type, and coating are required."}, status=status.HTTP_400_BAD_REQUEST)
 
         # ✅ Convert numeric values (if provided)
-        sph_left = float(sph_left) if sph_left else None
-        sph_right = float(sph_right) if sph_right else None
-        cyl_left = float(cyl_left) if cyl_left else None
-        cyl_right = float(cyl_right) if cyl_right else None
-        add_left = float(add_left) if add_left else None
-        add_right = float(add_right) if add_right else None
+        sph = float(sph) if sph else None
+        cyl = float(cyl) if cyl else None
+        add = float(add) if add else None
+        brand_id = int(brand_id) if brand_id else None
+        type_id = int(type_id) if type_id else None
+        coating_id = int(coating_id) if coating_id else None
+   
 
         # ✅ Call the search service
         lens, stock = LensSearchService.find_matching_lens(
-            brand_id, type_id, coating_id, sph_left, sph_right, cyl_left, cyl_right, add_left, add_right
+            brand_id, type_id, coating_id, sph, cyl, add, side, branch_id
         )
 
         if lens and stock:
