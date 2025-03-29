@@ -349,7 +349,6 @@ class OrderSerializer(serializers.ModelSerializer):
             'order_items',
             'order_payments',
             'sales_staff_code',
-            'remark', 
             'branch_id', 
             'branch_name',
             'order_remark',
