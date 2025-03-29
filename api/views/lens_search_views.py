@@ -44,9 +44,14 @@ class LensSearchView(APIView):
         )
 
         if lens and stock:
-            return Response({
-                "lens": LensSerializer(lens).data,
-                "stock": LensStockSerializer(stock).data
-            }, status=status.HTTP_200_OK)
+            lens_data = LensSerializer(lens).data
+            stock_data = LensStockSerializer(stock).data
+            
+            # Ensure stock is wrapped in an array
+            if not isinstance(stock_data, list):
+                stock_data = [stock_data]
+            
+            response_data = {**lens_data, 'stock': stock_data}
+            return Response(response_data, status=status.HTTP_200_OK)
         else:
             return Response({"message": "No matching lens available."}, status=status.HTTP_404_NOT_FOUND)
