@@ -329,6 +329,10 @@ class OrderSerializer(serializers.ModelSerializer):
     order_payments = OrderPaymentSerializer(many=True, read_only=True, source='orderpayment_set')
     refraction = serializers.PrimaryKeyRelatedField(queryset=Refraction.objects.all(), allow_null=True, required=False) 
     sales_staff_code = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all(), allow_null=True, required=False)
+    branch_id = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(), source='branch', required=False
+    )
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
     class Meta:
         model = Order
         fields = [
@@ -344,7 +348,9 @@ class OrderSerializer(serializers.ModelSerializer):
             'order_items',
             'order_payments',
             'sales_staff_code',
-            'remark'
+            'remark', 
+            'branch_id', 
+            'branch_name',
         ] 
 
 class ExternalLensSerializer(serializers.ModelSerializer):

@@ -282,6 +282,13 @@ class Order(models.Model):
 
     customer = models.ForeignKey(Patient, related_name='orders', on_delete=models.CASCADE)
     refraction = models.ForeignKey(Refraction, null=True, blank=True, on_delete=models.SET_NULL)
+    branch = models.ForeignKey(
+        'Branch',
+        on_delete=models.CASCADE,
+        related_name='orders',
+        null=True,
+        blank=True 
+    )
     order_date = models.DateTimeField(auto_now_add=True)
     order_updated_date = models.DateTimeField(auto_now=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')

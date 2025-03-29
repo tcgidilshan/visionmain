@@ -58,11 +58,21 @@ class OrderCreateView(APIView):
                         except RefractionDetails.DoesNotExist:
                             pass  # ✅ If no existing refraction details, do nothing
                 
-                # Step 5: Validate Stocks Using Service
-                order_items_data = request.data.get('order_items', [])
-                stock_items = [item for item in order_items_data if not item.get('is_non_stock', False)]  # 🔥 Filter only stock-based items (exclude is_non_stock=True)
-                stock_updates = StockValidationService.validate_stocks(stock_items) if stock_items else [] # 🔍 Validate stock only for stock items
+                # Step 5: Extract and validate order data
+                order_data = request.data.get('order')
+                if not order_data:
+                    return Response({"error": "The 'order' field is required."}, status=status.HTTP_400_BAD_REQUEST)
 
+                branch_id = order_data.get("branch_id")
+                if not branch_id:
+                    return Response({"error": "Branch ID is required for stock validation."}, status=status.HTTP_400_BAD_REQUEST)
+
+                # Filter only stock-based items
+                order_items_data = request.data.get('order_items', [])
+                stock_items = [item for item in order_items_data if not item.get('is_non_stock', False)]
+
+                # Validate stocks if stock items exist
+                stock_updates = StockValidationService.validate_stocks(stock_items, branch_id) if stock_items else []
                 # Step 6: Create Order and Order Items Using Service
                 order_data = request.data.get('order')
 
