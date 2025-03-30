@@ -28,3 +28,4 @@ from .payment_view import PaymentView
 from .other_item_views import OtherItemListCreateView,OtherItemRetrieveUpdateDeleteView
 from .user_views import CreateUserView,UpdateUserView, GetAllUsersView,GetSingleUserView
 from .code_check_views import UserCodeCheckView,AdminCodeCheckView
+from .invoice_search_views import FactoryInvoiceSearchView

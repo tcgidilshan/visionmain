@@ -28,3 +28,4 @@ class InvoiceDetailView(RetrieveAPIView):
                 return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
 
         return super().get(request, *args, **kwargs)  # ✅ Fallback to ID-based retrieval
+    

@@ -77,4 +77,25 @@ class InvoiceService:
             return Invoice.objects.get(id=invoice_id)
         except Invoice.DoesNotExist:
             raise NotFound("Invoice not found.")
+        
+    @staticmethod
+    def search_factory_invoices(user, invoice_number=None, mobile=None, nic=None):
+        qs = Invoice.objects.filter(invoice_type='factory')
+
+        # Handle invoice_number filtering by user branch
+        if invoice_number:
+            user_branches = user.user_branches.all().values_list('branch_id', flat=True)
+            if not user_branches:
+                raise ValueError("User has no branches assigned.")
+
+            qs = qs.filter(invoice_number=invoice_number, order__branch_id__in=user_branches)
+
+        if mobile:
+            qs = qs.filter(order__customer__phone_number=mobile)
+
+        if nic:
+            qs = qs.filter(order__customer__nic=nic)
+
+        return qs.select_related('order', 'order__customer').order_by('-invoice_date')
+
 
