@@ -410,6 +410,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'refraction_details',  # ✅ Full refraction details (if available)
             'invoice_type',  # "factory" or "manual"
             'daily_invoice_no',  # Unique daily number for factory invoices
+            'invoice_number',
             'invoice_date',
             'order_details',  # ✅ Full order details (optional)
         ]

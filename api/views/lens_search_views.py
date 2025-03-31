@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from ..services.lens_search_service import LensSearchService
-from ..serializers import LensSerializer, LensStockSerializer
+from ..serializers import LensSerializer, LensStockSerializer,LensPowerSerializer
 
 class LensSearchView(APIView):
     """
@@ -44,9 +44,14 @@ class LensSearchView(APIView):
         )
 
         if lens and stock:
-            return Response({
-                "lens": LensSerializer(lens).data,
-                "stock": LensStockSerializer(stock).data
-            }, status=status.HTTP_200_OK)
+
+            lens_data = LensSerializer(lens).data
+            lens_data['stock'] = [LensStockSerializer(stock).data]#frnted need stock data a and Array if not i will crash
+        # Powers are always complete
+            powers = lens.lens_powers.all()
+            lens_data['powers'] = LensPowerSerializer(powers, many=True).data
+            return Response(
+                lens_data
+            , status=status.HTTP_200_OK)
         else:
             return Response({"message": "No matching lens available."}, status=status.HTTP_404_NOT_FOUND)
