@@ -412,6 +412,11 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'daily_invoice_no',  # Unique daily number for factory invoices
             'invoice_date',
             'order_details',  # ✅ Full order details (optional)
+
+              # 🔽 NEW fields for tracking factory invoice progress
+            'progress_status',
+            'lens_arrival_status',
+            'whatsapp_sent',
         ]
 
 class DoctorSerializer(serializers.ModelSerializer):
