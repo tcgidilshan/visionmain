@@ -17,8 +17,9 @@ class FactoryInvoiceSearchView(APIView):
         mobile = request.query_params.get('mobile')
         nic = request.query_params.get('nic')
         progress_status = request.query_params.get('progress_status')
+        branch_id = request.query_params.get('branch_id')
 
-        if not any([invoice_number, mobile, nic,progress_status]):
+        if not any([invoice_number, mobile, nic,progress_status,branch_id]):
             return Response(
                 {"error": "Please provide at least one search parameter: invoice_number, mobile, or nic."},
                 status=status.HTTP_400_BAD_REQUEST
@@ -29,7 +30,8 @@ class FactoryInvoiceSearchView(APIView):
             invoice_number=invoice_number,
             mobile=mobile,
             nic=nic,
-            progress_status=progress_status
+            progress_status=progress_status,
+            branch_id=branch_id
         )
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(invoices, request)

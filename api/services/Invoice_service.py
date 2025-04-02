@@ -79,7 +79,7 @@ class InvoiceService:
             raise NotFound("Invoice not found.")
         
     @staticmethod
-    def search_factory_invoices(user, invoice_number=None, mobile=None, nic=None, progress_status=None):
+    def search_factory_invoices(user, invoice_number=None, mobile=None, nic=None, progress_status=None,branch_id=None):
         qs = Invoice.objects.filter(invoice_type='factory')
 
         # Handle invoice_number filtering by user branch
@@ -96,7 +96,7 @@ class InvoiceService:
         if nic:
             qs = qs.filter(order__customer__nic=nic)
         if progress_status:
-            qs = qs.filter(order__invoice__progress_status=progress_status)
+            qs = qs.filter(order__invoice__progress_status=progress_status,order__branch_id__in=branch_id)#branch what user curently using branch_id as param
         
 
         return qs.select_related('order', 'order__customer').order_by('-invoice_date')
