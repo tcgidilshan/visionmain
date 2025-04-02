@@ -45,28 +45,41 @@ class OtherItemListCreateView(generics.ListCreateAPIView):
 
     def create(self, request, *args, **kwargs):
         """
-        Create OtherItem with optional stock data.
+        Create OtherItem with stock data for multiple branches (if provided).
         """
         other_item_serializer = OtherItemSerializer(data=request.data)
         other_item_serializer.is_valid(raise_exception=True)
         other_item = other_item_serializer.save()
 
-        stock_data = request.data.get("stock", None)
-        stock_serializer = None
-        if stock_data:
-            stock_data["other_item_id"] = other_item.id  # Link stock to item
-            stock_serializer = OtherItemStockSerializer(data=stock_data)
-            stock_serializer.is_valid(raise_exception=True)
-            stock_serializer.save()
+        # Check if stock data is provided
+        stock_data_list = request.data.get("stock", [])
+        stock_serializers = []  # List to hold stock serializers
+
+        if stock_data_list:
+            for stock_data in stock_data_list:
+                # Ensure branch_id is provided for stock creation
+                branch_id = stock_data.get("branch_id")
+                if not branch_id:
+                    return Response(
+                        {"error": "Branch ID is required for stock creation."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                stock_data["other_item_id"] = other_item.id  # Link stock to item
+                stock_serializer = OtherItemStockSerializer(data=stock_data)
+                stock_serializer.is_valid(raise_exception=True)
+                stock_serializer.save()
+                stock_serializers.append(stock_serializer)
 
         return Response(
             {
                 "message": "OtherItem created successfully",
                 "item": other_item_serializer.data,
-                "stock": stock_serializer.data if stock_serializer else None
+                "stock": [serializer.data for serializer in stock_serializers]
             },
             status=status.HTTP_201_CREATED,
         )
+
 
 class OtherItemRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     """
