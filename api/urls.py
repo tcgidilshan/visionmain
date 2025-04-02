@@ -55,7 +55,7 @@ from .views import (
     CreateUserView,
     UserCodeCheckView,
     AdminCodeCheckView,
-    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView
+    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,BulkInvoiceProgressUpdateView
 )
 # from .views import CustomAuthToken
 
@@ -110,6 +110,8 @@ urlpatterns = [
     path('invoices/<int:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'), #invoice
     path('invoices/', InvoiceDetailView.as_view(), name='invoice-by-order'),  # ✅ Filter by order_id
     path('factory-invoices/<int:pk>/update-status/', InvoiceProgressUpdateView.as_view(), name='factory-invoice-status-update'),
+    path('factory-invoices/bulk-update-status/', BulkInvoiceProgressUpdateView.as_view(), 
+     name='factory-invoice-bulk-status-update'),
     path("factory-invoices/search/", FactoryInvoiceSearchView.as_view(), name="factory-invoice-search"),
     path('doctors/', DoctorListCreateView.as_view(), name='doctor-list-create'),
     path('doctors/<int:pk>/', DoctorRetrieveUpdateDeleteView.as_view(), name='doctor-detail'),
@@ -125,6 +127,7 @@ urlpatterns = [
     path('lens-types/<int:pk>/', LensTypeRetrieveUpdateDeleteView.as_view(), name='lens-type-detail'),
     path('lens-coatings/', LensCoatingListCreateView.as_view(), name='lens-coating-list-create'),
     path('lens-coatings/<int:pk>/', LensCoatingRetrieveUpdateDeleteView.as_view(), name='lens-coating-detail'),
+    
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

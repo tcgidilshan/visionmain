@@ -29,4 +29,4 @@ from .other_item_views import OtherItemListCreateView,OtherItemRetrieveUpdateDel
 from .user_views import CreateUserView,UpdateUserView, GetAllUsersView,GetSingleUserView
 from .code_check_views import UserCodeCheckView,AdminCodeCheckView
 from .invoice_search_views import FactoryInvoiceSearchView
-from .invoice_progress_views import InvoiceProgressUpdateView
+from .invoice_progress_views import InvoiceProgressUpdateView ,BulkInvoiceProgressUpdateView
