@@ -1,5 +1,5 @@
 from django.db import transaction
-from ..models import LensStock, LensCleanerStock, FrameStock
+from ..models import LensStock, LensCleanerStock, FrameStock, OtherItemStock
 
 class StockValidationService:
     """
@@ -49,6 +49,14 @@ class StockValidationService:
                         branch_id=branch_id
                     ).first()
                     stock_type = 'frame'
+
+                  # Validate other item stock
+                elif item_data.get('other_item'):
+                    stock = OtherItemStock.objects.select_for_update().filter(
+                        other_item_id=item_data['other_item'],
+                        branch_id=branch_id
+                    ).first()
+                    stock_type = 'other_item'
 
                 if not stock or stock.qty < item_data['quantity']:
                     raise ValueError(f"Insufficient stock for {stock_type} ID {item_data.get(stock_type)} in branch {branch_id}.")
