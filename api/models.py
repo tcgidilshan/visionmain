@@ -134,7 +134,15 @@ class RefractionDetails(models.Model):
     cataract = models.BooleanField(default=False)
     refraction_remark = models.CharField(max_length=100, blank=True, null=True)
     shuger=models.BooleanField(default=False)
-
+    created_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,  # Keep record even if user is deleted
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="refraction_details",
+    )
+   
     def __str__(self):
         if self.is_manual:
             return f"Manual Refraction Details - ID {self.id}"
@@ -559,3 +567,4 @@ class UserBranch(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.branch.name}"
+    

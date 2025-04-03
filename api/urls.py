@@ -55,7 +55,7 @@ from .views import (
     CreateUserView,
     UserCodeCheckView,
     AdminCodeCheckView,
-    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,BulkInvoiceProgressUpdateView
+    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,BulkInvoiceProgressUpdateView,AllRoleCheckView
 )
 # from .views import CustomAuthToken
 
@@ -73,7 +73,8 @@ urlpatterns = [
     path("users/", GetAllUsersView.as_view(), name="get-all-users"),
     path("user/check-code/", UserCodeCheckView.as_view(), name="check-user-code"),
     path("admin/check-code/", AdminCodeCheckView.as_view(), name="check-user-code"),
-    path('refractions/create/', RefractionCreateAPIView.as_view(), name='refraction-create'),
+    path("admin-and-user/check-code/", AllRoleCheckView.as_view(), name="check-user-and-admin-code"),
+    path('refractions/create/', RefractionCreateAPIView.as_view(), name='refraction-create'),#//! user code reqired
     path('refractions/', RefractionListAPIView.as_view(), name='refraction-list'),
     path('refractions/<int:pk>/update/', RefractionUpdateAPIView.as_view(), name='refraction-update'),#Update Retrive refraction NUmber
     path('refractions/<int:pk>/delete/', RefractionDeleteAPIView.as_view(), name='refraction-delete'),
