@@ -1,4 +1,4 @@
-from ..models import Order, OrderItem, LensStock, LensCleanerStock, FrameStock,Lens,LensCleaner,Frame,ExternalLens
+from ..models import Order, OrderItem, LensStock, LensCleanerStock, FrameStock,Lens,LensCleaner,Frame,ExternalLens,OtherItemStock
 from ..serializers import OrderSerializer, OrderItemSerializer, ExternalLensSerializer
 from django.db import transaction
 from ..services.order_payment_service import OrderPaymentService
@@ -109,6 +109,9 @@ class OrderService:
                     elif item_data.get("frame"):
                         stock = FrameStock.objects.select_for_update().filter(frame_id=item_data["frame"], branch_id=branch_id).first()
                         stock_type = "frame"
+                    elif item_data.get("other_item"):
+                        stock = OtherItemStock.objects.select_for_update().filter(other_item_id=item_data["other_item"], branch_id=branch_id).first()
+                        stock_type = "OtherItemStock"
                     elif item_data.get("lens_cleaner"):
                         stock = LensCleanerStock.objects.select_for_update().filter(lens_cleaner_id=item_data["lens_cleaner"], branch_id=branch_id).first()
                         stock_type = "lens_cleaner"
@@ -140,6 +143,7 @@ class OrderService:
                     existing_item.lens_id = item_data.get("lens", existing_item.lens_id)
                     existing_item.frame_id = item_data.get("frame", existing_item.frame_id)
                     existing_item.lens_cleaner_id = item_data.get("lens_cleaner", existing_item.lens_cleaner_id)
+                    existing_item.other_item_id = item_data.get("other_item", existing_item.other_item_id)
                     existing_item.save()
                 else:
                     OrderItem.objects.create(
@@ -150,7 +154,8 @@ class OrderService:
                         external_lens_id=item_data.get("external_lens"),
                         lens_id=item_data.get("lens"),
                         frame_id=item_data.get("frame"),
-                        lens_cleaner_id=item_data.get("lens_cleaner")
+                        lens_cleaner_id=item_data.get("lens_cleaner"),
+                        other_itm_id=item_data.get("other_itm")
                     )
 
             # ✅ Step 4: Restock and delete removed items
@@ -163,6 +168,8 @@ class OrderService:
                         stock = FrameStock.objects.filter(frame_id=deleted_item.frame_id, branch_id=branch_id).first()
                     elif deleted_item.lens_cleaner_id:
                         stock = LensCleanerStock.objects.filter(lens_cleaner_id=deleted_item.lens_cleaner_id, branch_id=branch_id).first()
+                    elif deleted_item.other_itm_id:
+                        stock = OtherItemStock.objects.filter(other_itm_id=deleted_item.other_itm_id, branch_id=branch_id).first()
 
                     if stock:
                         stock.qty += deleted_item.quantity

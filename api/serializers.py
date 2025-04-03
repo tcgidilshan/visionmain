@@ -251,6 +251,11 @@ class LensCleanerSerializer(serializers.ModelSerializer):
         instance.refresh_from_db()  # 🔥 This ensures we return the updated stock in the response
 
         return instance
+    
+class OtherItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OtherItem
+        fields = ['id', 'name', 'price', 'is_active']
         
 class OrderItemSerializer(serializers.ModelSerializer):
     type_id = serializers.CharField(source="external_lens.type.id", read_only=True)  # ✅ Get lens type name
@@ -264,6 +269,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
     is_non_stock = serializers.BooleanField(default=False) 
     lens_detail = LensSerializer(source="lens", read_only=True)
     frame_detail = FrameSerializer(source="frame", read_only=True)
+    other_item_detail = OtherItemSerializer(source="other_item", read_only=True)
     class Meta:
         model = OrderItem
         fields = [
@@ -272,7 +278,8 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'lens', 
             'external_lens','type_id',
             'frame',   # ✅ Return frame name
-            'lens_cleaner',       
+            'lens_cleaner',  
+            'other_item',      
             'coating_id',
             'brand_id',
             'quantity',
@@ -286,6 +293,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'type_name',
             'coating_name',
             'brand_name',
+            'other_item_detail', 
         ]
 
     def get_lens_powers(self, obj):

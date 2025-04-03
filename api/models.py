@@ -416,11 +416,20 @@ class Invoice(models.Model):
     def __str__(self):
         return f"Invoice {self.id} - {self.invoice_type} - Order {self.order.id}"
     
+class OtherItem(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.name} - ${self.price} - {'Active' if self.is_active else 'Inactive'}"
+    
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name='order_items', on_delete=models.CASCADE)
     lens = models.ForeignKey(Lens, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
     external_lens = models.ForeignKey(ExternalLens, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
     lens_cleaner = models.ForeignKey(LensCleaner, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
+    other_item = models.ForeignKey(OtherItem, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
     frame = models.ForeignKey(Frame, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
     quantity = models.PositiveIntegerField(default=1)
     price_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
@@ -530,14 +539,6 @@ class ChannelPayment(models.Model):
 
     def __str__(self):
         return f"Payment for {self.appointment.id} - {self.amount} ({self.payment_method})"
-
-class OtherItem(models.Model):
-    name = models.CharField(max_length=255, unique=True)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-    is_active = models.BooleanField(default=True)
-
-    def __str__(self):
-        return f"{self.name} - ${self.price} - {'Active' if self.is_active else 'Inactive'}"
     
 class OtherItemStock(models.Model):
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="other_item_stocks", null=True, blank=True)
