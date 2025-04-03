@@ -375,47 +375,49 @@ class Invoice(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Auto-generate formatted invoice number using:
-        - First 3 letters of branch name from order.branch
-        - Day from invoice_date
-        - 4-digit sequence from daily_invoice_no
-        Example: MAT280001
+        Auto-generate formatted invoice number:
+        - Factory: MAT280001
+        - Normal: MATN1, MATN2 ...
         """
+        if not self.invoice_date:
+            self.invoice_date = timezone.now()
+
+        # ✅ Extract branch_code at the top
+        if self.order and self.order.branch:
+            branch_code = self.order.branch.branch_name[:3].upper()
+        else:
+            raise ValueError("Invoice must be linked to an order with a valid branch.")
+
+        invoice_day = self.invoice_date.date() if hasattr(self.invoice_date, 'date') else self.invoice_date
+
         if self.invoice_type == 'factory':
-            if not self.invoice_date:
-                self.invoice_date = timezone.now()
-
-            invoice_day = self.invoice_date.date() if hasattr(self.invoice_date, 'date') else self.invoice_date
-
             if not self.daily_invoice_no or not self.invoice_number:
                 with transaction.atomic():
-                    # 🔒 Lock similar invoices
                     similar_invoices = Invoice.objects.select_for_update().filter(
                         invoice_type='factory',
                         order__branch=self.order.branch,
                         invoice_date__date=invoice_day
                     )
 
-                    today_count = similar_invoices.count() + 1  # Correctly increments the number
-                    self.daily_invoice_no = today_count  
+                    today_count = similar_invoices.count() + 1
+                    self.daily_invoice_no = today_count
 
-                    # Build invoice number
-                    branch_code = self.order.branch.branch_name[:3].upper()
                     day_str = self.invoice_date.strftime("%d")
-                    sequence = str(self.daily_invoice_no).zfill(4)
+                    sequence = str(today_count).zfill(4)
                     self.invoice_number = f"{branch_code}{day_str}{sequence}"
 
-                    # Save safely inside transaction
-                    super().save(*args, **kwargs)
-                    return  # prevent double save
+        elif self.invoice_type == 'normal':
+            if not self.invoice_number:
+                with transaction.atomic():
+                    count = Invoice.objects.select_for_update().filter(
+                        invoice_type='normal',
+                        order__branch=self.order.branch
+                    ).count() + 1
 
-        # Default save fallback
+                    self.invoice_number = f"{branch_code}N{count}"
+
         super().save(*args, **kwargs)
 
-
-    def __str__(self):
-        return f"Invoice {self.id} - {self.invoice_type} - Order {self.order.id}"
-    
 class OtherItem(models.Model):
     name = models.CharField(max_length=255, unique=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
