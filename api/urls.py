@@ -55,7 +55,7 @@ from .views import (
     CreateUserView,
     UserCodeCheckView,
     AdminCodeCheckView,
-    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView
+    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView
 )
 # from .views import CustomAuthToken
 
@@ -111,6 +111,7 @@ urlpatterns = [
     path('invoices/', InvoiceDetailView.as_view(), name='invoice-by-order'),  # ✅ Filter by order_id
     path('factory-invoices/<int:pk>/update-status/', InvoiceProgressUpdateView.as_view(), name='factory-invoice-status-update'),
     path("factory-invoices/search/", FactoryInvoiceSearchView.as_view(), name="factory-invoice-search"),
+    path('reports/invoices/', InvoiceReportView.as_view(), name='invoice-report'),
     path('doctors/', DoctorListCreateView.as_view(), name='doctor-list-create'),
     path('doctors/<int:pk>/', DoctorRetrieveUpdateDeleteView.as_view(), name='doctor-detail'),
     path('patients/', PatientListView.as_view(), name='patient-list'),
