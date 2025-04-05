@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model,authenticate
 
 User = get_user_model()  # Get CustomUser dynamically
 
@@ -70,7 +70,7 @@ class AllRoleCheckView(APIView):
     
     def post(self, request):
         user_code = request.data.get("user_code")
-        
+        password = request.data.get("password")
         if not user_code:
             return Response(
                 {"error": "user_code is required"}, 
@@ -79,6 +79,17 @@ class AllRoleCheckView(APIView):
 
         try:
             user = User.objects.get(user_code=user_code)
+               # Authenticate the user with password
+            authenticated_user = authenticate(
+                request, 
+                username=user.username, 
+                password=password
+            )
+            if not authenticated_user:
+                return Response(
+                    {"error": "Invalid password"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
             role = "admin" if user.is_staff or user.is_superuser else "user"  # Determine role
             
             return Response(

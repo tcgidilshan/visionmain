@@ -49,7 +49,7 @@ class RefractionSerializer(serializers.ModelSerializer):
         read_only_fields = ['refraction_number']  # Auto-generated
 
 class RefractionDetailsSerializer(serializers.ModelSerializer):
-    
+    refraction_by = serializers.CharField(source="user.username", read_only=True)
     class Meta:
         model = RefractionDetails
         fields = [
@@ -85,6 +85,7 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'shuger',
             'cataract',
             'created_by',
+            'refraction_by'
         ]
         
 class BrandSerializer(serializers.ModelSerializer):
