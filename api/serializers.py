@@ -49,6 +49,11 @@ class RefractionSerializer(serializers.ModelSerializer):
         read_only_fields = ['refraction_number']  # Auto-generated
 
 class RefractionDetailsSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())  # Accepts user ID
+    username = serializers.CharField(
+        source='user.username', 
+        read_only=True  # Only for output
+    )
     class Meta:
         model = RefractionDetails
         fields = [
@@ -83,6 +88,8 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'is_manual',
             'shuger',
             'cataract',
+            'user',
+            'username' 
         ]
   
 class BrandSerializer(serializers.ModelSerializer):
@@ -341,6 +348,10 @@ class OrderSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(), source='branch', required=False
     )
+    sales_staff_username = serializers.CharField(
+        source='sales_staff_code.username', 
+        read_only=True
+    )
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
     class Meta:
         model = Order
@@ -367,7 +378,8 @@ class OrderSerializer(serializers.ModelSerializer):
             'left_pd',
             'right_pd',
             'fitting_on_collection',
-            'on_hold'
+            'on_hold',
+            'sales_staff_username'
         ] 
 
 class ExternalLensSerializer(serializers.ModelSerializer):
@@ -563,4 +575,28 @@ class UserBranchSerializer(serializers.ModelSerializer):
         read_only_fields = ['assigned_at']
 
 
+class InvoiceSearchSerializer(serializers.ModelSerializer):
+    customer = serializers.PrimaryKeyRelatedField(source='order.customer.name', read_only=True)  # ✅ Fetch customer ID
+    # customer_details = PatientSerializer(source='order.customer', read_only=True)  # ✅ Full customer details
+    # refraction_details = RefractionSerializer(source='order.refraction', read_only=True)  # ✅ Refraction details (if exists)
+    # order_details = OrderSerializer(source='order', read_only=True)  # ✅ Full order details
 
+    class Meta:
+        model = Invoice
+        fields = [
+            'id',
+            'order',       # Order ID (ForeignKey)
+            'customer',    # ✅ Customer ID (from Order)
+            # 'customer_details',  # ✅ Full customer details
+            # 'refraction_details',  # ✅ Full refraction details (if available)
+            'invoice_type',  # "factory" or "manual"
+            'daily_invoice_no',  # Unique daily number for factory invoices
+            'invoice_number',
+            'invoice_date',
+            # 'order_details',  # ✅ Full order details (optional)
+
+              # 🔽 NEW fields for tracking factory invoice progress
+            'progress_status',
+            'lens_arrival_status',
+            'whatsapp_sent',
+        ]

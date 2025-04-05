@@ -27,7 +27,7 @@ from .frame_color_views import FrameColorListView
 from .payment_view import PaymentView
 from .other_item_views import OtherItemListCreateView,OtherItemRetrieveUpdateDeleteView
 from .user_views import CreateUserView,UpdateUserView, GetAllUsersView,GetSingleUserView
-from .code_check_views import UserCodeCheckView,AdminCodeCheckView
+from .code_check_views import UserCodeCheckView,AdminCodeCheckView,AllRoleCheckView
 from .invoice_search_views import FactoryInvoiceSearchView
-from .invoice_progress_views import InvoiceProgressUpdateView
+from .invoice_progress_views import InvoiceProgressUpdateView ,BulkInvoiceProgressUpdateView
 from .invoice_report_view import InvoiceReportView

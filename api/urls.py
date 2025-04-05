@@ -55,7 +55,7 @@ from .views import (
     CreateUserView,
     UserCodeCheckView,
     AdminCodeCheckView,
-    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView
+    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,BulkInvoiceProgressUpdateView,AllRoleCheckView,InvoiceReportView
 )
 # from .views import CustomAuthToken
 
@@ -73,7 +73,8 @@ urlpatterns = [
     path("users/", GetAllUsersView.as_view(), name="get-all-users"),
     path("user/check-code/", UserCodeCheckView.as_view(), name="check-user-code"),
     path("admin/check-code/", AdminCodeCheckView.as_view(), name="check-user-code"),
-    path('refractions/create/', RefractionCreateAPIView.as_view(), name='refraction-create'),
+    path("admin-and-user/check-code/", AllRoleCheckView.as_view(), name="check-user-and-admin-code"),
+    path('refractions/create/', RefractionCreateAPIView.as_view(), name='refraction-create'),#//! user code reqired
     path('refractions/', RefractionListAPIView.as_view(), name='refraction-list'),
     path('refractions/<int:pk>/update/', RefractionUpdateAPIView.as_view(), name='refraction-update'),#Update Retrive refraction NUmber
     path('refractions/<int:pk>/delete/', RefractionDeleteAPIView.as_view(), name='refraction-delete'),
@@ -110,6 +111,8 @@ urlpatterns = [
     path('invoices/<int:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'), #invoice
     path('invoices/', InvoiceDetailView.as_view(), name='invoice-by-order'),  # ✅ Filter by order_id
     path('factory-invoices/<int:pk>/update-status/', InvoiceProgressUpdateView.as_view(), name='factory-invoice-status-update'),
+    path('factory-invoices/bulk-update-status/', BulkInvoiceProgressUpdateView.as_view(), 
+     name='factory-invoice-bulk-status-update'),
     path("factory-invoices/search/", FactoryInvoiceSearchView.as_view(), name="factory-invoice-search"),
     path('reports/invoices/', InvoiceReportView.as_view(), name='invoice-report'),
     path('doctors/', DoctorListCreateView.as_view(), name='doctor-list-create'),
@@ -126,6 +129,7 @@ urlpatterns = [
     path('lens-types/<int:pk>/', LensTypeRetrieveUpdateDeleteView.as_view(), name='lens-type-detail'),
     path('lens-coatings/', LensCoatingListCreateView.as_view(), name='lens-coating-list-create'),
     path('lens-coatings/<int:pk>/', LensCoatingRetrieveUpdateDeleteView.as_view(), name='lens-coating-detail'),
+    
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

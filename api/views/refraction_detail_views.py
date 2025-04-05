@@ -17,8 +17,9 @@ class RefractionDetailCreateAPIView(generics.CreateAPIView):
         """
         Override create to use the service for creating refraction details.
         """
+        
         refraction_details = RefractionDetailsService.create_refraction_details(request.data)
-
+        
         return Response(
             {
                 "message": "Refraction details created successfully.",
