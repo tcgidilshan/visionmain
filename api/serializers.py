@@ -353,6 +353,7 @@ class OrderSerializer(serializers.ModelSerializer):
         read_only=True
     )
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
+    invoice_number = serializers.PrimaryKeyRelatedField(source='invoice.invoice_number', read_only=True)
     class Meta:
         model = Order
         fields = [
@@ -379,7 +380,8 @@ class OrderSerializer(serializers.ModelSerializer):
             'right_pd',
             'fitting_on_collection',
             'on_hold',
-            'sales_staff_username'
+            'sales_staff_username',
+            'invoice_number',
         ] 
 
 class ExternalLensSerializer(serializers.ModelSerializer):
