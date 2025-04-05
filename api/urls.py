@@ -55,7 +55,7 @@ from .views import (
     CreateUserView,
     UserCodeCheckView,
     AdminCodeCheckView,
-    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,BulkInvoiceProgressUpdateView,AllRoleCheckView
+    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,BulkInvoiceProgressUpdateView,AllRoleCheckView,InvoiceReportView
 )
 # from .views import CustomAuthToken
 
@@ -114,6 +114,7 @@ urlpatterns = [
     path('factory-invoices/bulk-update-status/', BulkInvoiceProgressUpdateView.as_view(), 
      name='factory-invoice-bulk-status-update'),
     path("factory-invoices/search/", FactoryInvoiceSearchView.as_view(), name="factory-invoice-search"),
+    path('reports/invoices/', InvoiceReportView.as_view(), name='invoice-report'),
     path('doctors/', DoctorListCreateView.as_view(), name='doctor-list-create'),
     path('doctors/<int:pk>/', DoctorRetrieveUpdateDeleteView.as_view(), name='doctor-detail'),
     path('patients/', PatientListView.as_view(), name='patient-list'),
