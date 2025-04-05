@@ -49,7 +49,11 @@ class RefractionSerializer(serializers.ModelSerializer):
         read_only_fields = ['refraction_number']  # Auto-generated
 
 class RefractionDetailsSerializer(serializers.ModelSerializer):
-    refraction_by = serializers.CharField(source="user.username", read_only=True)
+    user = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())  # Accepts user ID
+    username = serializers.CharField(
+        source='user.username', 
+        read_only=True  # Only for output
+    )
     class Meta:
         model = RefractionDetails
         fields = [
@@ -84,10 +88,10 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'is_manual',
             'shuger',
             'cataract',
-            'created_by',
-            'refraction_by'
+            'user',
+            'username' 
         ]
-        
+  
 class BrandSerializer(serializers.ModelSerializer):
     class Meta:
         model = Brand
@@ -336,6 +340,10 @@ class OrderSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(), source='branch', required=False
     )
+    sales_staff_username = serializers.CharField(
+        source='sales_staff_code.username', 
+        read_only=True
+    )
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
     class Meta:
         model = Order
@@ -362,7 +370,8 @@ class OrderSerializer(serializers.ModelSerializer):
             'left_pd',
             'right_pd',
             'fitting_on_collection',
-            'on_hold'
+            'on_hold',
+            'sales_staff_username'
         ] 
 
 class ExternalLensSerializer(serializers.ModelSerializer):

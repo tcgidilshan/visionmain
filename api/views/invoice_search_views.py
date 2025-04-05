@@ -36,8 +36,8 @@ class FactoryInvoiceSearchView(APIView):
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(invoices, request)
         if page is not None:
-            serializer = InvoiceSerializer(page, many=True)
+            serializer = InvoiceSearchSerializer(page, many=True)
             return paginator.get_paginated_response(serializer.data)
         #InvoiceSearchSerializer provide only nesasry info for the checkin module
-        serializer = InvoiceSerializer(invoices, many=True)
+        serializer = InvoiceSearchSerializer(invoices, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
