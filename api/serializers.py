@@ -579,8 +579,13 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
     customer = serializers.PrimaryKeyRelatedField(source='order.customer.name', read_only=True)  # ✅ Fetch customer ID
     # customer_details = PatientSerializer(source='order.customer', read_only=True)  # ✅ Full customer details
     # refraction_details = RefractionSerializer(source='order.refraction', read_only=True)  # ✅ Refraction details (if exists)
-    # order_details = OrderSerializer(source='order', read_only=True)  # ✅ Full order details
 
+    fitting_on_collection = serializers.BooleanField(
+        source='order.fitting_on_collection', read_only=True
+    )
+    on_hold = serializers.BooleanField(
+        source='order.on_hold', read_only=True
+    )
     class Meta:
         model = Invoice
         fields = [
@@ -589,14 +594,13 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
             'customer',    # ✅ Customer ID (from Order)
             # 'customer_details',  # ✅ Full customer details
             # 'refraction_details',  # ✅ Full refraction details (if available)
-            'invoice_type',  # "factory" or "manual"
-            'daily_invoice_no',  # Unique daily number for factory invoices
+            'invoice_type',  
+            'daily_invoice_no',  
             'invoice_number',
             'invoice_date',
-            # 'order_details',  # ✅ Full order details (optional)
-
-              # 🔽 NEW fields for tracking factory invoice progress
             'progress_status',
             'lens_arrival_status',
             'whatsapp_sent',
+            'fitting_on_collection',
+            'on_hold'
         ]
