@@ -14,7 +14,7 @@ class ChannelAppointmentView(APIView):
         data = request.data
 
         # Step 1: Validate Input
-        required_fields = ['doctor_id', 'name', 'address', 'contact_number', 'channel_date', 'time', 'channeling_fee', 'payments']
+        required_fields = ['doctor_id', 'name', 'address', 'contact_number', 'channel_date', 'time', 'channeling_fee','branch_id', 'payments']
         for field in required_fields:
             if field not in data:
                 return Response({"error": f"{field} is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -71,7 +71,8 @@ class ChannelAppointmentView(APIView):
                 "time": data['time'],
                 "status": "Pending",
                 "amount": data['channeling_fee'],
-                "channel_no": channel_no
+                "channel_no": channel_no,
+                "branch": data['branch_id']
             }
             appointment_serializer = AppointmentSerializer(data=appointment_data)
             appointment_serializer.is_valid(raise_exception=True)
@@ -116,19 +117,24 @@ class ChannelAppointmentView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
 class ChannelListView(ListAPIView):
-    queryset = Appointment.objects.prefetch_related('payments').select_related('doctor', 'patient')
+    queryset = Appointment.objects.prefetch_related('payments').select_related('doctor', 'patient', 'branch')
     serializer_class = ChannelListSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['doctor', 'date']  # Filter by doctor and date
-    search_fields = ['id', 'patient__phone_number']  # Search by appointment ID and patient contact number
-    ordering_fields = ['channel_no']  # Allow ordering by channel number
-    pagination_class = None  # Set your pagination class or leave for default
+    filterset_fields = ['doctor', 'date']  # Optional DRF filters
+    search_fields = ['id', 'patient__phone_number']
+    ordering_fields = ['channel_no']
+    pagination_class = None
 
     def get_queryset(self):
         queryset = super().get_queryset()
 
-        # Add custom filtering logic if necessary
+        # ✅ Get branch_id from query params
+        branch_id = self.request.query_params.get('branch_id')
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+
         return queryset
+
     
 class AppointmentRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Appointment.objects.select_related('doctor', 'patient', 'schedule').prefetch_related('payments')  # Use the correct related_name
