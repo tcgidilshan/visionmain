@@ -379,49 +379,52 @@ class Invoice(models.Model):
 
     class Meta:
         unique_together = ['invoice_date', 'daily_invoice_no']  # Ensures daily numbering uniqueness
+        constraints = [
+            models.UniqueConstraint(fields=["invoice_number"], name="unique_invoice_number")
+        ]
 
     def save(self, *args, **kwargs):
-        """
-        Auto-generate formatted invoice number:
-        - Factory: MAT280001
-        - Normal: MATN1, MATN2 ...
-        """
+        # Always ensure invoice_date is set
         if not self.invoice_date:
             self.invoice_date = timezone.now()
 
-        # ✅ Extract branch_code at the top
-        if self.order and self.order.branch:
+        if not self.invoice_number:
+            if not self.order or not self.order.branch:
+                raise ValueError("Invoice must be linked to an order with a valid branch.")
+
             branch_code = self.order.branch.branch_name[:3].upper()
-        else:
-            raise ValueError("Invoice must be linked to an order with a valid branch.")
 
-        invoice_day = self.invoice_date.date() if hasattr(self.invoice_date, 'date') else self.invoice_date
+            with transaction.atomic():
+                prefix = ""
+                number = 1  # default starting number
 
-        if self.invoice_type == 'factory':
-            if not self.daily_invoice_no or not self.invoice_number:
-                with transaction.atomic():
-                    similar_invoices = Invoice.objects.select_for_update().filter(
+                if self.invoice_type == 'factory':
+                    prefix = f"{branch_code}F"
+                    last_invoice = Invoice.objects.select_for_update().filter(
                         invoice_type='factory',
-                        order__branch=self.order.branch,
-                        invoice_date__date=invoice_day
-                    )
+                        invoice_number__startswith=prefix
+                    ).order_by('-id').first()
 
-                    today_count = similar_invoices.count() + 1
-                    self.daily_invoice_no = today_count
-
-                    day_str = self.invoice_date.strftime("%d")
-                    sequence = str(today_count).zfill(4)
-                    self.invoice_number = f"{branch_code}{day_str}{sequence}"
-
-        elif self.invoice_type == 'normal':
-            if not self.invoice_number:
-                with transaction.atomic():
-                    count = Invoice.objects.select_for_update().filter(
+                elif self.invoice_type == 'normal':
+                    prefix = f"{branch_code}N"
+                    last_invoice = Invoice.objects.select_for_update().filter(
                         invoice_type='normal',
-                        order__branch=self.order.branch
-                    ).count() + 1
+                        invoice_number__startswith=prefix
+                    ).order_by('-id').first()
 
-                    self.invoice_number = f"{branch_code}N{count}"
+                if last_invoice and last_invoice.invoice_number:
+                    try:
+                        # Use replace only once, to avoid errors in edge cases
+                        last_number = int(last_invoice.invoice_number.replace(prefix, '', 1))
+                        number = last_number + 1
+                    except ValueError:
+                        number = 1  # fallback in case of bad data
+
+                # Format invoice number
+                if self.invoice_type == 'factory':
+                    self.invoice_number = f"{prefix}{str(number).zfill(5)}"
+                elif self.invoice_type == 'normal':
+                    self.invoice_number = f"{prefix}{number}"
 
         super().save(*args, **kwargs)
 
@@ -527,6 +530,7 @@ class Appointment(models.Model):
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)  # Amount in LKR
     channel_no = models.IntegerField(null=True, blank=True) 
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="appointments", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

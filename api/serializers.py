@@ -465,6 +465,7 @@ class ScheduleSerializer(serializers.ModelSerializer):
 class AppointmentSerializer(serializers.ModelSerializer):
     doctor_name = serializers.CharField(source='doctor.name', read_only=True)  # Doctor's name
     patient_name = serializers.CharField(source='patient.name', read_only=True)  # Patient's name
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True)  # Patient's name
     schedule_date = serializers.DateField(source='schedule.date', read_only=True)  # Schedule date
     schedule_start_time = serializers.TimeField(source='schedule.start_time', read_only=True)  # Schedule start time
 
@@ -485,7 +486,9 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'amount',  # Channeling fee
             'channel_no',
             'created_at',  # Record creation timestamp
+            'branch',
             'updated_at',  # Record update timestamp
+            'branch_name'
         ]
 
 class ChannelPaymentSerializer(serializers.ModelSerializer):

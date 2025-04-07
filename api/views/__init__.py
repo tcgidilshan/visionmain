@@ -31,3 +31,4 @@ from .code_check_views import UserCodeCheckView,AdminCodeCheckView,AllRoleCheckV
 from .invoice_search_views import FactoryInvoiceSearchView
 from .invoice_progress_views import InvoiceProgressUpdateView ,BulkInvoiceProgressUpdateView
 from .invoice_report_view import InvoiceReportView
+from .account_report_views import ChannelReportView
