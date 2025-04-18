@@ -54,8 +54,8 @@ from .views import (
     OtherItemRetrieveUpdateDeleteView,
     CreateUserView,
     UserCodeCheckView,
-    AdminCodeCheckView,
-    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,BulkInvoiceProgressUpdateView,AllRoleCheckView,InvoiceReportView
+    AdminCodeCheckView,ChannelReportView,DoctorScheduleCreateView,DoctorUpcomingScheduleView,DoctorScheduleTransferView,
+    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView
 )
 # from .views import CustomAuthToken
 
@@ -73,8 +73,7 @@ urlpatterns = [
     path("users/", GetAllUsersView.as_view(), name="get-all-users"),
     path("user/check-code/", UserCodeCheckView.as_view(), name="check-user-code"),
     path("admin/check-code/", AdminCodeCheckView.as_view(), name="check-user-code"),
-    path("admin-and-user/check-code/", AllRoleCheckView.as_view(), name="check-user-and-admin-code"),
-    path('refractions/create/', RefractionCreateAPIView.as_view(), name='refraction-create'),#//! user code reqired
+    path('refractions/create/', RefractionCreateAPIView.as_view(), name='refraction-create'),
     path('refractions/', RefractionListAPIView.as_view(), name='refraction-list'),
     path('refractions/<int:pk>/update/', RefractionUpdateAPIView.as_view(), name='refraction-update'),#Update Retrive refraction NUmber
     path('refractions/<int:pk>/delete/', RefractionDeleteAPIView.as_view(), name='refraction-delete'),
@@ -111,12 +110,16 @@ urlpatterns = [
     path('invoices/<int:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'), #invoice
     path('invoices/', InvoiceDetailView.as_view(), name='invoice-by-order'),  # ✅ Filter by order_id
     path('factory-invoices/<int:pk>/update-status/', InvoiceProgressUpdateView.as_view(), name='factory-invoice-status-update'),
-    path('factory-invoices/bulk-update-status/', BulkInvoiceProgressUpdateView.as_view(), 
-     name='factory-invoice-bulk-status-update'),
     path("factory-invoices/search/", FactoryInvoiceSearchView.as_view(), name="factory-invoice-search"),
     path('reports/invoices/', InvoiceReportView.as_view(), name='invoice-report'),
+
+    #accounts
+    path('reports/channels/', ChannelReportView.as_view(), name="channel-report"),
     path('doctors/', DoctorListCreateView.as_view(), name='doctor-list-create'),
     path('doctors/<int:pk>/', DoctorRetrieveUpdateDeleteView.as_view(), name='doctor-detail'),
+    path('doctor-schedule/create/', DoctorScheduleCreateView.as_view(), name='doctor-schedule-create'),
+    path('doctor-schedule/<int:doctor_id>/upcoming/', DoctorUpcomingScheduleView.as_view(), name='doctor-schedule-upcoming'),
+    path('doctor-schedule/transfer/', DoctorScheduleTransferView.as_view(), name='doctor-schedule-transfer'),
     path('patients/', PatientListView.as_view(), name='patient-list'),
     path('patients/<int:pk>/', PatientUpdateView.as_view(), name='patient-update'),# Added by Lahiru to update patient need review
     path('channel/', ChannelAppointmentView.as_view(), name='channel-appointment'),
@@ -129,7 +132,6 @@ urlpatterns = [
     path('lens-types/<int:pk>/', LensTypeRetrieveUpdateDeleteView.as_view(), name='lens-type-detail'),
     path('lens-coatings/', LensCoatingListCreateView.as_view(), name='lens-coating-list-create'),
     path('lens-coatings/<int:pk>/', LensCoatingRetrieveUpdateDeleteView.as_view(), name='lens-coating-detail'),
-    
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

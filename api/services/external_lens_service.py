@@ -17,11 +17,11 @@ class ExternalLensService:
         if price is None:
             raise ValidationError({'price': 'Price is required for external lenses.'})
 
-         # ✅ Pass validated data instead of trying to pass `price` separately
+         #  Pass validated data instead of trying to pass `price` separately
         external_lens_serializer = ExternalLensSerializer(data=lens_data)
         external_lens_serializer.is_valid(raise_exception=True)
 
-        # ✅ Explicitly assign the price before saving
+        #  Explicitly assign the price before saving
         external_lens = external_lens_serializer.save()
         external_lens.price = price
         external_lens.save()
