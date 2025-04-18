@@ -108,9 +108,9 @@ class CodeSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'brand']
         
 class FrameSerializer(serializers.ModelSerializer):
-    brand_name = serializers.CharField(source='brand.name', read_only=True)  # ✅ Get brand name
-    code_name = serializers.CharField(source='code.name', read_only=True)    # ✅ Get code name
-    color_name = serializers.CharField(source='color.name', read_only=True)  # ✅ Get color name
+    brand_name = serializers.CharField(source='brand.name', read_only=True)  # Get brand name
+    code_name = serializers.CharField(source='code.name', read_only=True)    # Get code name
+    color_name = serializers.CharField(source='color.name', read_only=True)  # Get color name
 
     class Meta:
         model = Frame
@@ -192,8 +192,8 @@ class PowerSerializer(serializers.ModelSerializer):
 class LensPowerSerializer(serializers.ModelSerializer):
     side = serializers.ChoiceField(
         choices=[('left', 'Left'), ('right', 'Right')],
-        allow_null=True,  # ✅ Allows NULL values in the API
-        required=False  # ✅ Makes the field optional in requests
+        allow_null=True,  #  Allows NULL values in the API
+        required=False  #  Makes the field optional in requests
     )
     power_name=serializers.CharField(source='power.name', read_only=True)
     class Meta:
@@ -225,7 +225,7 @@ class LensCleanerSerializer(serializers.ModelSerializer):
     """
     Serializer for LensCleaner with Stock.
     """
-    stocks = LensCleanerStockSerializer(many=True, required=False)  # ✅ Stock can be updated without IDs
+    stocks = LensCleanerStockSerializer(many=True, required=False)  #  Stock can be updated without IDs
 
     class Meta:
         model = LensCleaner
@@ -235,27 +235,27 @@ class LensCleanerSerializer(serializers.ModelSerializer):
         """
         Override update to handle stock updates without requiring an ID.
         """
-        stocks_data = validated_data.pop('stocks', [])  # ✅ Extract stock data
+        stocks_data = validated_data.pop('stocks', [])  #  Extract stock data
         instance.name = validated_data.get('name', instance.name)
         instance.price = validated_data.get('price', instance.price)
         instance.save()
 
-        # ✅ Check if stock exists for this lens cleaner
+        #  Check if stock exists for this lens cleaner
         existing_stock = instance.stocks.first()  # Since there's only **one stock entry per cleaner**
 
         if stocks_data:
             stock_data = stocks_data[0]  # We only expect **one stock entry**
             if existing_stock:
-                # ✅ Update existing stock
+                #  Update existing stock
                 existing_stock.initial_count = stock_data.get('initial_count', existing_stock.initial_count)
                 existing_stock.qty = stock_data.get('qty', existing_stock.qty)
                 existing_stock.save()
             else:
-                # ✅ Create new stock entry (no existing stock)
+                #  Create new stock entry (no existing stock)
                 LensCleanerStock.objects.create(lens_cleaner=instance, **stock_data)
 
-        # ✅ REFRESH `instance` TO LOAD UPDATED STOCK VALUES
-        instance.refresh_from_db()  # 🔥 This ensures we return the updated stock in the response
+        #  REFRESH `instance` TO LOAD UPDATED STOCK VALUES
+        instance.refresh_from_db()  #  This ensures we return the updated stock in the response
 
         return instance
     
@@ -265,14 +265,14 @@ class OtherItemSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'price', 'is_active']
         
 class OrderItemSerializer(serializers.ModelSerializer):
-    type_id = serializers.CharField(source="external_lens.type.id", read_only=True)  # ✅ Get lens type name
+    type_id = serializers.CharField(source="external_lens.type.id", read_only=True)  #  Get lens type name
     type_name = serializers.CharField(source="external_lens.type.name", read_only=True)
     coating_name = serializers.CharField(source="external_lens.coating.name", read_only=True)
-    brand_name = serializers.CharField(source="external_lens.brand.name", read_only=True)  # ✅ Get lens brand name
+    brand_name = serializers.CharField(source="external_lens.brand.name", read_only=True)  #  Get lens brand name
     coating_id = serializers.IntegerField(source="external_lens.coating.id", read_only=True)
     brand_id = serializers.CharField(source="external_lens.brand.id", read_only=True)  # ✅ Get lens brand name
-    lens_powers = serializers.SerializerMethodField()  # ✅ Custom field for lens powers
-    external_lens_powers = serializers.SerializerMethodField()  # ✅ Custom field for external lens powers
+    lens_powers = serializers.SerializerMethodField()  #  Custom field for lens powers
+    external_lens_powers = serializers.SerializerMethodField()  #  Custom field for external lens powers
     is_non_stock = serializers.BooleanField(default=False) 
     lens_detail = LensSerializer(source="lens", read_only=True)
     frame_detail = FrameSerializer(source="frame", read_only=True)
@@ -284,7 +284,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'order',
             'lens', 
             'external_lens','type_id',
-            'frame',   # ✅ Return frame name
+            'frame',   #  Return frame name
             'lens_cleaner',  
             'other_item',      
             'coating_id',
@@ -292,7 +292,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'quantity',
             'price_per_unit',
             'subtotal',
-            'lens_powers',  # ✅ Include lens powers
+            'lens_powers',  #  Include lens powers
             'external_lens_powers',
             'is_non_stock' ,
             'lens_detail',
@@ -304,14 +304,14 @@ class OrderItemSerializer(serializers.ModelSerializer):
         ]
 
     def get_lens_powers(self, obj):
-        """ ✅ Fetch lens powers for the given lens. """
+        """  Fetch lens powers for the given lens. """
         if obj.lens:
             powers = obj.lens.lens_powers.all()
             return LensPowerSerializer(powers, many=True).data
         return []
     
     def get_external_lens_powers(self, obj):
-        """ ✅ Fetch lens powers for the given external lens. """
+        """  Fetch lens powers for the given external lens. """
         if obj.external_lens:
             powers = obj.external_lens.external_lens_powers.all()  
             return ExternalLensPowerSerializer(powers, many=True).data
@@ -319,9 +319,9 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 
     def create(self, validated_data):
-        """ ✅ Auto-calculate subtotal before saving. """
-        price = validated_data.get('price_per_unit', 0)  # ✅ Ensure price exists
-        quantity = validated_data.get('quantity', 1)  # ✅ Default quantity to 1
+        """  Auto-calculate subtotal before saving. """
+        price = validated_data.get('price_per_unit', 0)  #  Ensure price exists
+        quantity = validated_data.get('quantity', 1)  #  Default quantity to 1
 
         validated_data['subtotal'] = price * quantity
         return super().create(validated_data)
@@ -388,18 +388,18 @@ class ExternalLensSerializer(serializers.ModelSerializer):
         source="branch",  # Maps to `branch` field in the model
         required=False  # Makes it optional in requests
     )
-    brand_name = serializers.CharField(source="brand.name", read_only=True)  # ✅ Fetch Brand Name
-    type_name = serializers.CharField(source="type.name", read_only=True)  # ✅ Fetch Lens Type Name
-    coating_name = serializers.CharField(source="coating.name", read_only=True)  # ✅ Fetch Coating Name
+    brand_name = serializers.CharField(source="brand.name", read_only=True)  #  Fetch Brand Name
+    type_name = serializers.CharField(source="type.name", read_only=True)  #  Fetch Lens Type Name
+    coating_name = serializers.CharField(source="coating.name", read_only=True)  #  Fetch Coating Name
 
     class Meta:
         model = ExternalLens
         fields = [
             "id",
-            "brand", "brand_name",  # ✅ Return ID & Name
-            "type", "type_name",  # ✅ Return ID & Name
-            "coating", "coating_name",  # ✅ Return ID & Name
-            "price",  # ✅ Manually Entered Price
+            "brand", "brand_name",  #  Return ID & Name
+            "type", "type_name",  #  Return ID & Name
+            "coating", "coating_name",  #  Return ID & Name
+            "price",  #  Manually Entered Price
             "branch_id"
         ]
 
@@ -415,26 +415,26 @@ class PatientSerializer(serializers.ModelSerializer):
         
 
 class InvoiceSerializer(serializers.ModelSerializer):
-    customer = serializers.PrimaryKeyRelatedField(source='order.customer', read_only=True)  # ✅ Fetch customer ID
-    customer_details = PatientSerializer(source='order.customer', read_only=True)  # ✅ Full customer details
-    refraction_details = RefractionSerializer(source='order.refraction', read_only=True)  # ✅ Refraction details (if exists)
-    order_details = OrderSerializer(source='order', read_only=True)  # ✅ Full order details
+    customer = serializers.PrimaryKeyRelatedField(source='order.customer', read_only=True)  #  Fetch customer ID
+    customer_details = PatientSerializer(source='order.customer', read_only=True)  #  Full customer details
+    refraction_details = RefractionSerializer(source='order.refraction', read_only=True)  #  Refraction details (if exists)
+    order_details = OrderSerializer(source='order', read_only=True)  #  Full order details
 
     class Meta:
         model = Invoice
         fields = [
             'id',
             'order',       # Order ID (ForeignKey)
-            'customer',    # ✅ Customer ID (from Order)
-            'customer_details',  # ✅ Full customer details
-            'refraction_details',  # ✅ Full refraction details (if available)
+            'customer',    #  Customer ID (from Order)
+            'customer_details',  #  Full customer details
+            'refraction_details',  #  Full refraction details (if available)
             'invoice_type',  # "factory" or "manual"
             'daily_invoice_no',  # Unique daily number for factory invoices
             'invoice_number',
             'invoice_date',
-            'order_details',  # ✅ Full order details (optional)
+            'order_details',  #  Full order details (optional)
 
-              # 🔽 NEW fields for tracking factory invoice progress
+              #  NEW fields for tracking factory invoice progress
             'progress_status',
             'lens_arrival_status',
             'whatsapp_sent',
@@ -443,9 +443,11 @@ class InvoiceSerializer(serializers.ModelSerializer):
 class DoctorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Doctor
-        fields = ['id', 'name', 'contact_info', 'status']
+        fields = ['id', 'name', 'contact_info', 'status', 'specialization']
+        
 class ScheduleSerializer(serializers.ModelSerializer):
     doctor_name = serializers.CharField(source='doctor.name', read_only=True)  # Include doctor name if needed
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
 
     class Meta:
         model = Schedule
@@ -453,6 +455,8 @@ class ScheduleSerializer(serializers.ModelSerializer):
             'id',
             'doctor',  # Doctor ID
             'doctor_name',  # Doctor Name (Optional, based on `doctor.name`)
+            'branch',        # branch ID
+            'branch_name', 
             'date',  # Schedule Date
             'start_time',  # Start Time
             'status',  # Schedule Status (e.g., Available, Booked, Unavailable)
@@ -579,26 +583,26 @@ class UserBranchSerializer(serializers.ModelSerializer):
 
 
 class InvoiceSearchSerializer(serializers.ModelSerializer):
-    customer = serializers.PrimaryKeyRelatedField(source='order.customer.name', read_only=True)  # ✅ Fetch customer ID
-    # customer_details = PatientSerializer(source='order.customer', read_only=True)  # ✅ Full customer details
-    # refraction_details = RefractionSerializer(source='order.refraction', read_only=True)  # ✅ Refraction details (if exists)
-    # order_details = OrderSerializer(source='order', read_only=True)  # ✅ Full order details
+    customer = serializers.PrimaryKeyRelatedField(source='order.customer.name', read_only=True)  #  Fetch customer ID
+    # customer_details = PatientSerializer(source='order.customer', read_only=True)  #  Full customer details
+    # refraction_details = RefractionSerializer(source='order.refraction', read_only=True)  # Refraction details (if exists)
+    # order_details = OrderSerializer(source='order', read_only=True)  #  Full order details
 
     class Meta:
         model = Invoice
         fields = [
             'id',
             'order',       # Order ID (ForeignKey)
-            'customer',    # ✅ Customer ID (from Order)
-            # 'customer_details',  # ✅ Full customer details
-            # 'refraction_details',  # ✅ Full refraction details (if available)
+            'customer',    #  Customer ID (from Order)
+            # 'customer_details',  #  Full customer details
+            # 'refraction_details',  #  Full refraction details (if available)
             'invoice_type',  # "factory" or "manual"
             'daily_invoice_no',  # Unique daily number for factory invoices
             'invoice_number',
             'invoice_date',
-            # 'order_details',  # ✅ Full order details (optional)
+            # 'order_details',  #  Full order details (optional)
 
-              # 🔽 NEW fields for tracking factory invoice progress
+              #  NEW fields for tracking factory invoice progress
             'progress_status',
             'lens_arrival_status',
             'whatsapp_sent',

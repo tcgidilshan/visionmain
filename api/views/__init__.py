@@ -15,7 +15,7 @@ from .lens_cleaner_stock_views import LensCleanerStockListCreateView,LensCleaner
 from .order_views import OrderCreateView
 from .doctor_views import  DoctorListCreateView,DoctorRetrieveUpdateDeleteView
 from .patient_views import PatientListView, PatientUpdateView
-from .channel_views import ChannelAppointmentView,ChannelListView,AppointmentRetrieveUpdateDeleteView
+from .channel_views import ChannelAppointmentView,ChannelListView,AppointmentRetrieveUpdateDeleteView,DoctorScheduleTransferView
 from .lens_stock_views import LensStockListCreateView,LensStockRetrieveUpdateDeleteView
 from .lens_type_views import LensTypeListCreateView,LensTypeRetrieveUpdateDeleteView
 from .lens_coating_views import LensCoatingListCreateView,LensCoatingRetrieveUpdateDeleteView
@@ -32,3 +32,4 @@ from .invoice_search_views import FactoryInvoiceSearchView
 from .invoice_progress_views import InvoiceProgressUpdateView ,BulkInvoiceProgressUpdateView
 from .invoice_report_view import InvoiceReportView
 from .account_report_views import ChannelReportView
+from .doctor_schedule_views import DoctorScheduleCreateView,DoctorUpcomingScheduleView

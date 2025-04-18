@@ -54,7 +54,7 @@ from .views import (
     OtherItemRetrieveUpdateDeleteView,
     CreateUserView,
     UserCodeCheckView,
-    AdminCodeCheckView,ChannelReportView,
+    AdminCodeCheckView,ChannelReportView,DoctorScheduleCreateView,DoctorUpcomingScheduleView,DoctorScheduleTransferView,
     UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView
 )
 # from .views import CustomAuthToken
@@ -117,6 +117,9 @@ urlpatterns = [
     path('reports/channels/', ChannelReportView.as_view(), name="channel-report"),
     path('doctors/', DoctorListCreateView.as_view(), name='doctor-list-create'),
     path('doctors/<int:pk>/', DoctorRetrieveUpdateDeleteView.as_view(), name='doctor-detail'),
+    path('doctor-schedule/create/', DoctorScheduleCreateView.as_view(), name='doctor-schedule-create'),
+    path('doctor-schedule/<int:doctor_id>/upcoming/', DoctorUpcomingScheduleView.as_view(), name='doctor-schedule-upcoming'),
+    path('doctor-schedule/transfer/', DoctorScheduleTransferView.as_view(), name='doctor-schedule-transfer'),
     path('patients/', PatientListView.as_view(), name='patient-list'),
     path('patients/<int:pk>/', PatientUpdateView.as_view(), name='patient-update'),# Added by Lahiru to update patient need review
     path('channel/', ChannelAppointmentView.as_view(), name='channel-appointment'),

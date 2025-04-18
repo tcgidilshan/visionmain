@@ -3,10 +3,11 @@ from rest_framework.response import Response
 from rest_framework import status,generics
 from django.db import transaction
 from ..models import Doctor, Patient, Schedule, Appointment, ChannelPayment
-from ..serializers import PatientSerializer, ScheduleSerializer, AppointmentSerializer, ChannelPaymentSerializer,ChannelListSerializer,AppointmentDetailSerializer
+from ..serializers import PatientSerializer, ScheduleSerializer, AppointmentSerializer, ChannelPaymentSerializer,ChannelListSerializer,AppointmentDetailSerializer,ScheduleSerializer
 from rest_framework.generics import ListAPIView
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
+from ..services.doctor_schedule_service import DoctorScheduleService
 
 class ChannelAppointmentView(APIView):
     @transaction.atomic
@@ -160,3 +161,35 @@ class AppointmentRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView)
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response({"message": "Appointment deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+    
+class DoctorScheduleTransferView(APIView):
+   def post(self, request, *args, **kwargs):
+        doctor_id = request.data.get("doctor_id")
+        from_date = request.data.get("from_date")  # Make sure this is a valid date (YYYY-MM-DD)
+        to_date = request.data.get("to_date")  # Make sure this is a valid date (YYYY-MM-DD)
+        branch_id = request.data.get("branch_id")
+
+        # Step 1: Validate the incoming data
+        if not all([doctor_id, from_date, to_date, branch_id]):
+            return Response({"error": "doctor_id, from_date, to_date, branch_id are required."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Step 2: Transfer the schedule using the service method
+            new_schedule = DoctorScheduleService.transfer_schedule(
+                doctor_id=doctor_id,
+                from_date=from_date,
+                to_date=to_date,
+                branch_id=branch_id
+            )
+
+            # Step 3: Return the response with the new schedule details
+            return Response({
+                "message": "Schedule transferred successfully",
+                "new_schedule": ScheduleSerializer(new_schedule).data
+            }, status=status.HTTP_200_OK)
+
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

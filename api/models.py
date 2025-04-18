@@ -76,7 +76,7 @@ class Patient(models.Model):
     nic = models.CharField(max_length=15, unique=True, null=True, blank=True)
     refraction = models.ForeignKey(
         Refraction, null=True, blank=True, on_delete=models.SET_NULL, related_name="patients"
-    )  # ✅ Added refraction_id (nullable)
+    )  #  Added refraction_id (nullable)
     #new feature
     patient_note=models.CharField(max_length=100,null=True,blank=True)
     def __str__(self):
@@ -372,8 +372,8 @@ class Invoice(models.Model):
     whatsapp_sent = models.BooleanField(default=False)
 
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="invoice")
-    invoice_type = models.CharField(max_length=10, choices=INVOICE_TYPES)  # ✅ Identifies invoice type
-    daily_invoice_no = models.CharField(max_length=10,null=True, blank=True)  # ✅ Factory invoices get a daily number
+    invoice_type = models.CharField(max_length=10, choices=INVOICE_TYPES)  #  Identifies invoice type
+    daily_invoice_no = models.CharField(max_length=10,null=True, blank=True)  #  Factory invoices get a daily number
     invoice_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
     invoice_date = models.DateTimeField(auto_now_add=True)
 
@@ -486,6 +486,7 @@ class Doctor(models.Model):
         ('unavailable', 'Unavailable'),
     ]
     name = models.CharField(max_length=255)
+    specialization = models.CharField(max_length=100, blank=True, null=True) 
     contact_info = models.CharField(max_length=255, blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available')
     def __str__(self):
@@ -498,6 +499,7 @@ class Schedule(models.Model):
         UNAVAILABLE = 'Unavailable', _('Unavailable')
 
     doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE, related_name='schedules')
+    branch = models.ForeignKey('Branch', on_delete=models.CASCADE, related_name='schedules')
     date = models.DateField()
     start_time = models.TimeField()
     status = models.CharField(
@@ -507,6 +509,9 @@ class Schedule(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('doctor', 'branch', 'date', 'start_time') 
 
     def __str__(self):
         return f"{self.doctor} - {self.date} ({self.start_time}) - {self.status}"
