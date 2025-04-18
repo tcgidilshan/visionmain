@@ -53,6 +53,7 @@ class ChannelAppointmentView(APIView):
                 doctor_id=data['doctor_id'],
                 date=data['channel_date'],
                 start_time=data['time'],
+                branch_id=data['branch_id'], 
                 defaults={'status': 'Available'}
             )
             if not created and schedule.status != 'Available':
