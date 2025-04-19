@@ -543,14 +543,16 @@ class Appointment(models.Model):
         return f"Appointment with {self.doctor} for {self.patient} on {self.date} at {self.time}"
 
 class ChannelPayment(models.Model):
-    class PaymentMethods(models.TextChoices):
-        CASH = 'Cash', 'Cash'
-        CARD = 'Card', 'Card'
+    PAYMENT_METHOD_CHOICES = [
+        ('credit_card', 'Credit Card'),
+        ('cash', 'Cash'),
+        ('online_transfer', 'Online Transfer'),
+    ]
 
     appointment = models.ForeignKey('Appointment', on_delete=models.CASCADE, related_name='payments')
     payment_date = models.DateTimeField(auto_now_add=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_method = models.CharField(max_length=10, choices=PaymentMethods.choices)
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
     is_final = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
