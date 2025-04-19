@@ -53,7 +53,7 @@ from .views import (
     OtherItemListCreateView,
     OtherItemRetrieveUpdateDeleteView,
     CreateUserView,
-    UserCodeCheckView,
+    UserCodeCheckView,ChannelTransferView,
     AdminCodeCheckView,ChannelReportView,DoctorScheduleCreateView,DoctorUpcomingScheduleView,DoctorScheduleTransferView,
     UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView
 )
@@ -125,6 +125,7 @@ urlpatterns = [
     path('channel/', ChannelAppointmentView.as_view(), name='channel-appointment'),
     path('channels/', ChannelListView.as_view(), name='channel-list'),
     path('channels/<int:pk>/', AppointmentRetrieveUpdateDeleteView.as_view(), name='appointment-detail'),
+    path("channel/transfer/", ChannelTransferView.as_view(), name="channel-transfer"),
     path('lens-stocks/', LensStockListCreateView.as_view(), name='lens-stock-list-create'),
     path('lens-stocks/<int:pk>/', LensStockRetrieveUpdateDeleteView.as_view(), name='lens-stock-detail'),
     path("lenses/search/", LensSearchView.as_view(), name="lens-search"),
