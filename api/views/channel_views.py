@@ -128,7 +128,7 @@ class ChannelListView(ListAPIView):
     queryset = Appointment.objects.prefetch_related('payments').select_related('doctor', 'patient', 'branch')
     serializer_class = ChannelListSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['doctor', 'date']  # Optional DRF filters
+    filterset_fields = ['doctor', 'date','branch']  # Optional DRF filters
     search_fields = ['id', 'patient__phone_number']
     ordering_fields = ['channel_no']
     pagination_class = None

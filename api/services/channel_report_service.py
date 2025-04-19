@@ -36,7 +36,7 @@ class ChannelReportService:
                 results[appt_id]["amount_cash"] += float(payment.amount)
             elif method == 'credit_card':
                 results[appt_id]["amount_credit_card"] += float(payment.amount)
-            elif method == 'online':
+            elif method == 'online_transfer':
                 results[appt_id]["amount_online"] += float(payment.amount)
 
             results[appt_id]["total_paid"] += float(payment.amount)
