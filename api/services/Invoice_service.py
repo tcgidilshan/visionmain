@@ -100,5 +100,16 @@ class InvoiceService:
         
 
         return qs.select_related('order', 'order__customer').order_by('-invoice_date')
+    
+    @staticmethod
+    def get_invoice_by_invoice_number(invoice_type, invoice_number):
+        try:
+            invoice = Invoice.objects.select_related('order__customer', 'order__refraction').get(
+                invoice_type=invoice_type,
+                invoice_number=invoice_number
+            )
+            return InvoiceSerializer(invoice).data
+        except Invoice.DoesNotExist:
+            raise NotFound("Invoice not found with the given type and number.")
 
 
