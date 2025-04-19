@@ -15,54 +15,59 @@ class ChannelAppointmentView(APIView):
         data = request.data
 
         # Step 1: Validate Input
-        required_fields = ['doctor_id', 'name', 'address', 'contact_number', 'channel_date', 'time', 'channeling_fee','branch_id', 'payments']
+        required_fields = ['doctor_id', 'name', 'address', 'contact_number', 'channel_date', 'time', 'channeling_fee', 'branch_id', 'payments']
         for field in required_fields:
             if field not in data:
                 return Response({"error": f"{field} is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-           # Step 2: Handle Patient
-            if 'patient_id' in data and data['patient_id']:  # If patient_id is provided
+            # Step 2: Handle Patient
+            patient = None
+            phone_number = data.get('contact_number')
+
+            if data.get('patient_id'):
                 try:
-                    # Attempt to retrieve and update the existing patient
                     patient = Patient.objects.get(id=data['patient_id'])
                     patient.name = data['name']
-                    patient.phone_number = data['contact_number']
+                    patient.phone_number = phone_number
                     patient.address = data.get('address', patient.address)
                     patient.save()
-                    created = False  # Indicate that the patient was not newly created
                 except Patient.DoesNotExist:
-                    # If the provided patient_id does not exist, create a new patient
+                    return Response({"error": "Provided patient_id does not exist."}, status=status.HTTP_400_BAD_REQUEST)
+
+            else:
+                # Try to get patient by phone number
+                patient = Patient.objects.filter(phone_number=phone_number).first()
+                if patient:
+                    # Update patient info
+                    patient.name = data['name']
+                    patient.address = data.get('address', patient.address)
+                    patient.save()
+                else:
+                    # Create new patient
                     patient = Patient.objects.create(
-                        id=data['patient_id'],
                         name=data['name'],
-                        phone_number=data['contact_number'],
+                        phone_number=phone_number,
                         address=data.get('address', '')
                     )
-                    created = True
-            else:  # If patient_id is not provided, create a new patient
-                patient = Patient.objects.create(
-                    name=data['name'],
-                    phone_number=data['contact_number'],
-                    address=data.get('address', '')
-                )
-                created = True
 
             # Step 3: Handle Schedule (Create If Not Exists)
             schedule, created = Schedule.objects.get_or_create(
                 doctor_id=data['doctor_id'],
                 date=data['channel_date'],
                 start_time=data['time'],
-                branch_id=data['branch_id'], 
+                branch_id=data['branch_id'],
                 defaults={'status': 'Available'}
             )
+
             if not created and schedule.status != 'Available':
                 return Response({"error": "The selected schedule is not available."}, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Step 4: Calculate `channel_no`
+
+            # Step 4: Calculate channel number (branch + date specific)
             channel_date = data['channel_date']
-            appointments_today = Appointment.objects.filter(date=channel_date).count()
-            channel_no = appointments_today + 1  # Increment by 1 for the new appointment
+            branch_id = data['branch_id']
+            appointments_today = Appointment.objects.filter(date=channel_date, branch_id=branch_id).count()
+            channel_no = appointments_today + 1
 
             # Step 5: Create Appointment
             appointment_data = {
@@ -74,8 +79,9 @@ class ChannelAppointmentView(APIView):
                 "status": "Pending",
                 "amount": data['channeling_fee'],
                 "channel_no": channel_no,
-                "branch": data['branch_id']
+                "branch": branch_id
             }
+
             appointment_serializer = AppointmentSerializer(data=appointment_data)
             appointment_serializer.is_valid(raise_exception=True)
             appointment = appointment_serializer.save()
@@ -88,14 +94,14 @@ class ChannelAppointmentView(APIView):
                     "appointment": appointment.id,
                     "amount": payment['amount'],
                     "payment_method": payment['payment_method'],
-                    "is_final": False  # Default as not final
+                    "is_final": False
                 }
                 total_paid += payment['amount']
                 payment_serializer = ChannelPaymentSerializer(data=payment_data)
                 payment_serializer.is_valid(raise_exception=True)
                 payment_records.append(payment_serializer.save())
 
-            # Step 7: Mark Final Payment
+            # Step 7: Final Payment
             if total_paid == data['channeling_fee']:
                 payment_records[-1].is_final = True
                 payment_records[-1].save()
@@ -115,9 +121,9 @@ class ChannelAppointmentView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            transaction.set_rollback(True)  # Ensure rollback for any exception
+            transaction.set_rollback(True)
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
+
 class ChannelListView(ListAPIView):
     queryset = Appointment.objects.prefetch_related('payments').select_related('doctor', 'patient', 'branch')
     serializer_class = ChannelListSerializer
