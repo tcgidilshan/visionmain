@@ -34,3 +34,4 @@ from .invoice_report_view import InvoiceReportView
 from .account_report_views import ChannelReportView
 from .doctor_schedule_views import DoctorScheduleCreateView,DoctorUpcomingScheduleView
 from .channel_transfer_view import ChannelTransferView
+from .doctor_absence_reschedule_view import DoctorAbsenceRescheduleView

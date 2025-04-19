@@ -53,7 +53,7 @@ from .views import (
     OtherItemListCreateView,
     OtherItemRetrieveUpdateDeleteView,
     CreateUserView,
-    UserCodeCheckView,ChannelTransferView,
+    UserCodeCheckView,ChannelTransferView,DoctorAbsenceRescheduleView,
     UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,
     AdminCodeCheckView,ChannelReportView,DoctorScheduleCreateView,DoctorUpcomingScheduleView,DoctorScheduleTransferView,AllRoleCheckView,
     UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,BulkInvoiceProgressUpdateView,
@@ -124,6 +124,7 @@ urlpatterns = [
     path('doctor-schedule/create/', DoctorScheduleCreateView.as_view(), name='doctor-schedule-create'),
     path('doctor-schedule/<int:doctor_id>/upcoming/', DoctorUpcomingScheduleView.as_view(), name='doctor-schedule-upcoming'),
     path('doctor-schedule/transfer/', DoctorScheduleTransferView.as_view(), name='doctor-schedule-transfer'),
+    path('doctor-absence/reschedule/', DoctorAbsenceRescheduleView.as_view(), name='doctor-absence-reschedule'),
     path('patients/', PatientListView.as_view(), name='patient-list'),
     path('patients/<int:pk>/', PatientUpdateView.as_view(), name='patient-update'),# Added by Lahiru to update patient need review
     path('channel/', ChannelAppointmentView.as_view(), name='channel-appointment'),
