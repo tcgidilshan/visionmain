@@ -393,13 +393,16 @@ class Invoice(models.Model):
                 raise ValueError("Invoice must be linked to an order with a valid branch.")
 
             branch_code = self.order.branch.branch_name[:3].upper()
+            invoice_day = self.invoice_date.strftime('%d')  # Get day as 2-digit string
+            sequence_number = 1  # Default start
 
             with transaction.atomic():
                 prefix = ""
                 number = 1  # default starting number
 
                 if self.invoice_type == 'factory':
-                    prefix = f"{branch_code}"
+                    prefix = f"{branch_code}{invoice_day}"
+
                     last_invoice = Invoice.objects.select_for_update().filter(
                         invoice_type='factory',
                         invoice_number__startswith=prefix
