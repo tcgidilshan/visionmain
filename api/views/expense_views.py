@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from ..services.expense_validation_service import ExpenseValidationService
 from django.db.models import Sum
 from django.utils.dateparse import parse_date
+from django.db import transaction
 
 # ---------- Main Category Views ----------
 class ExpenseMainCategoryListCreateView(generics.ListCreateAPIView):
@@ -76,4 +77,36 @@ class ExpenseReportView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class ExpenseUpdateView(generics.UpdateAPIView):
+    queryset = Expense.objects.all()
+    serializer_class = ExpenseSerializer
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        # Capture the original amount
+        original_amount = instance.amount
+        original_date = instance.created_at.date()
+        branch_id = instance.branch_id
+
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        updated_amount = serializer.validated_data.get('amount', original_amount)
+
+        # Calculate adjusted total: (current total - original + new)
+        try:
+            ExpenseValidationService.validate_expense_update(
+                expense_instance=instance,
+                new_amount=updated_amount,
+                branch_id=branch_id,
+                date=original_date
+            )
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            self.perform_update(serializer)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 

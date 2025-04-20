@@ -51,7 +51,7 @@ from .views import (
     LensSearchView,
     PaymentView,
     OtherItemListCreateView,
-    OtherItemRetrieveUpdateDeleteView,ExpenseCreateView,
+    OtherItemRetrieveUpdateDeleteView,ExpenseCreateView,ExpenseUpdateView,
     CreateUserView,ExpenseMainCategoryListCreateView, ExpenseMainCategoryRetrieveUpdateDestroyView,
     ExpenseSubCategoryListCreateView, ExpenseSubCategoryRetrieveUpdateDestroyView,
     UserCodeCheckView,ChannelTransferView,DoctorAbsenceRescheduleView,ExpenseReportView,
@@ -149,6 +149,8 @@ urlpatterns = [
     path('expense-subcategories/<int:pk>/', ExpenseSubCategoryRetrieveUpdateDestroyView.as_view(), name='expense-sub-category-detail'),
     path('expenses/', ExpenseCreateView.as_view(), name='expense-create'),
     path("expenses/report/", ExpenseReportView.as_view(), name="expense-report"),
+
+    path('expenses/<int:pk>/update/', ExpenseUpdateView.as_view(), name='expense-update'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

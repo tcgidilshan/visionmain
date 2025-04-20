@@ -35,10 +35,10 @@ class DoctorAbsenceService:
             next_schedule = Schedule.objects.filter(
                 doctor_id=doctor_id,
                 date__gt=to_date,
+                start_time=original_time,
                 branch_id=branch_id,
-                status=Schedule.StatusChoices.AVAILABLE
+                # status=Schedule.StatusChoices.AVAILABLE
             ).order_by('date', 'start_time').first()
-
 
             if not next_schedule:
                 continue  # Skip if no upcoming schedule available
