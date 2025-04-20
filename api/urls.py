@@ -51,9 +51,10 @@ from .views import (
     LensSearchView,
     PaymentView,
     OtherItemListCreateView,
-    OtherItemRetrieveUpdateDeleteView,
-    CreateUserView,
-    UserCodeCheckView,ChannelTransferView,DoctorAbsenceRescheduleView,
+    OtherItemRetrieveUpdateDeleteView,ExpenseCreateView,
+    CreateUserView,ExpenseMainCategoryListCreateView, ExpenseMainCategoryRetrieveUpdateDestroyView,
+    ExpenseSubCategoryListCreateView, ExpenseSubCategoryRetrieveUpdateDestroyView,
+    UserCodeCheckView,ChannelTransferView,DoctorAbsenceRescheduleView,ExpenseReportView,
     UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,
     AdminCodeCheckView,ChannelReportView,DoctorScheduleCreateView,DoctorUpcomingScheduleView,DoctorScheduleTransferView,AllRoleCheckView,
     UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,BulkInvoiceProgressUpdateView,
@@ -138,6 +139,16 @@ urlpatterns = [
     path('lens-types/<int:pk>/', LensTypeRetrieveUpdateDeleteView.as_view(), name='lens-type-detail'),
     path('lens-coatings/', LensCoatingListCreateView.as_view(), name='lens-coating-list-create'),
     path('lens-coatings/<int:pk>/', LensCoatingRetrieveUpdateDeleteView.as_view(), name='lens-coating-detail'),
+
+    #expenses
+    path('expense-categories/', ExpenseMainCategoryListCreateView.as_view(), name='expense-main-category-list-create'),
+    path('expense-categories/<int:pk>/', ExpenseMainCategoryRetrieveUpdateDestroyView.as_view(), name='expense-main-category-detail'),
+
+    # Sub Category
+    path('expense-subcategories/', ExpenseSubCategoryListCreateView.as_view(), name='expense-sub-category-list-create'),
+    path('expense-subcategories/<int:pk>/', ExpenseSubCategoryRetrieveUpdateDestroyView.as_view(), name='expense-sub-category-detail'),
+    path('expenses/', ExpenseCreateView.as_view(), name='expense-create'),
+    path("expenses/report/", ExpenseReportView.as_view(), name="expense-report"),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

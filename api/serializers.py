@@ -29,8 +29,8 @@ from .models import (
     ExternalLens,
     ExternalLensPower,
     OtherItem,
-    OtherItemStock,
-    UserBranch
+    OtherItemStock,Expense,
+    UserBranch,ExpenseMainCategory, ExpenseSubCategory
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -419,8 +419,8 @@ class PatientSerializer(serializers.ModelSerializer):
 class InvoiceSerializer(serializers.ModelSerializer):
     customer = serializers.PrimaryKeyRelatedField(source='order.customer', read_only=True)  #  Fetch customer ID
     customer_details = PatientSerializer(source='order.customer', read_only=True)  #  Full customer details
-    refraction_details = RefractionSerializer(source='order.refraction', read_only=True)  #  Refraction details (if exists)
     order_details = OrderSerializer(source='order', read_only=True)  #  Full order details
+    refraction_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Invoice
@@ -441,6 +441,18 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'lens_arrival_status',
             'whatsapp_sent',
         ]
+
+    def get_refraction_details(self, obj):
+        refraction = getattr(obj.order, 'refraction', None)
+        if refraction:
+            # This assumes RefractionDetails has a ForeignKey to Refraction
+            from api.models import RefractionDetails  # adjust path as needed
+            try:
+                details = RefractionDetails.objects.get(refraction=refraction)
+                return RefractionDetailsSerializer(details).data
+            except RefractionDetails.DoesNotExist:
+                return None
+        return None
 
 class DoctorSerializer(serializers.ModelSerializer):
     class Meta:
@@ -616,4 +628,38 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
             'whatsapp_sent',
             'fitting_on_collection',
             'on_hold'
+        ]
+
+class ExpenseMainCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExpenseMainCategory
+        fields = ['id', 'name']
+
+
+class ExpenseSubCategorySerializer(serializers.ModelSerializer):
+    main_category_name = serializers.CharField(source='main_category.name', read_only=True)
+
+    class Meta:
+        model = ExpenseSubCategory
+        fields = ['id', 'main_category', 'main_category_name', 'name']
+
+# serializers.py
+class ExpenseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Expense
+        fields = ['id', 'branch', 'main_category', 'sub_category', 'amount', 'note', 'created_at']
+
+class ExpenseReportSerializer(serializers.ModelSerializer):
+    main_category_name = serializers.CharField(source='main_category.name', read_only=True)
+    sub_category_name = serializers.CharField(source='sub_category.name', read_only=True)
+
+    class Meta:
+        model = Expense
+        fields = [
+            'id',
+            'created_at',
+            'main_category_name',
+            'sub_category_name',
+            'amount',
+            'note'
         ]
