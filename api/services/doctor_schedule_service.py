@@ -38,40 +38,36 @@ class DoctorScheduleService:
     @transaction.atomic
     def transfer_schedule(doctor_id, from_date, to_date, branch_id):
         """
-        Transfers the doctor's schedule from one date to another. It ensures the schedule exists
-        on the original date and performs the transfer to the new date. 
+        Transfers a doctor's schedule from `from_date` to `to_date`.
+        If a schedule already exists at `to_date`, it will reuse it.
         """
-        # Step 1: Validate that a schedule exists for the given doctor, from_date, and branch_id
+
+        # Step 1: Ensure the original schedule exists
         try:
-            # Find the schedule for the specified doctor, date, and branch
             old_schedule = Schedule.objects.get(
                 doctor_id=doctor_id,
                 date=from_date,
                 branch_id=branch_id
             )
-            print(f"Found schedule: {old_schedule}")
-
         except Schedule.DoesNotExist:
-            # If no schedule is found, raise an error
-            print(f"Schedule not found for doctor {doctor_id} on {from_date} at branch {branch_id}")
             raise ValueError("Original schedule does not exist.")
 
-        # Step 2: Create a new schedule for the doctor on the target date
-        # The new schedule will have the same doctor, branch, and status as the original one
-        new_schedule = Schedule(
+        # Step 2: Check if a schedule already exists on the target date
+        new_schedule, created = Schedule.objects.get_or_create(
             doctor_id=doctor_id,
             date=to_date,
-            start_time=old_schedule.start_time,  # You can also update the start_time if needed
-            status=old_schedule.status,  # Retain the status of the original schedule
-            branch_id=branch_id  # Ensure it’s assigned to the correct branch
+            start_time=old_schedule.start_time,
+            branch_id=branch_id,
+            defaults={'status': old_schedule.status}
         )
-        new_schedule.save()
 
-        print(f"Transferred schedule to new date: {new_schedule}")
+        if created:
+            print(f"✅ Created new schedule for {to_date}")
+        else:
+            print(f"⚠️ Reusing existing schedule for {to_date}")
 
-        # Step 3: Optional - Update the status of the old schedule (if needed)
-        old_schedule.status = "Transferred"  # You can set this status as per the requirement
+        # Step 3: Optionally mark the old schedule
+        old_schedule.status = "Transferred"
         old_schedule.save()
 
-        # Return the new schedule details (can also return the old schedule if needed)
         return new_schedule
