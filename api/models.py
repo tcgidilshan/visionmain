@@ -399,7 +399,7 @@ class Invoice(models.Model):
                 number = 1  # default starting number
 
                 if self.invoice_type == 'factory':
-                    prefix = f"{branch_code}F"
+                    prefix = f"{branch_code}"
                     last_invoice = Invoice.objects.select_for_update().filter(
                         invoice_type='factory',
                         invoice_number__startswith=prefix
