@@ -45,7 +45,7 @@ class RefractionSerializer(serializers.ModelSerializer):
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
     class Meta:
         model = Refraction
-        fields = ['id', 'customer_full_name', 'customer_mobile', 'refraction_number', 'nic', 'branch_id', 'branch_name']
+        fields = ['id', 'customer_full_name', 'customer_mobile', 'refraction_number', 'nic', 'branch_id', 'branch_name','created_at']
         read_only_fields = ['refraction_number']  # Auto-generated
 
 class RefractionDetailsSerializer(serializers.ModelSerializer):

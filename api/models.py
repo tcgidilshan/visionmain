@@ -51,7 +51,8 @@ class Refraction(models.Model):
     customer_mobile = models.CharField(max_length=15)
     refraction_number = models.CharField(max_length=10, blank=True)
     nic = models.CharField(max_length=12, null=True, blank=True)
-
+    created_at = models.DateTimeField(auto_now_add=True)
+    
     def save(self, *args, **kwargs):
         # Generate refraction_number per branch if not set
         if not self.refraction_number and self.branch:
