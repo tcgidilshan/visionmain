@@ -50,7 +50,7 @@ from .views import (
     RefractionDetailRetrieveUpdateDeleteView,
     LensSearchView,
     PaymentView,
-    OtherItemListCreateView,
+    OtherItemListCreateView,BankAccountListCreateView,BankAccountRetrieveUpdateDeleteView,
     OtherItemRetrieveUpdateDeleteView,ExpenseCreateView,ExpenseUpdateView,
     CreateUserView,ExpenseMainCategoryListCreateView, ExpenseMainCategoryRetrieveUpdateDestroyView,
     ExpenseSubCategoryListCreateView, ExpenseSubCategoryRetrieveUpdateDestroyView,
@@ -69,6 +69,11 @@ urlpatterns = [
     path('register/admin/', AdminRegistrationView.as_view(), name='admin-registration'),
     path('branches/', BranchListCreateAPIView.as_view(), name='branch-list-create'),
     path('branches/<int:pk>/', BranchRetrieveUpdateDestroyAPIView.as_view(), name='branch-detail'),
+
+    #bank
+    path('bank_accounts/', BankAccountListCreateView.as_view(), name='bank_account_list_create'),
+    path('bank_accounts/<int:id>/', BankAccountRetrieveUpdateDeleteView.as_view(), name='bank_account_detail_update_delete'),
+
     path("users/create/", CreateUserView.as_view(), name="create-user"), 
     path("users/update/<int:user_id>/", UpdateUserView.as_view(), name="update-user"),
     path("users/get/<int:user_id>/", GetSingleUserView.as_view(), name="get-single-user"),

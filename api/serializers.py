@@ -28,7 +28,7 @@ from .models import (
     Invoice,
     ExternalLens,
     ExternalLensPower,
-    OtherItem,
+    OtherItem,BankAccount,
     OtherItemStock,Expense,
     UserBranch,ExpenseMainCategory, ExpenseSubCategory
 )
@@ -37,6 +37,12 @@ class BranchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Branch
         fields = '__all__'
+
+
+class BankAccountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BankAccount
+        fields = ['id', 'account_number', 'bank_name', 'branch']
         
 class RefractionSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(

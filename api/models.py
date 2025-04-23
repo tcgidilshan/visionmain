@@ -23,6 +23,14 @@ class Branch(models.Model):
     def __str__(self):
         return self.branch_name
     
+class BankAccount(models.Model):
+    account_number = models.CharField(max_length=255, unique=True)
+    bank_name = models.CharField(max_length=255)
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE)  # Linking bank account to branch
+    
+    def __str__(self):
+        return f"{self.bank_name} - {self.account_number}"
+    
 class CustomUser(AbstractUser):
     mobile = models.CharField(max_length=15, blank=True, null=True)
     user_code = models.CharField(max_length=10, null=True, blank=True) 
