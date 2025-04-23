@@ -49,7 +49,7 @@ from .views import (
     OrderUpdateView,
     RefractionDetailRetrieveUpdateDeleteView,
     LensSearchView,
-    PaymentView,
+    PaymentView,ExternalLensListCreateView,ExternalLensRetrieveUpdateDeleteView,
     OtherItemListCreateView,BankAccountListCreateView,BankAccountRetrieveUpdateDeleteView,
     OtherItemRetrieveUpdateDeleteView,ExpenseCreateView,ExpenseUpdateView,
     CreateUserView,ExpenseMainCategoryListCreateView, ExpenseMainCategoryRetrieveUpdateDestroyView,
@@ -104,6 +104,11 @@ urlpatterns = [
     path('lenses/<int:pk>/', LensRetrieveUpdateDeleteView.as_view(), name='lens-detail'),
     path('lens-powers/', LensPowerListCreateView.as_view(), name='lens-power-list-create'),
     path('lens-powers/<int:pk>/', LensPowerRetrieveUpdateDeleteView.as_view(), name='lens-power-detail'),
+
+    #external lenses
+    path('external_lenses/', ExternalLensListCreateView.as_view(), name='external_lens_list_create'),
+    path('external_lenses/<int:id>/', ExternalLensRetrieveUpdateDeleteView.as_view(), name='external_lens_detail'),
+
     path('lens-cleaners/', LensCleanerListCreateView.as_view(), name='lens-cleaner-list-create'),
     path('lens-cleaners/<int:pk>/', LensCleanerRetrieveUpdateDeleteView.as_view(), name='lens-cleaner-detail'),
     path('lens-cleaner-stocks/', LensCleanerStockListCreateView.as_view(), name='lens-cleaner-stock-list-create'),

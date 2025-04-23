@@ -29,35 +29,11 @@ class OrderUpdateView(APIView):
             order_items_data = request.data.get("order_items", [])
             payments_data = request.data.get("order_payments", [])
 
-            # ✅ Step 3: Ensure External Lens Data is Processed
-            updated_items = []
-            for item_data in order_items_data:
-                external_lens_data = item_data.get("external_lens_data")
+            # ✅ Step 3: Pass items directly (no external lens creation)
+            # No transformation needed now
+            updated_items = order_items_data
 
-                if external_lens_data:
-                    lens_data = external_lens_data.get("lens", None)
-                    powers_data = external_lens_data.get("powers", [])
-
-                    if not lens_data:
-                        raise ValidationError({"external_lens_data": "Lens data is required for external lenses."})
-
-                    # ✅ If an external lens already exists for this item, update it
-                    if item_data.get("external_lens"):
-                        existing_lens = ExternalLens.objects.get(id=item_data["external_lens"])
-                        lens_serializer = ExternalLensSerializer(existing_lens, data=lens_data, partial=True)
-                        if lens_serializer.is_valid():
-                            lens_serializer.save()
-                        else:
-                            raise ValidationError(lens_serializer.errors)
-                    else:
-                        # ✅ Otherwise, create a new external lens
-                        created_lens = ExternalLensService.create_external_lens(lens_data, powers_data)
-                        item_data["external_lens"] = created_lens["external_lens"]["id"]
-                        print(f"✅ Created New External Lens: {created_lens['external_lens']['id']}")
-
-                updated_items.append(item_data)
-
-            # ✅ Step 4: Update Order Using OrderService
+            # ✅ Step 4: Update Order
             updated_order = OrderService.update_order(order, order_data, updated_items, payments_data)
 
             # ✅ Step 5: Return Updated Order Response

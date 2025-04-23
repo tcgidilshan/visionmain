@@ -328,32 +328,29 @@ class Order(models.Model):
         return f"Order {self.id} - Status: {self.status} - Customer: {self.customer.id}"
     
 class ExternalLens(models.Model):
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="external_lenses", null=True, blank=True)
-    type = models.ForeignKey(LenseType, related_name='external_lenses', on_delete=models.CASCADE)
-    coating = models.ForeignKey(Coating, related_name='external_lenses', on_delete=models.CASCADE)
-    brand = models.ForeignKey(Brand, related_name='external_lenses', on_delete=models.CASCADE)
-    price = models.DecimalField(max_digits=10, decimal_places=2)  # ✅ Manually entered price
-
-    def __str__(self):
-        return f"{self.brand.name} {self.type.name} ({self.coating.name}) - LKR {self.price}"
-    
-class ExternalLensPower(models.Model):
-    SIDE_CHOICES = [
-        ('left', 'Left'),
-        ('right', 'Right'),
-    ]
-    external_lens = models.ForeignKey(ExternalLens, related_name='external_lens_powers', on_delete=models.CASCADE)
-    power = models.ForeignKey('Power', related_name='external_lens_powers', on_delete=models.CASCADE)  # Assuming Power table exists
-    value = models.DecimalField(max_digits=5, decimal_places=2,)
-    side = models.CharField(
-        max_length=10,
-        choices=SIDE_CHOICES,
-        null=True, 
-        blank=True 
+    BRAND_CHOICES = (
+        ('branded', 'Branded'),
+        ('non_branded', 'Non-Branded'),
     )
 
+    branch        = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='external_lenses', null=True, blank=True)
+    lens_type     = models.ForeignKey(LenseType, related_name='external_lenses', on_delete=models.CASCADE)
+    coating       = models.ForeignKey(Coating, related_name='external_lenses', on_delete=models.CASCADE)
+    brand         = models.ForeignKey('Brand', related_name='external_lenses', on_delete=models.CASCADE)  # ✅ Reintroduced as ForeignKey
+    branded       = models.CharField(max_length=20, choices=BRAND_CHOICES)
+    price         = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    created_at    = models.DateTimeField(auto_now_add=True)
+    updated_at    = models.DateTimeField(auto_now=True)
+
     def __str__(self):
-        return f"Lens: {self.external_lens} - Power: {self.value} ({self.side})"
+        return f"{self.brand.name} - {self.lens_factory} - {self.lens_type.name} ({self.coating.name}) – {self.get_branded_display()} – LKR {self.price or 'N/A'}"
+
+    class Meta:
+        ordering = ['lens_type', 'coating']
+        verbose_name = "External Lens"
+        verbose_name_plural = "External Lenses"
+
     
 class Invoice(models.Model):
     INVOICE_TYPES = [

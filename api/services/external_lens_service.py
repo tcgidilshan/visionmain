@@ -2,7 +2,7 @@ from django.db import transaction
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from ..models import ExternalLens
-from ..serializers import ExternalLensSerializer,ExternalLensPowerSerializer
+from ..serializers import ExternalLensSerializer
 
 
 class ExternalLensService:
@@ -27,16 +27,9 @@ class ExternalLensService:
         external_lens.save()
 
         # Create Powers
-        power_instances = []
         for power_data in powers_data:
             power_data['external_lens'] = external_lens.id  # Associate power with the lens
-            power_serializer = ExternalLensPowerSerializer(data=power_data)
-            if not power_serializer.is_valid():
-                raise ValidationError(power_serializer.errors)
-            
-            power_instances.append(power_serializer.save())  # Save and collect instances
 
         return {
             'external_lens': external_lens_serializer.data,
-            'powers': [ExternalLensPowerSerializer(power).data for power in power_instances]
         }
