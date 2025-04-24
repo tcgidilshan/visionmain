@@ -138,23 +138,48 @@ class OrderService:
                         other_item_id=item_data.get("other_item")
                     )
 
-            # Handle deletions
+            # ✅ Handle deletions with safe restocking
             for deleted_item in existing_items.values():
                 if not deleted_item.is_non_stock:
                     stock = None
+                    stock_model = None
+
                     if deleted_item.lens_id:
-                        stock = LensStock.objects.filter(lens_id=deleted_item.lens_id, branch_id=branch_id).first()
+                        stock_model = LensStock
+                        stock = LensStock.objects.select_for_update().filter(
+                            lens_id=deleted_item.lens_id,
+                            branch_id=branch_id
+                        ).first()
                     elif deleted_item.frame_id:
-                        stock = FrameStock.objects.filter(frame_id=deleted_item.frame_id, branch_id=branch_id).first()
+                        stock_model = FrameStock
+                        stock = FrameStock.objects.select_for_update().filter(
+                            frame_id=deleted_item.frame_id,
+                            branch_id=branch_id
+                        ).first()
                     elif deleted_item.lens_cleaner_id:
-                        stock = LensCleanerStock.objects.filter(lens_cleaner_id=deleted_item.lens_cleaner_id, branch_id=branch_id).first()
+                        stock_model = LensCleanerStock
+                        stock = LensCleanerStock.objects.select_for_update().filter(
+                            lens_cleaner_id=deleted_item.lens_cleaner_id,
+                            branch_id=branch_id
+                        ).first()
                     elif deleted_item.other_item_id:
-                        stock = OtherItemStock.objects.filter(other_item_id=deleted_item.other_item_id, branch_id=branch_id).first()
+                        stock_model = OtherItemStock
+                        stock = OtherItemStock.objects.select_for_update().filter(
+                            other_item_id=deleted_item.other_item_id,
+                            branch_id=branch_id
+                        ).first()
 
                     if stock:
                         stock.qty += deleted_item.quantity
                         stock.save()
+                    else:
+                        raise ValueError(
+                            f"Stock record not found for deleted item "
+                            f"[{stock_model.__name__ if stock_model else 'Unknown'}] "
+                            f"in branch {branch_id}"
+                        )
 
+                # ✅ Always delete after restocking
                 deleted_item.delete()
 
             # Payments
