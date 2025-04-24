@@ -27,9 +27,8 @@ from .models import (
     CustomUser,
     Invoice,
     ExternalLens,
-    # ExternalLensPower,
     OtherItem,BankAccount,
-    OtherItemStock,Expense,
+    OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
     UserBranch,ExpenseMainCategory, ExpenseSubCategory
 )
 
@@ -660,3 +659,27 @@ class ExpenseReportSerializer(serializers.ModelSerializer):
             'amount',
             'note'
         ]
+
+class OtherIncomeCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OtherIncomeCategory
+        fields = ['id', 'name', 'description']
+
+
+class OtherIncomeSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+
+    class Meta:
+        model = OtherIncome
+        fields = [
+            'id',
+            'date',
+            'branch',
+            'category',        # FK ID (writable)
+            'category_name',   # Human-readable label (read-only)
+            'amount',
+            'note',
+            'created_at',
+            'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']

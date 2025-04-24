@@ -48,7 +48,8 @@ from .views import (
     InvoiceDetailView,
     OrderUpdateView,
     RefractionDetailRetrieveUpdateDeleteView,
-    LensSearchView,
+    LensSearchView,OtherIncomeListCreateView,OtherIncomeRetrieveUpdateDeleteView,OtherIncomeCategoryListCreateView,
+    OtherIncomeCategoryRetrieveUpdateView,
     PaymentView,ExternalLensListCreateView,ExternalLensRetrieveUpdateDeleteView,
     OtherItemListCreateView,BankAccountListCreateView,BankAccountRetrieveUpdateDeleteView,
     OtherItemRetrieveUpdateDeleteView,ExpenseCreateView,ExpenseUpdateView,
@@ -73,6 +74,13 @@ urlpatterns = [
     #bank
     path('bank_accounts/', BankAccountListCreateView.as_view(), name='bank_account_list_create'),
     path('bank_accounts/<int:id>/', BankAccountRetrieveUpdateDeleteView.as_view(), name='bank_account_detail_update_delete'),
+
+    #other incomes
+    path('other-income-categories/', OtherIncomeCategoryListCreateView.as_view(), name='other-income-category-list'),
+    path('other-income-categories/<int:pk>/', OtherIncomeCategoryRetrieveUpdateView.as_view(), name='other-income-category-detail'),
+
+    path('other-incomes/', OtherIncomeListCreateView.as_view(), name='other-income-list'),
+    path('other-incomes/<int:pk>/', OtherIncomeRetrieveUpdateDeleteView.as_view(), name='other-income-detail'),
 
     path("users/create/", CreateUserView.as_view(), name="create-user"), 
     path("users/update/<int:user_id>/", UpdateUserView.as_view(), name="update-user"),
