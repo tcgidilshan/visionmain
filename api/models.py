@@ -31,6 +31,15 @@ class BankAccount(models.Model):
     def __str__(self):
         return f"{self.bank_name} - {self.account_number}"
     
+class BankDeposit(models.Model):
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE)
+    bank_account = models.ForeignKey(BankAccount, on_delete=models.CASCADE, related_name="deposits")
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    date = models.DateField()
+    is_confirmed = models.BooleanField(default=False)  # ✅ For "ticking" confirmed deposits
+    note = models.TextField(blank=True, null=True)
+
+    
 class CustomUser(AbstractUser):
     mobile = models.CharField(max_length=15, blank=True, null=True)
     user_code = models.CharField(max_length=10, null=True, blank=True) 

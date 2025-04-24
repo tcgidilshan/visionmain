@@ -27,7 +27,7 @@ from .models import (
     CustomUser,
     Invoice,
     ExternalLens,
-    OtherItem,BankAccount,
+    OtherItem,BankAccount,BankDeposit,
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
     UserBranch,ExpenseMainCategory, ExpenseSubCategory
 )
@@ -683,3 +683,22 @@ class OtherIncomeSerializer(serializers.ModelSerializer):
             'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
+
+class BankDepositSerializer(serializers.ModelSerializer):
+    bank_name = serializers.CharField(source='bank_account.bank_name', read_only=True)
+    account_number = serializers.CharField(source='bank_account.account_number', read_only=True)
+
+    class Meta:
+        model = BankDeposit
+        fields = [
+            'id',
+            'branch',
+            'bank_account',
+            'bank_name',         # 🔁 from FK (read-only)
+            'account_number',    # 🔁 from FK (read-only)
+            'amount',
+            'date',
+            'is_confirmed',
+            'note',
+        ]
+        read_only_fields = ['is_confirmed']

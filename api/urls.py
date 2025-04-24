@@ -45,8 +45,8 @@ from .views import (
     LensCoatingListCreateView,
     LensCoatingRetrieveUpdateDeleteView,
     ManualOrderCreateView,
-    InvoiceDetailView,
-    OrderUpdateView,
+    InvoiceDetailView,BankDepositListCreateView,BankDepositRetrieveUpdateView,BankDepositConfirmView,
+    OrderUpdateView,DailyFinanceSummaryView,
     RefractionDetailRetrieveUpdateDeleteView,
     LensSearchView,OtherIncomeListCreateView,OtherIncomeRetrieveUpdateDeleteView,OtherIncomeCategoryListCreateView,
     OtherIncomeCategoryRetrieveUpdateView,
@@ -79,8 +79,16 @@ urlpatterns = [
     path('other-income-categories/', OtherIncomeCategoryListCreateView.as_view(), name='other-income-category-list'),
     path('other-income-categories/<int:pk>/', OtherIncomeCategoryRetrieveUpdateView.as_view(), name='other-income-category-detail'),
 
+    #finance
+    path('finance-summary/', DailyFinanceSummaryView.as_view(), name='daily-finance-summary'),
+
     path('other-incomes/', OtherIncomeListCreateView.as_view(), name='other-income-list'),
     path('other-incomes/<int:pk>/', OtherIncomeRetrieveUpdateDeleteView.as_view(), name='other-income-detail'),
+
+    #bank deposit
+    path('bank-deposits/', BankDepositListCreateView.as_view(), name='bank-deposit-list'),
+    path('bank-deposits/<int:pk>/', BankDepositRetrieveUpdateView.as_view(), name='bank-deposit-detail'),
+    path('bank-deposits/<int:pk>/confirm/', BankDepositConfirmView.as_view(), name='bank-deposit-confirm'),
 
     path("users/create/", CreateUserView.as_view(), name="create-user"), 
     path("users/update/<int:user_id>/", UpdateUserView.as_view(), name="update-user"),
