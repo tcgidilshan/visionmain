@@ -158,7 +158,6 @@ class OrderService:
                         stock_model = OtherItemStock
                         stock_filter = {"other_item_id": deleted_item.other_item_id, "branch_id": branch_id}
 
-                    # Fetch stock row if applicable
                     if stock_model and stock_filter:
                         stock = stock_model.objects.select_for_update().filter(**stock_filter).first()
 
@@ -171,13 +170,13 @@ class OrderService:
                             f"(Item ID: {deleted_item.id})"
                         )
                     else:
-                        raise ValueError(
-                            f"Cannot determine stock model for deleted item (ID: {deleted_item.id}). "
-                            f"Ensure lens/frame/etc. is properly assigned."
+                        print(
+                            f"⚠️ Warning: Item ID {deleted_item.id} marked as stock, but has no stock FK set "
+                            f"(lens, frame, other_item, or lens_cleaner). Skipping restock."
                         )
 
-                # ✅ Always delete the item
                 deleted_item.delete()
+
 
             # Payments
             total_payment = OrderPaymentService.update_process_payments(order, payments_data)
