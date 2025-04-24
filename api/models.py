@@ -356,6 +356,12 @@ class ExternalLens(models.Model):
         return f"{self.brand.name} - {self.lens_factory} - {self.lens_type.name} ({self.coating.name}) – {self.get_branded_display()} – LKR {self.price or 'N/A'}"
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['lens_type', 'coating', 'brand', 'branded'],
+                name='unique_lens_combination'
+            )
+        ]
         ordering = ['lens_type', 'coating']
         verbose_name = "External Lens"
         verbose_name_plural = "External Lenses"

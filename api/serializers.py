@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 from .models import (
     Branch,
     Refraction,
@@ -400,6 +401,21 @@ class ExternalLensSerializer(serializers.ModelSerializer):
             'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
+
+    def validate(self, data):
+        # On create only
+        if self.instance is None:
+            exists = ExternalLens.objects.filter(
+                lens_type=data.get('lens_type'),
+                coating=data.get('coating'),
+                brand=data.get('brand'),
+                branded=data.get('branded')
+            ).exists()
+
+            if exists:
+                raise ValidationError("This lens combination already exists.")
+
+        return data
 
 class PatientSerializer(serializers.ModelSerializer):
     refraction_number = serializers.SerializerMethodField()
