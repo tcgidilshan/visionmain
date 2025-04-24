@@ -143,43 +143,40 @@ class OrderService:
                 if not deleted_item.is_non_stock:
                     stock = None
                     stock_model = None
+                    stock_filter = {}
 
                     if deleted_item.lens_id:
                         stock_model = LensStock
-                        stock = LensStock.objects.select_for_update().filter(
-                            lens_id=deleted_item.lens_id,
-                            branch_id=branch_id
-                        ).first()
+                        stock_filter = {"lens_id": deleted_item.lens_id, "branch_id": branch_id}
                     elif deleted_item.frame_id:
                         stock_model = FrameStock
-                        stock = FrameStock.objects.select_for_update().filter(
-                            frame_id=deleted_item.frame_id,
-                            branch_id=branch_id
-                        ).first()
+                        stock_filter = {"frame_id": deleted_item.frame_id, "branch_id": branch_id}
                     elif deleted_item.lens_cleaner_id:
                         stock_model = LensCleanerStock
-                        stock = LensCleanerStock.objects.select_for_update().filter(
-                            lens_cleaner_id=deleted_item.lens_cleaner_id,
-                            branch_id=branch_id
-                        ).first()
+                        stock_filter = {"lens_cleaner_id": deleted_item.lens_cleaner_id, "branch_id": branch_id}
                     elif deleted_item.other_item_id:
                         stock_model = OtherItemStock
-                        stock = OtherItemStock.objects.select_for_update().filter(
-                            other_item_id=deleted_item.other_item_id,
-                            branch_id=branch_id
-                        ).first()
+                        stock_filter = {"other_item_id": deleted_item.other_item_id, "branch_id": branch_id}
+
+                    # Fetch stock row if applicable
+                    if stock_model and stock_filter:
+                        stock = stock_model.objects.select_for_update().filter(**stock_filter).first()
 
                     if stock:
                         stock.qty += deleted_item.quantity
                         stock.save()
+                    elif stock_model:
+                        raise ValueError(
+                            f"Stock record not found for deleted item [{stock_model.__name__}] in branch {branch_id} "
+                            f"(Item ID: {deleted_item.id})"
+                        )
                     else:
                         raise ValueError(
-                            f"Stock record not found for deleted item "
-                            f"[{stock_model.__name__ if stock_model else 'Unknown'}] "
-                            f"in branch {branch_id}"
+                            f"Cannot determine stock model for deleted item (ID: {deleted_item.id}). "
+                            f"Ensure lens/frame/etc. is properly assigned."
                         )
 
-                # ✅ Always delete after restocking
+                # ✅ Always delete the item
                 deleted_item.delete()
 
             # Payments
