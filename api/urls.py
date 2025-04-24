@@ -44,7 +44,7 @@ from .views import (
     LensTypeRetrieveUpdateDeleteView,
     LensCoatingListCreateView,
     LensCoatingRetrieveUpdateDeleteView,
-    ManualOrderCreateView,
+    ManualOrderCreateView,DoctorAppointmentTransferView,
     InvoiceDetailView,BankDepositListCreateView,BankDepositRetrieveUpdateView,BankDepositConfirmView,
     OrderUpdateView,DailyFinanceSummaryView,
     RefractionDetailRetrieveUpdateDeleteView,
@@ -158,6 +158,7 @@ urlpatterns = [
     path('channels/', ChannelListView.as_view(), name='channel-list'),
     path('channels/<int:pk>/', AppointmentRetrieveUpdateDeleteView.as_view(), name='appointment-detail'),
     path("channel/transfer/", ChannelTransferView.as_view(), name="channel-transfer"),
+    path('doctor/transfer-appointments/', DoctorAppointmentTransferView.as_view(), name='doctor-appointment-transfer'), #appointment trans
     path('lens-stocks/', LensStockListCreateView.as_view(), name='lens-stock-list-create'),
     path('lens-stocks/<int:pk>/', LensStockRetrieveUpdateDeleteView.as_view(), name='lens-stock-detail'),
     path("lenses/search/", LensSearchView.as_view(), name="lens-search"),

@@ -176,27 +176,47 @@ class DoctorScheduleTransferView(APIView):
         to_date = request.data.get("to_date")
         branch_id = request.data.get("branch_id")
 
-        # Step 1: Validate the incoming data
         if not all([doctor_id, from_date, to_date, branch_id]):
             return Response({"error": "doctor_id, from_date, to_date, branch_id are required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Step 2: Transfer the schedule using the service method
-            transfer_result = DoctorScheduleService.transfer_schedule(
+            new_schedules = DoctorScheduleService.transfer_schedules(
                 doctor_id=doctor_id,
                 from_date=from_date,
                 to_date=to_date,
                 branch_id=branch_id
             )
 
-            # Step 3: Return the response with the new schedule details
             return Response({
-                "message": f"{len(transfer_result['updated_appointments'])} appointments were rescheduled.",
-                "new_schedules": ScheduleSerializer(transfer_result['new_schedules'], many=True).data,
-                "updated_appointments": AppointmentSerializer(transfer_result['updated_appointments'], many=True).data
+                "message": f"{len(new_schedules)} schedules transferred.",
+                "new_schedules": ScheduleSerializer(new_schedules, many=True).data
             }, status=status.HTTP_200_OK)
 
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class DoctorAppointmentTransferView(APIView):
+    def post(self, request, *args, **kwargs):
+        doctor_id = request.data.get("doctor_id")
+        from_date = request.data.get("from_date")
+        to_date = request.data.get("to_date")
+
+        if not all([doctor_id, from_date, to_date]):
+            return Response({"error": "doctor_id, from_date, and to_date are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            updated_appointments = DoctorScheduleService.transfer_appointments_only(
+                doctor_id=doctor_id,
+                from_date=from_date,
+                to_date=to_date
+            )
+
+            return Response({
+                "message": f"{len(updated_appointments)} appointments were rescheduled.",
+                "updated_appointments": AppointmentSerializer(updated_appointments, many=True).data
+            }, status=status.HTTP_200_OK)
+
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
