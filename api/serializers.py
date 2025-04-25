@@ -276,6 +276,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
     lens_powers   = serializers.SerializerMethodField()  # Optional/custom field
     is_non_stock  = serializers.BooleanField(default=False)
     external_lens = serializers.PrimaryKeyRelatedField(queryset=ExternalLens.objects.all(), required=False)
+    note = serializers.CharField(allow_blank=True, allow_null=True, required=False)
 
     class Meta:
         model = OrderItem
@@ -301,6 +302,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'lens_detail',
             'frame_detail',
             'other_item_detail',
+            'note'
         ]
 
 

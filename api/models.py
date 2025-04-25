@@ -471,6 +471,7 @@ class OrderItem(models.Model):
     price_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     is_non_stock = models.BooleanField(default=False)  # ✅ Mark Non-Stock Items
+    note = models.TextField(blank=True, null=True, required=False)
 
     def save(self, *args, **kwargs):
        # Dynamically calculate subtotal on save

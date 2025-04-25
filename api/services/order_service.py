@@ -124,6 +124,7 @@ class OrderService:
                     existing_item.frame_id = item_data.get("frame", existing_item.frame_id)
                     existing_item.lens_cleaner_id = item_data.get("lens_cleaner", existing_item.lens_cleaner_id)
                     existing_item.other_item_id = item_data.get("other_item", existing_item.other_item_id)
+                    existing_item.note = item_data.get("note", existing_item.note)
                     existing_item.save()
                 else:
                     OrderItem.objects.create(
