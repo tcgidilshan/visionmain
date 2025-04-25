@@ -13,18 +13,32 @@ class OrderService:
     """
 
     @staticmethod
+    @transaction.atomic
     def create_order(order_data, order_items_data):
         """
         Creates an order and its related order items.
         References external lenses by ID only (no creation).
-        Raises validation errors if invalid IDs are passed.
+        Conditionally deducts stock if order is not on hold.
+        Raises validation errors if invalid IDs or stock issues occur.
         """
-        # Step 1: Create the Order
+        # Step 1: Extract necessary fields
+        on_hold = order_data.get("on_hold", False)
+        branch_id = order_data.get("branch_id")
+
+        if not branch_id:
+            raise ValidationError({"branch_id": "Branch ID is required for stock validation."})
+
+        # Step 2: Validate stock only if not on hold
+        stock_updates = []
+        if not on_hold:
+            stock_updates = StockValidationService.validate_stocks(order_items_data, branch_id)
+
+        # Step 3: Create the Order
         order_serializer = OrderSerializer(data=order_data)
         order_serializer.is_valid(raise_exception=True)
         order = order_serializer.save()
 
-        # Step 2: Create the Order Items
+        # Step 4: Create the Order Items
         order_items = []
         for item_data in order_items_data:
             external_lens_id = item_data.get('external_lens')
@@ -39,44 +53,60 @@ class OrderService:
             order_item_serializer.is_valid(raise_exception=True)
             order_items.append(order_item_serializer.save())
 
-        return order  # Return the created order
+        # Step 5: Adjust stock only if not on hold
+        if not on_hold:
+            StockValidationService.adjust_stocks(stock_updates)
+
+        # Step 6: Return the created order
+        return order
     
     @staticmethod
     @transaction.atomic
     def update_order(order, order_data, order_items_data, payments_data):
         """
         Updates an order along with its items and payments.
-        External lenses are now referenced by ID only — no creation or modification.
-        Stock updates and deletions handled inline.
+        Stock is only deducted when on_hold transitions from True → False.
+        External lenses are referenced by ID only — no creation or modification.
         """
         try:
             branch_id = order.branch_id
             if not branch_id:
                 raise ValueError("Order is not associated with a branch.")
 
+            # 🔹 Track on_hold flag changes
+            on_hold = order_data.get("on_hold", order.on_hold)
+            should_deduct_stock = not on_hold and order.on_hold  # Transition from hold → active
+
             existing_items = {item.id: item for item in order.order_items.all()}
 
-            # Update order fields
+            # 🔹 Validate stock if transitioning from hold to active
+            stock_updates = []
+            if should_deduct_stock:
+                stock_updates = StockValidationService.validate_stocks(order_items_data, branch_id)
+
+            # 🔹 Update order fields
             order.sub_total = order_data.get('sub_total', order.sub_total)
             order.discount = order_data.get('discount', order.discount)
             order.total_price = order_data.get('total_price', order.total_price)
             order.status = order_data.get('status', order.status)
             order.sales_staff_code_id = order_data.get('sales_staff_code', order.sales_staff_code_id)
             order.order_remark = order_data.get('order_remark', order.order_remark)
+            order.on_hold = on_hold  # ✅ Update hold status
             order.save()
 
+            # 🔹 Create/Update order items
             for item_data in order_items_data:
                 item_id = item_data.get('id')
                 is_non_stock = item_data.get('is_non_stock', False)
                 quantity = item_data['quantity']
-
-                # ✅ Validate external lens if provided
                 external_lens_id = item_data.get('external_lens')
+
+                # Validate external lens
                 if external_lens_id:
                     if not ExternalLens.objects.filter(id=external_lens_id).exists():
                         raise ValueError(f"External lens ID {external_lens_id} does not exist.")
 
-                # Handle stock
+                # Handle stock if not non-stock
                 stock = None
                 stock_type = None
 
@@ -113,7 +143,7 @@ class OrderService:
                         stock.qty -= quantity
                         stock.save()
 
-                # Create or update the item
+                # Save order item
                 if item_id and item_id in existing_items:
                     existing_item = existing_items.pop(item_id)
                     existing_item.quantity = quantity
@@ -136,10 +166,12 @@ class OrderService:
                         lens_id=item_data.get("lens"),
                         frame_id=item_data.get("frame"),
                         lens_cleaner_id=item_data.get("lens_cleaner"),
-                        other_item_id=item_data.get("other_item")
+                        other_item_id=item_data.get("other_item"),
+                        is_non_stock=is_non_stock,
+                        note=item_data.get("note")
                     )
 
-            # ✅ Handle deletions with safe restocking
+            # 🔹 Handle deleted items and restock
             for deleted_item in existing_items.values():
                 if not deleted_item.is_non_stock:
                     stock = None
@@ -178,8 +210,11 @@ class OrderService:
 
                 deleted_item.delete()
 
+            # 🔹 Final: Deduct stock if on_hold → False
+            if should_deduct_stock:
+                StockValidationService.adjust_stocks(stock_updates)
 
-            # Payments
+            # 🔹 Process Payments
             total_payment = OrderPaymentService.update_process_payments(order, payments_data)
             if total_payment > order.total_price:
                 raise ValueError("Total payments exceed the order total price.")
