@@ -49,7 +49,7 @@ from .views import (
     OrderUpdateView,DailyFinanceSummaryView,
     RefractionDetailRetrieveUpdateDeleteView,
     LensSearchView,OtherIncomeListCreateView,OtherIncomeRetrieveUpdateDeleteView,OtherIncomeCategoryListCreateView,
-    OtherIncomeCategoryRetrieveUpdateView,
+    OtherIncomeCategoryRetrieveUpdateView,DailySummaryView,
     PaymentView,ExternalLensListCreateView,ExternalLensRetrieveUpdateDeleteView,
     OtherItemListCreateView,BankAccountListCreateView,BankAccountRetrieveUpdateDeleteView,
     OtherItemRetrieveUpdateDeleteView,ExpenseCreateView,ExpenseUpdateView,
@@ -166,6 +166,7 @@ urlpatterns = [
     path('lens-types/<int:pk>/', LensTypeRetrieveUpdateDeleteView.as_view(), name='lens-type-detail'),
     path('lens-coatings/', LensCoatingListCreateView.as_view(), name='lens-coating-list-create'),
     path('lens-coatings/<int:pk>/', LensCoatingRetrieveUpdateDeleteView.as_view(), name='lens-coating-detail'),
+    path('summary/daily/', DailySummaryView.as_view(), name='daily-summary'),
 
     #expenses
     path('expense-categories/', ExpenseMainCategoryListCreateView.as_view(), name='expense-main-category-list-create'),
