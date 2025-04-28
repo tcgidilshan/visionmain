@@ -91,6 +91,7 @@ class OrderService:
             order.status = order_data.get('status', order.status)
             order.sales_staff_code_id = order_data.get('sales_staff_code', order.sales_staff_code_id)
             order.order_remark = order_data.get('order_remark', order.order_remark)
+            order.user_date = order_data.get('user_date', order.user_date)
             order.on_hold = on_hold  # ✅ Update hold status
             order.save()
 

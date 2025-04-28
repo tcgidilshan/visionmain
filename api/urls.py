@@ -47,7 +47,7 @@ from .views import (
     ManualOrderCreateView,DoctorAppointmentTransferView,
     InvoiceDetailView,BankDepositListCreateView,BankDepositRetrieveUpdateView,BankDepositConfirmView,
     OrderUpdateView,DailyFinanceSummaryView,
-    RefractionDetailRetrieveUpdateDeleteView,
+    RefractionDetailRetrieveUpdateDeleteView,BusSystemSettingListCreateView,BusSystemSettingRetrieveUpdateDeleteView,
     LensSearchView,OtherIncomeListCreateView,OtherIncomeRetrieveUpdateDeleteView,OtherIncomeCategoryListCreateView,
     OtherIncomeCategoryRetrieveUpdateView,DailySummaryView,
     PaymentView,ExternalLensListCreateView,ExternalLensRetrieveUpdateDeleteView,
@@ -179,6 +179,12 @@ urlpatterns = [
     path("expenses/report/", ExpenseReportView.as_view(), name="expense-report"),
 
     path('expenses/<int:pk>/update/', ExpenseUpdateView.as_view(), name='expense-update'),
+
+    #bus
+    path('bus/title/', BusSystemSettingListCreateView.as_view(), name='bus-system-title-list-create'),
+    path('bus/title/<int:pk>/', BusSystemSettingRetrieveUpdateDeleteView.as_view(), name='bus-system-title-rud'),
+
+
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

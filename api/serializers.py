@@ -27,7 +27,7 @@ from .models import (
     ChannelPayment,
     CustomUser,
     Invoice,
-    ExternalLens,
+    ExternalLens,BusSystemSetting,
     OtherItem,BankAccount,BankDeposit,
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
     UserBranch,ExpenseMainCategory, ExpenseSubCategory
@@ -349,6 +349,7 @@ class OrderSerializer(serializers.ModelSerializer):
     )
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
     invoice_number = serializers.PrimaryKeyRelatedField(source='invoice.invoice_number', read_only=True)
+    user_date = serializers.DateField(required=False)
     class Meta:
         model = Order
         fields = [
@@ -377,6 +378,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'on_hold',
             'sales_staff_username',
             'invoice_number',
+            'user_date'
         ] 
 
 class ExternalLensSerializer(serializers.ModelSerializer):
@@ -720,3 +722,9 @@ class BankDepositSerializer(serializers.ModelSerializer):
             'note',
         ]
         read_only_fields = ['is_confirmed']
+
+class BusSystemSettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BusSystemSetting
+        fields = ['id', 'title', 'updated_at']
+        read_only_fields = ['id', 'updated_at']

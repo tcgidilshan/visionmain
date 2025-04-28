@@ -42,3 +42,4 @@ from .other_income_views import OtherIncomeListCreateView,OtherIncomeRetrieveUpd
 from .finance_summary_view import DailyFinanceSummaryView
 from .bank_deposit_views import BankDepositListCreateView,BankDepositRetrieveUpdateView,BankDepositConfirmView
 from .daily_summary_views import DailySummaryView
+from .bus_views import BusSystemSettingListCreateView,BusSystemSettingRetrieveUpdateDeleteView

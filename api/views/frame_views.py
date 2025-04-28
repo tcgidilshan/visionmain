@@ -15,7 +15,7 @@ class FrameListCreateView(generics.ListCreateAPIView):
         List all frames along with their stock details across different branches.
         """
         branch = BranchProtectionsService.validate_branch_id(request)
-        frames = self.get_queryset()
+        frames = self.get_queryset().filter(is_active=True)
 
         data = []
 
@@ -133,9 +133,10 @@ class FrameRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):
         """
-        Delete a frame and its associated stock.
+        Soft delete: Mark the frame as inactive instead of deleting it.
         """
         frame = self.get_object()
-        frame.stocks.all().delete()  # Delete associated stock
-        frame.delete()
+        frame.is_active = False
+        frame.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
+

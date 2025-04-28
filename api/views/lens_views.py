@@ -5,6 +5,8 @@ from django.db import transaction
 from ..models import Lens, LensStock, LensPower
 from ..serializers import LensSerializer, LensStockSerializer, LensPowerSerializer
 from ..services.branch_protection_service import BranchProtectionsService
+from rest_framework.exceptions import ValidationError
+
 # List and Create Lenses (with stock and powers)
 class LensListCreateView(generics.ListCreateAPIView):
     queryset = Lens.objects.all()
@@ -12,12 +14,15 @@ class LensListCreateView(generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        List all lenses with their branch-wise stock and powers.
+        List all ACTIVE lenses with their branch-wise stock and powers.
         If branch_id is passed, only show stock for that branch.
         """
         BranchProtectionsService.validate_branch_id(request)
         branch_id = request.query_params.get('branch_id', None)
-        lenses = self.get_queryset()
+
+        # 🔥 Filter only active lenses
+        lenses = self.get_queryset().filter(is_active=True)
+
         data = []
 
         for lens in lenses:
@@ -38,21 +43,61 @@ class LensListCreateView(generics.ListCreateAPIView):
         return Response(data)
 
     @transaction.atomic
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
         """
-        Create a new lens, its stock (with initial_count), and powers.
-        Supports multiple branch-wise stocks.
+        Create a new lens, its stock, and powers.
+        Validates that type + coating + brand + powers (side+value+power_id) combination is unique.
         """
+
         lens_data = request.data.get('lens')
-        stock_data_list = request.data.get('stock', [])  # ✅ Accept list of stocks
+        stock_data_list = request.data.get('stock', [])
         powers_data = request.data.get('powers', [])
 
-        # ✅ Create Lens
+        if not lens_data:
+            return Response({"error": "Lens data is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not powers_data:
+            return Response({"error": "Powers data are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 🔥 STEP 1: Extract Lens Basic Info
+        type_id = lens_data.get('type')
+        coating_id = lens_data.get('coating')
+        brand_id = lens_data.get('brand')
+
+        # 🔥 STEP 2: Search existing lenses with same type + coating + brand
+        existing_lenses = Lens.objects.filter(
+            type_id=type_id,
+            coating_id=coating_id,
+            brand_id=brand_id
+        )
+
+        # 🔥 STEP 3: Prepare incoming power set
+        incoming_power_set = set(
+            (power['side'], str(power['value']), power['power'])  # side, value as string, power_id
+            for power in powers_data
+        )
+
+        # 🔥 STEP 4: Check against each existing lens
+        for existing_lens in existing_lenses:
+            existing_powers = existing_lens.lens_powers.all()
+
+            existing_power_set = set(
+                (p.side, str(p.value), p.power_id)  # side, value as string, power_id
+                for p in existing_powers
+            )
+
+            if incoming_power_set == existing_power_set:
+                raise ValidationError(
+                    "A lens with the same type, coating, brand, and powers already exists."
+                )
+
+        # ✅ STEP 5: Save Lens
         lens_serializer = self.get_serializer(data=lens_data)
         lens_serializer.is_valid(raise_exception=True)
         lens = lens_serializer.save()
 
-        # ✅ Process branch-wise stock
+        # ✅ STEP 6: Save Stock
         created_stocks = []
         if isinstance(stock_data_list, list):
             for stock_data in stock_data_list:
@@ -71,7 +116,7 @@ class LensListCreateView(generics.ListCreateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # ✅ Process powers
+        # ✅ STEP 7: Save Powers
         created_powers = []
         for power_data in powers_data:
             power_data['lens'] = lens.id
@@ -79,10 +124,10 @@ class LensListCreateView(generics.ListCreateAPIView):
             power_serializer.is_valid(raise_exception=True)
             created_powers.append(power_serializer.save())
 
-        # ✅ Prepare response
+        # ✅ STEP 8: Prepare Response
         response_data = lens_serializer.data
         response_data['stock'] = LensStockSerializer(created_stocks, many=True).data
-        response_data['powers'] = powers_data  # original request payload, or serialize if needed
+        response_data['powers'] = powers_data  # or serialize if you want
 
         return Response(response_data, status=status.HTTP_201_CREATED)
 
@@ -189,11 +234,11 @@ class LensRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):
         """
-        Delete a lens, its associated stock, and powers.
+        Soft delete: Mark the lens as inactive instead of deleting it.
         """
         lens = self.get_object()
-        lens.stocks.all().delete()  # Delete associated stock
-        lens.lens_powers.all().delete()  # Delete associated powers
-        lens.delete()
+        lens.is_active = False
+        lens.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
 

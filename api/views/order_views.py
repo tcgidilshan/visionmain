@@ -10,6 +10,7 @@ from ..services.order_service import OrderService
 from ..services.patient_service import PatientService
 from ..services.Invoice_service import InvoiceService
 from ..services.refraction_details_service import RefractionDetailsService
+from django.utils import timezone
 
 class OrderCreateView(APIView):
     @transaction.atomic
@@ -53,6 +54,10 @@ class OrderCreateView(APIView):
                 order_data = request.data.get('order')
                 if not order_data:
                     return Response({"error": "The 'order' field is required."}, status=status.HTTP_400_BAD_REQUEST)
+                
+                # ✅ Ensure order_date is set
+                if not order_data.get('user_date'):
+                    order_data['user_date'] = timezone.now().date()
 
                 # 🔹 Step 5: Extract On-Hold status
                 on_hold = order_data.get('on_hold', False)
