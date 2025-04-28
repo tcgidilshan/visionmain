@@ -6,6 +6,7 @@ from rest_framework.authtoken.models import Token as BaseToken
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import Max
 
 class Item(models.Model):
     name = models.CharField(max_length=100)
@@ -150,6 +151,7 @@ class RefractionDetails(models.Model):
     #new Changes
     prescription = models.BooleanField(default=False)
     cataract = models.BooleanField(default=False)
+    blepharitis = models.BooleanField(default=False)
     refraction_remark = models.CharField(max_length=100, blank=True, null=True)
     shuger=models.BooleanField(default=False)
     user = models.ForeignKey(
@@ -565,8 +567,19 @@ class Appointment(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)  # Amount in LKR
     channel_no = models.IntegerField(null=True, blank=True) 
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="appointments", null=True, blank=True)
+    appointment_id = models.IntegerField(null=True, blank=True) 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if self.appointment_id is None and self.branch:
+            # Find the current highest appointment_id for this branch
+            max_id = Appointment.objects.filter(branch=self.branch).aggregate(Max('appointment_id'))['appointment_id__max']
+            if max_id:
+                self.appointment_id = max_id + 1
+            else:
+                self.appointment_id = 1  # First appointment for this branch
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Appointment with {self.doctor} for {self.patient} on {self.date} at {self.time}"

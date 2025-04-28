@@ -95,7 +95,8 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'shuger',
             'cataract',
             'user',
-            'username' 
+            'username', 
+            'blepharitis'
         ]
   
 class BrandSerializer(serializers.ModelSerializer):
@@ -520,7 +521,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'created_at',  # Record creation timestamp
             'branch',
             'updated_at',  # Record update timestamp
-            'branch_name'
+            'branch_name',
+            'appointment_id'
         ]
 
 class ChannelPaymentSerializer(serializers.ModelSerializer):

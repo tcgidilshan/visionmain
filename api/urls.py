@@ -46,7 +46,7 @@ from .views import (
     LensCoatingRetrieveUpdateDeleteView,
     ManualOrderCreateView,DoctorAppointmentTransferView,
     InvoiceDetailView,BankDepositListCreateView,BankDepositRetrieveUpdateView,BankDepositConfirmView,
-    OrderUpdateView,DailyFinanceSummaryView,
+    OrderUpdateView,DailyFinanceSummaryView,FrameReportView,
     RefractionDetailRetrieveUpdateDeleteView,BusSystemSettingListCreateView,BusSystemSettingRetrieveUpdateDeleteView,
     LensSearchView,OtherIncomeListCreateView,OtherIncomeRetrieveUpdateDeleteView,OtherIncomeCategoryListCreateView,
     OtherIncomeCategoryRetrieveUpdateView,DailySummaryView,
@@ -114,6 +114,9 @@ urlpatterns = [
     path('frames/', FrameListCreateView.as_view(), name='frame-list-create'),
     path('frames/<int:pk>/', FrameRetrieveUpdateDeleteView.as_view(), name='frame-detail'),
     path("frames/colors/", FrameColorListView.as_view(), name="frame-colors"),
+
+    path('frames/report/', FrameReportView.as_view(), name='frames-report'), #frame reports
+
     path('powers/', PowerListCreateView.as_view(), name='power-list-create'),
     path('powers/<int:pk>/', PowerRetrieveUpdateDeleteView.as_view(), name='power-detail'),
     path('lenses/', LensListCreateView.as_view(), name='lens-list-create'),
