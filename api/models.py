@@ -109,30 +109,30 @@ class RefractionDetails(models.Model):
     )
     is_manual = models.BooleanField(default=False) 
     # Hb Rx
-    hb_rx_right_dist = models.CharField(max_length=10, blank=True, null=True)  # Right Eye Hb Rx Dist
-    hb_rx_left_dist = models.CharField(max_length=10, blank=True, null=True)   # Left Eye Hb Rx Dist
-    hb_rx_right_near = models.CharField(max_length=10, blank=True, null=True)  # Right Eye Hb Rx Near
-    hb_rx_left_near = models.CharField(max_length=10, blank=True, null=True)   # Left Eye Hb Rx Near
+    hb_rx_right_dist = models.CharField(max_length=20, blank=True, null=True)  # Right Eye Hb Rx Dist
+    hb_rx_left_dist = models.CharField(max_length=20, blank=True, null=True)   # Left Eye Hb Rx Dist
+    hb_rx_right_near = models.CharField(max_length=20, blank=True, null=True)  # Right Eye Hb Rx Near
+    hb_rx_left_near = models.CharField(max_length=20, blank=True, null=True)   # Left Eye Hb Rx Near
 
     # Auto Ref
     auto_ref_right = models.CharField(max_length=20, blank=True, null=True)  # Auto Ref Right
     auto_ref_left = models.CharField(max_length=20, blank=True, null=True)   # Auto Ref Left
 
     # NTC
-    ntc_right = models.CharField(max_length=10, blank=True, null=True)  # NTC Right
-    ntc_left = models.CharField(max_length=10, blank=True, null=True)   # NTC Left
+    ntc_right = models.CharField(max_length=20, blank=True, null=True)  # NTC Right
+    ntc_left = models.CharField(max_length=20, blank=True, null=True)   # NTC Left
 
     # VA Without Glass
-    va_without_glass_right = models.CharField(max_length=10, blank=True, null=True)  # VA Without Glass Right
-    va_without_glass_left = models.CharField(max_length=10, blank=True, null=True)   # VA Without Glass Left
+    va_without_glass_right = models.CharField(max_length=20, blank=True, null=True)  # VA Without Glass Right
+    va_without_glass_left = models.CharField(max_length=20, blank=True, null=True)   # VA Without Glass Left
 
     # VA Without P/H
-    va_without_ph_right = models.CharField(max_length=10, blank=True, null=True)  # VA Without P/H Right
-    va_without_ph_left = models.CharField(max_length=10, blank=True, null=True)   # VA Without P/H Left
+    va_without_ph_right = models.CharField(max_length=20, blank=True, null=True)  # VA Without P/H Right
+    va_without_ph_left = models.CharField(max_length=20, blank=True, null=True)   # VA Without P/H Left
 
     # VA With Glass
-    va_with_glass_right = models.CharField(max_length=10, blank=True, null=True)  # VA With Glass Right
-    va_with_glass_left = models.CharField(max_length=10, blank=True, null=True)   # VA With Glass Left
+    va_with_glass_right = models.CharField(max_length=20, blank=True, null=True)  # VA With Glass Right
+    va_with_glass_left = models.CharField(max_length=20, blank=True, null=True)   # VA With Glass Left
 
     # Right Eye Fields
     right_eye_dist_sph = models.CharField(max_length=10, blank=True, null=True)

@@ -27,6 +27,10 @@ class LensSearchService:
         for lens in lenses:
             lens_powers = lens.lens_powers.all()
 
+            # Filter lens powers based on the side (if provided)
+            if side:
+                lens_powers = lens_powers.filter(side=side)
+
             # Determine if the lens has the required SPH
             if sph is not None:
                 has_sph = lens_powers.filter(power__name="SPH", value=sph).exists()
