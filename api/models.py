@@ -149,7 +149,6 @@ class RefractionDetails(models.Model):
     note = models.CharField(max_length=100, blank=True, null=True)
 
     #new Changes
-    prescription = models.BooleanField(default=False)
     cataract = models.BooleanField(default=False)
     blepharitis = models.BooleanField(default=False)
     refraction_remark = models.CharField(max_length=100, blank=True, null=True)
@@ -160,6 +159,20 @@ class RefractionDetails(models.Model):
         null=True,
         blank=True,
         related_name="refraction_details",
+    )
+    class PrescriptionType(models.TextChoices):
+        INTERNAL = 'internal', 'Internal Prescription'
+        VISION_PLUS = 'vision_plus', 'Vision Plus Prescription'
+        OTHER = 'other', 'Other Prescription'
+
+    # Replace this:
+    # prescription = models.BooleanField(default=False)
+
+    # With this:
+    prescription_type = models.CharField(
+        max_length=20,
+        choices=PrescriptionType.choices,
+        default=PrescriptionType.INTERNAL
     )
     
     def __str__(self):
@@ -338,6 +351,7 @@ class Order(models.Model):
     fitting_on_collection=models.BooleanField(default=False)
     on_hold=models.BooleanField(default=False)
     user_date = models.DateField(null=True, blank=True)
+    is_frame_only = models.BooleanField(default=False) 
 
     def __str__(self):
         return f"Order {self.id} - Status: {self.status} - Customer: {self.customer.id}"

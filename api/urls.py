@@ -43,7 +43,7 @@ from .views import (
     LensTypeListCreateView,
     LensTypeRetrieveUpdateDeleteView,
     LensCoatingListCreateView,
-    LensCoatingRetrieveUpdateDeleteView,
+    LensCoatingRetrieveUpdateDeleteView,FrameOnlyOrderCreateView,
     ManualOrderCreateView,DoctorAppointmentTransferView,
     InvoiceDetailView,BankDepositListCreateView,BankDepositRetrieveUpdateView,BankDepositConfirmView,
     OrderUpdateView,DailyFinanceSummaryView,FrameReportView,
@@ -139,6 +139,10 @@ urlpatterns = [
     # path("manual-orders/", ManualOrderCreateView.as_view(), name="manual-order-create"),
     path('orders/update-payments/', PaymentView.as_view(), name='update-payments'),
     path('orders/payments/', PaymentView.as_view(), name='order-payments'),
+
+    #frame only
+    path('orders/frame-only/', FrameOnlyOrderCreateView.as_view(), name='frame-only-order-create'),
+
     path('invoices/<int:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'), #invoice
     path('invoices/', InvoiceDetailView.as_view(), name='invoice-by-order'),  # ✅ Filter by order_id
     path('factory-invoices/<int:pk>/update-status/', InvoiceProgressUpdateView.as_view(), name='factory-invoice-status-update'),

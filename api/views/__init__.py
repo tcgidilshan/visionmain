@@ -44,3 +44,4 @@ from .bank_deposit_views import BankDepositListCreateView,BankDepositRetrieveUpd
 from .daily_summary_views import DailySummaryView
 from .bus_views import BusSystemSettingListCreateView,BusSystemSettingRetrieveUpdateDeleteView
 from .frame_report_views import FrameReportView
+from .frame_only_order_view import FrameOnlyOrderCreateView

@@ -60,6 +60,9 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
         source='user.username', 
         read_only=True  # Only for output
     )
+    prescription_type_display = serializers.CharField(
+        source='get_prescription_type_display', read_only=True
+    )
     class Meta:
         model = RefractionDetails
         fields = [
@@ -89,12 +92,13 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'left_eye_dist_axis',
             'left_eye_near_sph',
             'refraction_remark',
-            'prescription',
             'note',
             'is_manual',
             'shuger',
             'cataract',
             'user',
+            'prescription_type',        
+            'prescription_type_display',  
             'username', 
             'blepharitis'
         ]
@@ -730,3 +734,17 @@ class BusSystemSettingSerializer(serializers.ModelSerializer):
         model = BusSystemSetting
         fields = ['id', 'title', 'updated_at']
         read_only_fields = ['id', 'updated_at']
+
+class FrameOnlyOrderSerializer(serializers.Serializer):
+    customer = serializers.PrimaryKeyRelatedField(queryset=Patient.objects.all())
+    frame = serializers.PrimaryKeyRelatedField(queryset=Frame.objects.all())
+    quantity = serializers.IntegerField(min_value=1)
+    price_per_unit = serializers.DecimalField(max_digits=10, decimal_places=2)
+    branch_id = serializers.IntegerField() 
+    sales_staff_code = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all(), allow_null=True, required=False)
+    payments = serializers.ListField(required=False, write_only=True)  
+
+    def validate(self, data):
+        if not data.get('frame').is_active:
+            raise serializers.ValidationError("Selected frame is inactive.")
+        return data
