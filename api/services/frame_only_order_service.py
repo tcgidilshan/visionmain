@@ -23,7 +23,7 @@ class FrameOnlyOrderService:
         nic = patient_data.get('nic')
 
         existing_patient = Patient.objects.filter(
-            Q(phone_number=phone) | Q(nic=nic)
+            phone_number=phone
         ).first()
 
         if existing_patient:
