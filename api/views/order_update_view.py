@@ -24,17 +24,22 @@ class OrderUpdateView(APIView):
             if patient_data:
                 PatientService.create_or_update_patient(patient_data)
 
-            # ✅ Step 2: Extract Order Data
+            # ✅ Step 2: Extract Order Data (check if on_hold status is changing)
             order_data = request.data.get("order", {})
             order_items_data = request.data.get("order_items", [])
             payments_data = request.data.get("order_payments", [])
 
-            # ✅ Step 3: Pass items directly (no external lens creation)
-            # No transformation needed now
-            updated_items = order_items_data
+            # ✅ Check if we're changing on_hold status
+            current_on_hold = order.on_hold
+            new_on_hold = order_data.get("on_hold", current_on_hold)
+            
+            # Log the on-hold transition if it's happening (can be helpful for debugging)
+            if current_on_hold != new_on_hold:
+                print(f"Order {order.id} on_hold status changing: {current_on_hold} → {new_on_hold}")
 
-            # ✅ Step 4: Update Order
-            updated_order = OrderService.update_order(order, order_data, updated_items, payments_data)
+            # ✅ Step 3: Update Order 
+            # The updated update_order method now handles different stock behavior based on on_hold status
+            updated_order = OrderService.update_order(order, order_data, order_items_data, payments_data)
 
             # ✅ Step 5: Return Updated Order Response
             response_serializer = OrderSerializer(updated_order)
@@ -47,6 +52,9 @@ class OrderUpdateView(APIView):
         except ValidationError as e:
             transaction.set_rollback(True)
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+        except ValueError as e:
+            transaction.set_rollback(True)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             transaction.set_rollback(True)
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

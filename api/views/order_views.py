@@ -59,46 +59,32 @@ class OrderCreateView(APIView):
                 if not order_data.get('user_date'):
                     order_data['user_date'] = timezone.now().date()
 
-                # 🔹 Step 5: Extract On-Hold status
-                on_hold = order_data.get('on_hold', False)
-
-                # 🔹 Step 6: If not on_hold, validate stocks
-                stock_updates = []
-                if not on_hold:
-                    branch_id = order_data.get("branch_id")
-                    if not branch_id:
-                        return Response({"error": "Branch ID is required for stock validation."}, status=status.HTTP_400_BAD_REQUEST)
-
-                    order_items_data = request.data.get('order_items', [])
-                    stock_items = [item for item in order_items_data if not item.get('is_non_stock', False)]
-
-                    stock_updates = StockValidationService.validate_stocks(stock_items, branch_id) if stock_items else []
-                else:
-                    order_items_data = request.data.get('order_items', [])
-
-                # 🔹 Step 7: Create Order + Items
+                # Add customer ID to order data
                 order_data["customer"] = patient.id
+                
+                # Get order items
+                order_items_data = request.data.get('order_items', [])
+                
+                # 🔹 Step 5: Create Order + Items using the updated service
+                # The stock validation and adjustment is now handled within create_order
+                # based on the on_hold status
                 order = OrderService.create_order(order_data, order_items_data)
 
-                # 🔹 Step 8: Generate Invoice
+                # 🔹 Step 6: Generate Invoice
                 InvoiceService.create_invoice(order)
 
-                # 🔹 Step 9: Create Payments
+                # 🔹 Step 7: Create Payments
                 payments_data = request.data.get('order_payments', [])
                 if not payments_data:
                     raise ValueError("At least one order payment is required.")
 
                 total_payment = OrderPaymentService.process_payments(order, payments_data)
 
-                # 🔹 Step 10: Validate payment amount
+                # 🔹 Step 8: Validate payment amount
                 if total_payment > order.total_price:
                     raise ValueError("Total payments exceed the order total price.")
 
-                # 🔹 Step 11: Adjust Stocks if not on_hold
-                if not on_hold and stock_updates:
-                    StockValidationService.adjust_stocks(stock_updates)
-
-                # 🔹 Step 12: Return Success
+                # 🔹 Step 9: Return Success
                 response_serializer = OrderSerializer(order)
                 return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 

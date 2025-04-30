@@ -2,42 +2,54 @@
 
 from decimal import Decimal
 from django.db import transaction
-from ..models import Order, OrderItem, Invoice
+from ..models import Order, OrderItem, Invoice, Patient
 from datetime import date
+from django.db.models import Q
 
 class FrameOnlyOrderService:
 
     @staticmethod
     @transaction.atomic
     def create(data):
-        customer = data['customer']
+        patient_data = data['patient']
         frame = data['frame']
         quantity = data['quantity']
         price_per_unit = data['price_per_unit']
         branch_id = data['branch_id']
-
-        # sales_staff_code comes as CustomUser instance (serializer!)
         sales_staff_code = data.get('sales_staff_code', None)
 
-        # Prepare item structure
+        # 🧠 Step 1: Get or create patient
+        phone = patient_data.get('phone_number')
+        nic = patient_data.get('nic')
+
+        existing_patient = Patient.objects.filter(
+            Q(phone_number=phone) | Q(nic=nic)
+        ).first()
+
+        if existing_patient:
+            customer = existing_patient
+        else:
+            customer = Patient.objects.create(**patient_data)
+
+        # Step 2: Prepare item
         order_items_data = [{
             "frame": frame.id,
             "quantity": quantity,
             "is_non_stock": False
         }]
 
-        # Validate stock
+        # Step 3: Validate stock
         stock_updates = FrameOnlyOrderService.validate_stocks(order_items_data, branch_id)
 
-        # Calculate totals
+        # Step 4: Totals
         subtotal = Decimal(quantity) * price_per_unit
         total_price = subtotal
 
-        # Create Order
+        # Step 5: Create order
         order = Order.objects.create(
             customer=customer,
             branch_id=branch_id,
-            sales_staff_code=sales_staff_code,  # ✅ Pass the object directly
+            sales_staff_code=sales_staff_code,
             refraction=None,
             is_frame_only=True,
             sub_total=subtotal,
@@ -47,7 +59,7 @@ class FrameOnlyOrderService:
             user_date=date.today()
         )
 
-        # Create OrderItem
+        # Step 6: Order item
         OrderItem.objects.create(
             order=order,
             frame=frame,
@@ -56,10 +68,10 @@ class FrameOnlyOrderService:
             is_non_stock=False
         )
 
-        # Adjust Stocks
+        # Step 7: Adjust stock
         FrameOnlyOrderService.adjust_stocks(stock_updates)
 
-        # Create Invoice
+        # Step 8: Invoice
         Invoice.objects.create(
             order=order,
             invoice_type='factory'

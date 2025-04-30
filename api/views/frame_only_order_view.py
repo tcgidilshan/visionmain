@@ -20,10 +20,10 @@ class FrameOnlyOrderCreateView(APIView):
 
         try:
             with transaction.atomic():
-                # Step 1: Create the order
+                # ✅ FrameOnlyOrderService will now create or reuse the patient
                 order = FrameOnlyOrderService.create(serializer.validated_data)
 
-                # Step 2: Handle payments
+                # Handle payments
                 payments_data = request.data.get('payments', [])
                 if payments_data:
                     prepared_payments = []
@@ -31,22 +31,18 @@ class FrameOnlyOrderCreateView(APIView):
                         payment_copy = payment.copy()
                         payment_copy['order'] = order.id
 
-                        # Safely cast amount
                         amount = payment_copy.get('amount')
                         if amount is not None:
                             payment_copy['amount'] = Decimal(str(amount))
 
-                        # Safe fallback for optional fields
                         payment_copy['payment_method'] = payment.get('payment_method', 'cash')
                         payment_copy['reference_number'] = payment.get('reference_number')
                         payment_copy['payment_date'] = payment.get('payment_date', str(date.today()))
 
                         prepared_payments.append(payment_copy)
 
-                    # Now validate and process payments
                     total_paid = OrderPaymentService.process_payments(order, prepared_payments)
 
-                    # Update order status
                     if total_paid >= order.total_price:
                         order.status = 'paid'
                     elif total_paid > 0:
@@ -59,6 +55,5 @@ class FrameOnlyOrderCreateView(APIView):
             return Response({"detail": f"An unexpected error occurred: {str(e)}"}, 
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Return the created order
         output_serializer = OrderSerializer(order)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)

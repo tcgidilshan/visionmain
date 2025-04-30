@@ -736,7 +736,7 @@ class BusSystemSettingSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'updated_at']
 
 class FrameOnlyOrderSerializer(serializers.Serializer):
-    customer = serializers.PrimaryKeyRelatedField(queryset=Patient.objects.all())
+    patient = PatientSerializer()
     frame = serializers.PrimaryKeyRelatedField(queryset=Frame.objects.all())
     quantity = serializers.IntegerField(min_value=1)
     price_per_unit = serializers.DecimalField(max_digits=10, decimal_places=2)
