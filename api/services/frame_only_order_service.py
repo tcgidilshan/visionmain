@@ -54,8 +54,8 @@ class FrameOnlyOrderService:
             is_frame_only=True,
             sub_total=subtotal,
             total_price=total_price,
-            discount=Decimal('0.00'),
-            status='pending',
+            discount = Decimal(data.get("discount") or "0.00"),
+            status = data.get("status", "pending"),
             user_date=date.today()
         )
 
@@ -76,9 +76,7 @@ class FrameOnlyOrderService:
             order=order,
             invoice_type='factory'
         )
-
         return order
-
 
     @staticmethod
     def validate_stocks(order_items_data, branch_id):
@@ -91,7 +89,6 @@ class FrameOnlyOrderService:
             raise ValueError("Branch ID is required.")
 
         stock_updates = []
-
         with transaction.atomic():
             for item_data in order_items_data:
                 if item_data.get('is_non_stock'):
@@ -113,7 +110,6 @@ class FrameOnlyOrderService:
                     )
 
                 stock_updates.append((stock_type, stock, item_data['quantity']))
-
         return stock_updates
 
     @staticmethod
