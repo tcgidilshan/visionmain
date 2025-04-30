@@ -111,6 +111,11 @@ def update_order(order, order_data, order_items_data, payments_data):
         order.order_remark = order_data.get('order_remark', order.order_remark)
         order.user_date = order_data.get('user_date', order.user_date)
         order.on_hold = will_be_on_hold  # ✅ Update hold status
+
+        for field in ['pd', 'height', 'right_height', 'left_height', 'left_pd', 'right_pd']:
+            if field in order_data:
+                setattr(order, field, order_data.get(field))
+
         order.save()
 
         # 🔹 Create/Update order items
