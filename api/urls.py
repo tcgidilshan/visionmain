@@ -41,8 +41,10 @@ from .views import (
     LensStockListCreateView,
     LensStockRetrieveUpdateDeleteView,
     LensTypeListCreateView,
-    LensTypeRetrieveUpdateDeleteView,
-    LensCoatingListCreateView,
+    LensTypeRetrieveUpdateDeleteView,ExternalLensCoatingListCreateView,
+    ExternalLensCoatingRetrieveUpdateDeleteView,
+    LensCoatingListCreateView,ExternalLensBrandListCreateView,
+    ExternalLensBrandRetrieveUpdateDeleteView,
     LensCoatingRetrieveUpdateDeleteView,FrameOnlyOrderCreateView,
     ManualOrderCreateView,DoctorAppointmentTransferView,
     InvoiceDetailView,BankDepositListCreateView,BankDepositRetrieveUpdateView,BankDepositConfirmView,
@@ -127,6 +129,13 @@ urlpatterns = [
     #external lenses
     path('external_lenses/', ExternalLensListCreateView.as_view(), name='external_lens_list_create'),
     path('external_lenses/<int:id>/', ExternalLensRetrieveUpdateDeleteView.as_view(), name='external_lens_detail'),
+
+    path('external-lens-coatings/', ExternalLensCoatingListCreateView.as_view(), name='external-lens-coating-list-create'),
+    path('external-lens-coatings/<int:id>/', ExternalLensCoatingRetrieveUpdateDeleteView.as_view(), name='external-lens-coating-detail'),
+
+    # External Lens Brand CRUD
+    path('external-lens-brands/', ExternalLensBrandListCreateView.as_view(), name='external-lens-brand-list-create'),
+    path('external-lens-brands/<int:id>/', ExternalLensBrandRetrieveUpdateDeleteView.as_view(), name='external-lens-brand-detail'),
 
     path('lens-cleaners/', LensCleanerListCreateView.as_view(), name='lens-cleaner-list-create'),
     path('lens-cleaners/<int:pk>/', LensCleanerRetrieveUpdateDeleteView.as_view(), name='lens-cleaner-detail'),

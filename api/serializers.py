@@ -26,7 +26,7 @@ from .models import (
     Appointment,
     ChannelPayment,
     CustomUser,
-    Invoice,
+    Invoice,ExternalLensCoating, ExternalLensBrand,
     ExternalLens,BusSystemSetting,
     OtherItem,BankAccount,BankDeposit,
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
@@ -155,7 +155,7 @@ class ExternalLensTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = LenseType
         fields = ['id', 'name', 'description']
-        
+
 class CoatingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Coating
@@ -422,9 +422,20 @@ class ExternalLensSerializer(serializers.ModelSerializer):
             ).exists()
 
             if exists:
-                raise ValidationError("This lens combination already exists.")
-
+                raise ValidationError({
+                    'lens_type': "This lens type already exists with the selected coating, brand, and branded value."
+                })
         return data
+    
+class ExternalLensCoatingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExternalLensCoating
+        fields = ['id', 'name', 'description']
+
+class ExternalLensBrandSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExternalLensBrand
+        fields = ['id', 'name']
 
 class PatientSerializer(serializers.ModelSerializer):
     refraction_number = serializers.SerializerMethodField()

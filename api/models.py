@@ -196,6 +196,11 @@ class Brand(models.Model):
     def __str__(self):
         return f"{self.name} ({self.get_brand_type_display()})"
     
+class ExternalLensBrand(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    def __str__(self):
+        return f"{self.name})"
+   
 #color    
 class Color(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -242,6 +247,12 @@ class LenseType(models.Model):
         return self.name
     
 class Coating(models.Model):
+    name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)  # Allows NULL and empty values
+
+    def __str__(self):
+        return self.name
+class ExternalLensCoating(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)  # Allows NULL and empty values
 
@@ -362,31 +373,31 @@ class ExternalLens(models.Model):
         ('non_branded', 'Non-Branded'),
     )
 
-    branch        = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='external_lenses', null=True, blank=True)
-    lens_type     = models.ForeignKey(LenseType, related_name='external_lenses', on_delete=models.CASCADE)
-    coating       = models.ForeignKey(Coating, related_name='external_lenses', on_delete=models.CASCADE)
-    brand         = models.ForeignKey('Brand', related_name='external_lenses', on_delete=models.CASCADE)  # ✅ Reintroduced as ForeignKey
-    branded       = models.CharField(max_length=20, choices=BRAND_CHOICES)
-    price         = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    branch     = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='external_lenses', null=True, blank=True)
+    lens_type  = models.ForeignKey(LenseType, related_name='external_lenses', on_delete=models.CASCADE)
+    coating    = models.ForeignKey(ExternalLensCoating, related_name='external_lenses', on_delete=models.CASCADE)
+    brand      = models.ForeignKey(ExternalLensBrand, related_name='external_lenses', on_delete=models.CASCADE)
+    branded    = models.CharField(max_length=20, choices=BRAND_CHOICES)
+    price      = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
 
-    created_at    = models.DateTimeField(auto_now_add=True)
-    updated_at    = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.brand.name} - {self.lens_factory} - {self.lens_type.name} ({self.coating.name}) – {self.get_branded_display()} – LKR {self.price or 'N/A'}"
+        return f"{self.brand.name} - {self.lens_type.name} ({self.coating.name}) – {self.get_branded_display()} – LKR {self.price or 'N/A'}"
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
                 fields=['lens_type', 'coating', 'brand', 'branded'],
-                name='unique_lens_combination'
+                name='unique_external_lens_combination'
             )
         ]
         ordering = ['lens_type', 'coating']
         verbose_name = "External Lens"
         verbose_name_plural = "External Lenses"
 
-    
 class Invoice(models.Model):
     INVOICE_TYPES = [
         ('factory', 'Factory Invoice'),  # Linked to an order with refraction
