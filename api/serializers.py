@@ -755,6 +755,10 @@ class FrameOnlyOrderSerializer(serializers.Serializer):
     sales_staff_code = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all(), allow_null=True, required=False)
     payments = serializers.ListField(required=False, write_only=True)  
 
+    status = serializers.CharField(required=False, default='pending')
+    sub_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    discount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0.00)
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     def validate(self, data):
         if not data.get('frame').is_active:
             raise serializers.ValidationError("Selected frame is inactive.")
