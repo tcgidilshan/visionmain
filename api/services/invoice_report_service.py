@@ -30,7 +30,7 @@ class InvoiceReportService:
                 payments_by_order[oid] = {
                     "cash": 0,
                     "credit_card": 0,
-                    "online": 0,
+                    "online_transfer": 0,
                     "total": 0
                 }
 
