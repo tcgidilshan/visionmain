@@ -748,8 +748,20 @@ class BusSystemSettingSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'updated_at', 'is_active', ]
         read_only_fields = ['id', 'updated_at']
 
+class FrameOnlyPatientInputSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    phone_number = serializers.CharField()
+    date_of_birth = serializers.DateField(required=False, allow_null=True)
+    nic = serializers.CharField(required=False, allow_null=True)
+    address = serializers.CharField(required=False, allow_blank=True)
+    patient_note = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, data):
+        # Don't block on existing unique values — let service decide
+        return data
+
 class FrameOnlyOrderSerializer(serializers.Serializer):
-    patient = PatientSerializer()
+    patient = FrameOnlyPatientInputSerializer()
     frame = serializers.PrimaryKeyRelatedField(queryset=Frame.objects.all())
     quantity = serializers.IntegerField(min_value=1)
     price_per_unit = serializers.DecimalField(max_digits=10, decimal_places=2)
