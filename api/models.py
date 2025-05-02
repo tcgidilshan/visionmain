@@ -363,7 +363,13 @@ class Order(models.Model):
     on_hold=models.BooleanField(default=False)
     user_date = models.DateField(null=True, blank=True)
     is_frame_only = models.BooleanField(default=False) 
-
+    bus_title = models.ForeignKey(
+        'BusSystemSetting',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='orders'
+    )
     def __str__(self):
         return f"Order {self.id} - Status: {self.status} - Customer: {self.customer.id}"
     
@@ -696,11 +702,9 @@ class OtherIncome(models.Model):
         return f"{self.category.name} - LKR {self.amount}"
     
 class BusSystemSetting(models.Model):
-    title = models.CharField(max_length=255, default="Bus System Order")
+    title = models.CharField(max_length=200, unique=True)
     updated_at = models.DateTimeField(auto_now=True)
-    class Meta:
-        verbose_name = "Bus System Setting"
-        verbose_name_plural = "Bus System Settings"
+    is_active = models.BooleanField(default=False)  # Track if this title is currently active
 
     def __str__(self):
         return self.title
