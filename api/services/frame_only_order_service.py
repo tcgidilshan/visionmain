@@ -43,7 +43,7 @@ class FrameOnlyOrderService:
 
         # Step 4: Totals
         subtotal = Decimal(quantity) * price_per_unit
-        total_price = subtotal
+        total_price = subtotal - Decimal(data.get("discount") or "0.00")
 
         # Step 5: Create order
         order = Order.objects.create(
