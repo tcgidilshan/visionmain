@@ -355,6 +355,7 @@ class OrderSerializer(serializers.ModelSerializer):
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
     invoice_number = serializers.PrimaryKeyRelatedField(source='invoice.invoice_number', read_only=True)
     user_date = serializers.DateField(required=False)
+    bus_title = serializers.PrimaryKeyRelatedField(source='bus_title.title', read_only=True)
     class Meta:
         model = Order
         fields = [
@@ -383,7 +384,8 @@ class OrderSerializer(serializers.ModelSerializer):
             'on_hold',
             'sales_staff_username',
             'invoice_number',
-            'user_date'
+            'user_date',
+            'bus_title'
         ] 
 
 class ExternalLensSerializer(serializers.ModelSerializer):
@@ -743,7 +745,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
 class BusSystemSettingSerializer(serializers.ModelSerializer):
     class Meta:
         model = BusSystemSetting
-        fields = ['id', 'title', 'updated_at']
+        fields = ['id', 'title', 'updated_at', 'is_active', ]
         read_only_fields = ['id', 'updated_at']
 
 class FrameOnlyOrderSerializer(serializers.Serializer):
