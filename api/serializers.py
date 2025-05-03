@@ -355,7 +355,10 @@ class OrderSerializer(serializers.ModelSerializer):
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
     invoice_number = serializers.PrimaryKeyRelatedField(source='invoice.invoice_number', read_only=True)
     user_date = serializers.DateField(required=False)
-    bus_title = serializers.PrimaryKeyRelatedField(source='bus_title.title', read_only=True)
+    bus_title = serializers.PrimaryKeyRelatedField(
+        queryset=BusSystemSetting.objects.all(), required=False, allow_null=True
+    )
+    bus_title_name = serializers.PrimaryKeyRelatedField(source='bus_title.title', read_only=True)
     class Meta:
         model = Order
         fields = [
@@ -385,7 +388,8 @@ class OrderSerializer(serializers.ModelSerializer):
             'sales_staff_username',
             'invoice_number',
             'user_date',
-            'bus_title'
+            'bus_title',
+            'bus_title_name'
         ] 
 
 class ExternalLensSerializer(serializers.ModelSerializer):
