@@ -2,9 +2,10 @@
 
 from decimal import Decimal
 from django.db import transaction
-from ..models import Order, OrderItem, Invoice, Patient
+from ..models import Order, OrderItem, Invoice, Patient, FrameStock
 from datetime import date
 from django.db.models import Q
+from ..services import order_payment_service
 
 class FrameOnlyOrderService:
 
@@ -77,6 +78,8 @@ class FrameOnlyOrderService:
             invoice_type='factory'
         )
         return order
+    
+
 
     @staticmethod
     def validate_stocks(order_items_data, branch_id):
@@ -121,3 +124,87 @@ class FrameOnlyOrderService:
             for stock_type, stock, quantity in stock_updates:
                 stock.qty -= quantity
                 stock.save()
+
+    @staticmethod
+    @transaction.atomic
+    def update(order, data):
+        # 🔹 Step 1: Patient create/update
+        patient_data = data.get("patient")
+        if patient_data:
+            phone = patient_data.get('phone_number')
+            nic = patient_data.get('nic')
+            existing_patient = Patient.objects.filter(
+                Q(phone_number=phone) | Q(nic=nic)
+            ).first()
+
+            if existing_patient:
+                for field, value in patient_data.items():
+                    if value is not None and getattr(existing_patient, field) != value:
+                        setattr(existing_patient, field, value)
+                existing_patient.save()
+                customer = existing_patient
+            else:
+                customer = Patient.objects.create(**patient_data)
+            order.customer = customer
+
+        # 🔹 Step 2: Detect changes
+        new_frame = data["frame"]
+        new_quantity = data["quantity"]
+        price_per_unit = data["price_per_unit"]
+        branch_id = data["branch_id"]
+
+        existing_item = order.order_items.first()
+        old_frame = existing_item.frame if existing_item else None
+        old_quantity = existing_item.quantity if existing_item else 0
+
+        frame_changed = not old_frame or old_frame.id != new_frame.id
+        qty_increased = new_quantity > old_quantity
+
+        # 🔁 Step 3: Restock if frame changed or quantity reduced
+        if old_frame and (frame_changed or new_quantity < old_quantity):
+            restock_qty = old_quantity if frame_changed else (old_quantity - new_quantity)
+            stock = FrameStock.objects.select_for_update().filter(
+                frame_id=old_frame.id,
+                branch_id=branch_id
+            ).first()
+            if stock:
+                stock.qty += restock_qty
+                stock.save()
+
+        # 🔐 Step 4: Validate and deduct stock if needed
+        if frame_changed or qty_increased:
+            order_items_data = [{
+                "frame": new_frame.id,
+                "quantity": new_quantity,
+                "is_non_stock": False
+            }]
+            stock_updates = FrameOnlyOrderService.validate_stocks(order_items_data, branch_id)
+            FrameOnlyOrderService.adjust_stocks(stock_updates)
+
+        # 🔹 Step 5: Update order fields
+        subtotal = Decimal(new_quantity) * price_per_unit
+        discount = data.get("discount", Decimal("0.00"))
+        total_price = subtotal - discount
+
+        order.branch_id = branch_id
+        order.sales_staff_code_id = data.get("sales_staff_code", order.sales_staff_code_id)
+        order.sub_total = subtotal
+        order.discount = discount
+        order.total_price = total_price
+        order.status = data.get("status", order.status)
+        order.save()
+
+        # 🔹 Step 6: Replace item
+        if existing_item:
+            existing_item.delete()
+
+        OrderItem.objects.create(
+            order=order,
+            frame=new_frame,
+            quantity=new_quantity,
+            price_per_unit=price_per_unit,
+            is_non_stock=False,
+            subtotal=subtotal
+        )
+
+        return order

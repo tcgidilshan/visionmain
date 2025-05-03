@@ -777,3 +777,22 @@ class FrameOnlyOrderSerializer(serializers.Serializer):
         if not data.get('frame').is_active:
             raise serializers.ValidationError("Selected frame is inactive.")
         return data
+    
+class FrameOnlyOrderUpdateSerializer(serializers.Serializer):
+    patient = FrameOnlyPatientInputSerializer(required=False)
+    frame = serializers.PrimaryKeyRelatedField(queryset=Frame.objects.all())
+    quantity = serializers.IntegerField(min_value=1)
+    price_per_unit = serializers.DecimalField(max_digits=10, decimal_places=2)
+    branch_id = serializers.IntegerField()
+    sales_staff_code = serializers.IntegerField(required=False)
+    payments = serializers.ListField(child=serializers.DictField(), required=False)
+
+    status = serializers.CharField(required=False, default='pending')
+    sub_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    discount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0.00)
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+
+    def validate(self, data):
+        if not data.get('frame').is_active:
+            raise serializers.ValidationError("Selected frame is inactive.")
+        return data
