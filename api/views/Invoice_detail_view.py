@@ -17,10 +17,13 @@ class InvoiceDetailView(RetrieveAPIView):
     def get(self, request, *args, **kwargs):
         invoice_type = request.query_params.get("invoice_type")
         invoice_number = request.query_params.get("invoice_number")
+        is_frame_only = request.query_params.get("is_frame_only")
 
         if invoice_type and invoice_number:
             try:
-                invoice_data = InvoiceService.get_invoice_by_invoice_number(invoice_type, invoice_number)
+                invoice_data = InvoiceService.get_invoice_by_invoice_number(
+                    invoice_type, invoice_number, is_frame_only
+                )
                 return Response(invoice_data, status=status.HTTP_200_OK)
             except NotFound as e:
                 return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
@@ -29,4 +32,6 @@ class InvoiceDetailView(RetrieveAPIView):
             {"error": "Both 'invoice_type' and 'invoice_number' are required."},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+
     
