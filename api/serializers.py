@@ -800,3 +800,11 @@ class FrameOnlyOrderUpdateSerializer(serializers.Serializer):
         if not data.get('frame').is_active:
             raise serializers.ValidationError("Selected frame is inactive.")
         return data
+
+class AppointmentTimeListSerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source='patient.name', read_only=True)
+    time = serializers.TimeField(format='%I:%M %p')  # Format time as 12-hour with AM/PM
+
+    class Meta:
+        model = Appointment
+        fields = ['time', 'patient_name', 'channel_no']

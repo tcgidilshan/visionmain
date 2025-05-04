@@ -111,6 +111,7 @@ class OrderService:
             order.order_remark = order_data.get('order_remark', order.order_remark)
             order.user_date = order_data.get('user_date', order.user_date)
             order.on_hold = will_be_on_hold  # ✅ Update hold status
+            order.fitting_on_collection = order_data.get('fitting_on_collection', order.fitting_on_collection)  # ✅ Update hold status
             bus_title_id = order_data.get('bus_title')
             if bus_title_id is not None:
                 order.bus_title = BusSystemSetting.objects.get(pk=bus_title_id)
