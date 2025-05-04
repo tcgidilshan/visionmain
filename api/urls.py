@@ -34,9 +34,10 @@ from .views import (
     DoctorListCreateView,
     DoctorRetrieveUpdateDeleteView,
     PatientListView,
-    PatientUpdateView,# Added by Lahiru
+    PatientUpdateView,
     ChannelAppointmentView,
     ChannelListView,
+    DoctorAppointmentTimeListView,
     AppointmentRetrieveUpdateDeleteView,
     LensStockListCreateView,
     LensStockRetrieveUpdateDeleteView,
@@ -173,6 +174,7 @@ urlpatterns = [
     path('patients/<int:pk>/', PatientUpdateView.as_view(), name='patient-update'),
     path('channel/', ChannelAppointmentView.as_view(), name='channel-appointment'),
     path('channels/', ChannelListView.as_view(), name='channel-list'),
+    path('channels/time-slots/', DoctorAppointmentTimeListView.as_view(), name='doctor-appointment-time-list'),#time slots
     path('channels/<int:pk>/', AppointmentRetrieveUpdateDeleteView.as_view(), name='appointment-detail'),
     path("channel/transfer/", ChannelTransferView.as_view(), name="channel-transfer"),
     path('doctor/transfer-appointments/', DoctorAppointmentTransferView.as_view(), name='doctor-appointment-transfer'), #appointment trans
