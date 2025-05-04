@@ -642,8 +642,13 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
     customer = serializers.PrimaryKeyRelatedField(source='order.customer.name', read_only=True)  # ✅ Fetch customer ID
     # customer_details = PatientSerializer(source='order.customer', read_only=True)  #  Full customer details
     # refraction_details = RefractionSerializer(source='order.refraction', read_only=True)  # Refraction details (if exists)
-    # order_details = OrderSerializer(source='order', read_only=True)  #  Full order details
-
+    payments = serializers.SerializerMethodField()
+    total_price = serializers.DecimalField(
+    source='order.total_price',
+    max_digits=10,  # Use the same as your model
+    decimal_places=2,  # Use the same as your model
+    read_only=True
+)
     fitting_on_collection = serializers.BooleanField(
         source='order.fitting_on_collection', read_only=True
     )
@@ -655,23 +660,29 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'order',       # Order ID (ForeignKey)
-            'customer',    # Customer ID (from Order)
-            # 'customer_details',  #  Full customer details
-            # 'refraction_details',  #  Full refraction details (if available)
+            'customer',   
             'invoice_type',  # "factory" or "manual"
             'daily_invoice_no',  # Unique daily number for factory invoices
             'invoice_number',
             'invoice_date',
-            # 'order_details',  #  Full order details (optional)
-
-              #  NEW fields for tracking factory invoice progress
+            'total_price',
             'progress_status',
             'lens_arrival_status',
             'whatsapp_sent',
             'fitting_on_collection',
-            'on_hold'
+            'on_hold',
+            'payments'
         ]
-
+    def get_payments(self, obj):
+            # Get the order related to this invoice
+            order = obj.order
+            if order:
+                # Get all payments related to this order
+                payments = order.orderpayment_set.all()
+                # Serialize them
+                from .serializers import OrderPaymentSerializer  # Avoid circular import if needed
+                return OrderPaymentSerializer(payments, many=True).data
+            return []
 class ExpenseMainCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ExpenseMainCategory
