@@ -122,6 +122,7 @@ class FrameSerializer(serializers.ModelSerializer):
     brand_name = serializers.CharField(source='brand.name', read_only=True)  # Get brand name
     code_name = serializers.CharField(source='code.name', read_only=True)    # Get code name
     color_name = serializers.CharField(source='color.name', read_only=True)  # Get color name
+    brand_type_display = serializers.CharField(source='get_brand_type_display', read_only=True)
 
     class Meta:
         model = Frame
@@ -134,6 +135,8 @@ class FrameSerializer(serializers.ModelSerializer):
             'size',
             'species',
             'image',
+            'brand_type',
+            'brand_type_display',
         ]
         
 class FrameStockSerializer(serializers.ModelSerializer):

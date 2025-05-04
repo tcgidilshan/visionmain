@@ -217,7 +217,12 @@ class Code(models.Model):
         return self.name
     
 class Frame(models.Model):
+    BRAND_CHOICES = (
+        ('branded', 'Branded'),
+        ('non_branded', 'Non-Branded'),
+    )
     brand = models.ForeignKey(Brand, related_name='frames', on_delete=models.CASCADE)
+    brand_type = models.CharField(max_length=20, choices=BRAND_CHOICES)
     code = models.ForeignKey(Code, related_name='frames', on_delete=models.CASCADE)
     color = models.ForeignKey(Color, related_name='frames', on_delete=models.CASCADE)
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -227,7 +232,18 @@ class Frame(models.Model):
     is_active = models.BooleanField(default=True) 
 
     def __str__(self):
-        return f"{self.brand.name} - {self.code.name} - {self.color.name}"
+        return f"{self.brand.name} - {self.code.name} - {self.color.name} - {self.get_brand_type_display()}"
+    class Meta:
+        unique_together = (
+            'brand',
+            'brand_type',
+            'code',
+            'color',
+            'species',
+            'size',
+        )
+    verbose_name = "Frame"
+    verbose_name_plural = "Frames"
     
 class FrameStock(models.Model):
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="frame_stocks", null=True, blank=True)
