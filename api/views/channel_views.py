@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status,generics
 from django.db import transaction
 from ..models import Doctor, Patient, Schedule, Appointment, ChannelPayment
-from ..serializers import PatientSerializer, ScheduleSerializer, AppointmentSerializer, ChannelPaymentSerializer,ChannelListSerializer,AppointmentDetailSerializer
+from ..serializers import PatientSerializer, ScheduleSerializer, AppointmentSerializer, ChannelPaymentSerializer,ChannelListSerializer,AppointmentDetailSerializer,AppointmentTimeListSerializer
 from rest_framework.generics import ListAPIView
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
@@ -220,3 +220,40 @@ class DoctorAppointmentTransferView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class DoctorAppointmentTimeListView(APIView):
+    def get(self, request, *args, **kwargs):
+        doctor_id = request.query_params.get('doctor_id')
+        branch_id = request.query_params.get('branch_id')
+        date = request.query_params.get('date')
+
+        if not all([doctor_id, branch_id, date]):
+            return Response(
+                {"error": "doctor_id, branch_id, and date are required query parameters"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Get appointments for the specified criteria
+            appointments = Appointment.objects.filter(
+                doctor_id=doctor_id,
+                branch_id=branch_id,
+                date=date
+            ).select_related('patient').order_by('time')
+
+            # Get total count
+            total_count = appointments.count()
+
+            # Serialize the appointments
+            serializer = AppointmentTimeListSerializer(appointments, many=True)
+
+            return Response({
+                "total_appointments": total_count,
+                "appointments": serializer.data
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

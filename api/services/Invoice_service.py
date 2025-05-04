@@ -82,6 +82,8 @@ class InvoiceService:
         qs = Invoice.objects.filter(invoice_type='factory')
 
         # Handle invoice_number filtering by user branch
+        if branch_id:
+            qs = qs.filter(order__branch_id=branch_id)
         if invoice_number:
             user_branches = user.user_branches.all().values_list('branch_id', flat=True)
             if not user_branches:
