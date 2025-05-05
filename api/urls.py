@@ -203,7 +203,6 @@ urlpatterns = [
     path('bus/title/', BusSystemSettingListCreateView.as_view(), name='bus-system-title-list-create'),
     path('bus/title/<int:pk>/', BusSystemSettingRetrieveUpdateDeleteView.as_view(), name='bus-system-title-rud'),
 
-
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

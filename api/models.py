@@ -6,7 +6,7 @@ from rest_framework.authtoken.models import Token as BaseToken
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Max
+from django.db.models import Max,Q
 
 class Item(models.Model):
     name = models.CharField(max_length=100)
@@ -90,16 +90,30 @@ class Refraction(models.Model):
 class Patient(models.Model):
     name = models.CharField(max_length=50)
     date_of_birth = models.DateField(null=True, blank=True)
-    phone_number = models.CharField(null=True, blank=True,max_length=15, unique=True)
+    phone_number = models.CharField(max_length=15, null=True, blank=True)
     address = models.TextField(null=True, blank=True)
-    nic = models.CharField(max_length=15, unique=True, null=True, blank=True)
+    nic = models.CharField(max_length=15, null=True, blank=True)
     refraction = models.ForeignKey(
         Refraction, null=True, blank=True, on_delete=models.SET_NULL, related_name="patients"
-    )  #  Added refraction_id (nullable)
-    #new feature
-    patient_note=models.CharField(max_length=100,null=True,blank=True)
+    )
+    patient_note = models.CharField(max_length=100, null=True, blank=True)
+
     def __str__(self):
-        return f"{self.name}"
+        return self.name
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['phone_number'],
+                name='unique_phone_number_not_null',
+                condition=~Q(phone_number=None)
+            ),
+            models.UniqueConstraint(
+                fields=['nic'],
+                name='unique_nic_not_null',
+                condition=~Q(nic=None)
+            ),
+        ]
     
 class RefractionDetails(models.Model):
     refraction = models.OneToOneField(

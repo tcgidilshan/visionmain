@@ -5,34 +5,27 @@ from django.db import transaction
 from ..models import Order, OrderItem, Invoice, Patient, FrameStock
 from datetime import date
 from django.db.models import Q
-from ..services import order_payment_service
+from ..services.patient_service import PatientService
 
 class FrameOnlyOrderService:
 
     @staticmethod
     @transaction.atomic
     def create(data):
-        patient_data = data['patient']
-        frame = data['frame']
-        quantity = data['quantity']
-        price_per_unit = data['price_per_unit']
-        branch_id = data['branch_id']
-        sales_staff_code = data.get('sales_staff_code', None)
+
+        patient_data = data.get("patient")
+        frame = data["frame"]
+        quantity = data["quantity"]
+        price_per_unit = data["price_per_unit"]
+        branch_id = data["branch_id"]
+        sales_staff_code = data.get("sales_staff_code", None)
 
         # 🧠 Step 1: Get or create patient
-        phone = patient_data.get('phone_number')
-        nic = patient_data.get('nic')
+        customer = None
+        if patient_data:
+            customer = PatientService.create_or_update_patient(patient_data)
 
-        existing_patient = Patient.objects.filter(
-            Q(phone_number=phone) | Q(nic=nic)
-        ).first()
-
-        if existing_patient:
-            customer = existing_patient
-        else:
-            customer = Patient.objects.create(**patient_data)
-
-        # Step 2: Prepare item
+        # Step 2: Prepare order item
         order_items_data = [{
             "frame": frame.id,
             "quantity": quantity,
@@ -44,7 +37,8 @@ class FrameOnlyOrderService:
 
         # Step 4: Totals
         subtotal = Decimal(quantity) * price_per_unit
-        total_price = subtotal - Decimal(data.get("discount") or "0.00")
+        discount = Decimal(data.get("discount") or "0.00")
+        total_price = subtotal - discount
 
         # Step 5: Create order
         order = Order.objects.create(
@@ -55,31 +49,31 @@ class FrameOnlyOrderService:
             is_frame_only=True,
             sub_total=subtotal,
             total_price=total_price,
-            discount = Decimal(data.get("discount") or "0.00"),
-            status = data.get("status", "pending"),
+            discount=discount,
+            status=data.get("status", "pending"),
             user_date=date.today()
         )
 
-        # Step 6: Order item
+        # Step 6: Create order item
         OrderItem.objects.create(
             order=order,
             frame=frame,
             quantity=quantity,
             price_per_unit=price_per_unit,
-            is_non_stock=False
+            is_non_stock=False,
+            subtotal=subtotal
         )
 
         # Step 7: Adjust stock
         FrameOnlyOrderService.adjust_stocks(stock_updates)
 
-        # Step 8: Invoice
+        # Step 8: Create invoice
         Invoice.objects.create(
             order=order,
-            invoice_type='factory'
+            invoice_type="factory"
         )
-        return order
-    
 
+        return order
 
     @staticmethod
     def validate_stocks(order_items_data, branch_id):
@@ -128,23 +122,10 @@ class FrameOnlyOrderService:
     @staticmethod
     @transaction.atomic
     def update(order, data):
-        # 🔹 Step 1: Patient create/update
+        # 🔹 Step 1: Update or create patient
         patient_data = data.get("patient")
         if patient_data:
-            phone = patient_data.get('phone_number')
-            nic = patient_data.get('nic')
-            existing_patient = Patient.objects.filter(
-                Q(phone_number=phone) | Q(nic=nic)
-            ).first()
-
-            if existing_patient:
-                for field, value in patient_data.items():
-                    if value is not None and getattr(existing_patient, field) != value:
-                        setattr(existing_patient, field, value)
-                existing_patient.save()
-                customer = existing_patient
-            else:
-                customer = Patient.objects.create(**patient_data)
+            customer = PatientService.create_or_update_patient(patient_data)
             order.customer = customer
 
         # 🔹 Step 2: Detect changes
@@ -183,7 +164,7 @@ class FrameOnlyOrderService:
 
         # 🔹 Step 5: Update order fields
         subtotal = Decimal(new_quantity) * price_per_unit
-        discount = data.get("discount", Decimal("0.00"))
+        discount = Decimal(data.get("discount") or "0.00")
         total_price = subtotal - discount
 
         order.branch_id = branch_id
@@ -194,7 +175,7 @@ class FrameOnlyOrderService:
         order.status = data.get("status", order.status)
         order.save()
 
-        # 🔹 Step 6: Replace item
+        # 🔹 Step 6: Replace order item
         if existing_item:
             existing_item.delete()
 
