@@ -6,7 +6,7 @@ from rest_framework.authtoken.models import Token as BaseToken
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Max,Q
+from django.db.models import Max,Sum,Q
 
 class Item(models.Model):
     name = models.CharField(max_length=100)
@@ -644,6 +644,13 @@ class Appointment(models.Model):
 
     def __str__(self):
         return f"Appointment with {self.doctor} for {self.patient} on {self.date} at {self.time}"
+    
+    def get_total_paid(self):
+        return self.payments.aggregate(total=Sum('amount'))['total'] or 0
+
+    def get_remaining_amount(self):
+        return float(self.total_fee) - self.get_total_paid()
+
 
 class ChannelPayment(models.Model):
     PAYMENT_METHOD_CHOICES = [

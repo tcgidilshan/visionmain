@@ -822,3 +822,12 @@ class AppointmentTimeListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Appointment
         fields = ['time', 'patient_name', 'channel_no']
+
+class SingleRepaymentSerializer(serializers.Serializer):
+    appointment_id = serializers.IntegerField()
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    payment_method = serializers.ChoiceField(choices=ChannelPayment.PAYMENT_METHOD_CHOICES)
+    is_final = serializers.BooleanField(required=False, default=False)
+
+class MultipleRepaymentSerializer(serializers.Serializer):
+    payments = SingleRepaymentSerializer(many=True)
