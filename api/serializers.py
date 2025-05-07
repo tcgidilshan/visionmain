@@ -25,7 +25,7 @@ from .models import (
     Schedule,
     Appointment,
     ChannelPayment,
-    CustomUser,
+    CustomUser,SafeTransaction,SafeBalance,
     Invoice,ExternalLensCoating, ExternalLensBrand,
     ExternalLens,BusSystemSetting,
     OtherItem,BankAccount,BankDeposit,
@@ -700,7 +700,7 @@ class ExpenseSubCategorySerializer(serializers.ModelSerializer):
 class ExpenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Expense
-        fields = ['id', 'branch', 'main_category', 'sub_category', 'amount', 'note', 'created_at']
+        fields = ['id', 'branch', 'main_category', 'sub_category', 'amount', 'note', 'paid_from_safe', 'created_at']
 
 class ExpenseReportSerializer(serializers.ModelSerializer):
     main_category_name = serializers.CharField(source='main_category.name', read_only=True)
@@ -721,7 +721,6 @@ class OtherIncomeCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = OtherIncomeCategory
         fields = ['id', 'name', 'description']
-
 
 class OtherIncomeSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
@@ -831,3 +830,37 @@ class SingleRepaymentSerializer(serializers.Serializer):
 
 class MultipleRepaymentSerializer(serializers.Serializer):
     payments = SingleRepaymentSerializer(many=True)
+
+class SafeBalanceSerializer(serializers.ModelSerializer):
+    branch_name = serializers.CharField(source="branch.branch_name", read_only=True)
+
+    class Meta:
+        model = SafeBalance
+        fields = [
+            "id",
+            "branch",
+            "branch_name",
+            "balance",
+            "last_updated",
+        ]
+        read_only_fields = ["balance", "last_updated"]
+
+class SafeTransactionSerializer(serializers.ModelSerializer):
+    branch_name = serializers.CharField(source="branch.branch_name", read_only=True)
+    transaction_type_display = serializers.CharField(source="get_transaction_type_display", read_only=True)
+
+    class Meta:
+        model = SafeTransaction
+        fields = [
+            "id",
+            "branch",
+            "branch_name",
+            "transaction_type",
+            "transaction_type_display",
+            "amount",
+            "reason",
+            "reference_id",
+            "date",
+            "created_at",
+        ]
+        read_only_fields = ["date", "created_at"]

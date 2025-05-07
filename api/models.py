@@ -40,7 +40,6 @@ class BankDeposit(models.Model):
     is_confirmed = models.BooleanField(default=False)  # ✅ For "ticking" confirmed deposits
     note = models.TextField(blank=True, null=True)
 
-    
 class CustomUser(AbstractUser):
     mobile = models.CharField(max_length=15, blank=True, null=True)
     user_code = models.CharField(max_length=10, null=True, blank=True) 
@@ -711,11 +710,18 @@ class ExpenseSubCategory(models.Model):
 
 
 class Expense(models.Model):
+    SOURCE_CHOICES = [
+    ('safe', 'Safe'),
+    ('cash', 'Cash'),
+    ('bank', 'Bank'),
+    ]
+    paid_source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='safe')
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE)
     main_category = models.ForeignKey(ExpenseMainCategory, on_delete=models.CASCADE)
     sub_category = models.ForeignKey(ExpenseSubCategory, on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     note = models.TextField(blank=True)
+    paid_from_safe = models.BooleanField(default=True) 
     created_at = models.DateTimeField(auto_now_add=True)
 
 class OtherIncomeCategory(models.Model):
@@ -745,6 +751,32 @@ class BusSystemSetting(models.Model):
 
     def __str__(self):
         return self.title
+    
+class SafeBalance(models.Model):
+    branch = models.OneToOneField("Branch", on_delete=models.CASCADE, related_name="safe_balance")
+    balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.branch.branch_name} Safe – LKR {self.balance}"
+    
+class SafeTransaction(models.Model):
+    class TransactionType(models.TextChoices):
+        INCOME = 'income', 'Income'
+        EXPENSE = 'expense', 'Expense'
+        DEPOSIT = 'deposit', 'Bank Deposit'
+
+    branch = models.ForeignKey("Branch", on_delete=models.CASCADE, related_name="safe_transactions")
+    transaction_type = models.CharField(max_length=10, choices=TransactionType.choices)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    reason = models.TextField(blank=True, null=True)
+    reference_id = models.CharField(max_length=100, blank=True, null=True)  # Optional: links to invoice/expense/etc.
+    date = models.DateField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.branch.branch_name} – {self.transaction_type} – LKR {self.amount} on {self.date}"
+
 
 
     

@@ -6,6 +6,7 @@ from ..serializers import ExpenseMainCategorySerializer, ExpenseSubCategorySeria
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from ..services.expense_validation_service import ExpenseValidationService
+from ..services.safe_service import SafeService
 from django.db.models import Sum
 from django.utils.dateparse import parse_date
 from django.db import transaction
@@ -37,10 +38,27 @@ class ExpenseCreateView(APIView):
         if serializer.is_valid():
             branch_id = serializer.validated_data['branch'].id
             amount = serializer.validated_data['amount']
+            paid_source = serializer.validated_data.get("paid_source", "safe")
 
             try:
-                ExpenseValidationService.validate_expense_limit(branch_id, amount)
+                # 🛡️ Validate safe balance if paid from safe
+                if paid_source == "safe":
+                    SafeService.validate_sufficient_balance(branch_id, amount)
+                else:
+                    ExpenseValidationService.validate_expense_limit(branch_id, amount)
+
                 expense = serializer.save()
+
+                # 💾 Record safe transaction if needed
+                if paid_source == "safe":
+                    SafeService.record_transaction(
+                        branch=expense.branch,
+                        amount=expense.amount,
+                        transaction_type='expense',
+                        reason=f"{expense.main_category.name} - {expense.sub_category.name}",
+                        reference_id=f"expense-{expense.id}"
+                    )
+
                 return Response(ExpenseSerializer(expense).data, status=status.HTTP_201_CREATED)
             except Exception as e:
                 return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
