@@ -575,6 +575,7 @@ class ChannelListSerializer(serializers.ModelSerializer):
     address = serializers.CharField(source='patient.address', read_only=True)
     contact_number = serializers.CharField(source='patient.phone_number', read_only=True)
     first_payment = serializers.SerializerMethodField()
+    appointment_id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Appointment
@@ -586,6 +587,7 @@ class ChannelListSerializer(serializers.ModelSerializer):
             'patient_name',
             'channel_no',
             'first_payment',
+            'appointment_id',
             'date',  # For filtering
         ]
 

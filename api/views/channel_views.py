@@ -8,6 +8,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from ..services.doctor_schedule_service import DoctorScheduleService
+from ..services.pagination_service import PaginationService
 
 class ChannelAppointmentView(APIView):
     @transaction.atomic
@@ -128,10 +129,10 @@ class ChannelListView(ListAPIView):
     queryset = Appointment.objects.prefetch_related('payments').select_related('doctor', 'patient', 'branch')
     serializer_class = ChannelListSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['doctor', 'date','branch']  # Optional DRF filters
+    filterset_fields = ['doctor', 'date','branch','appointment_id']  # Optional DRF filters
     search_fields = ['id', 'patient__phone_number']
     ordering_fields = ['channel_no']
-    pagination_class = None
+    pagination_class = PaginationService
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -227,6 +228,7 @@ class DoctorAppointmentTimeListView(APIView):
         branch_id = request.query_params.get('branch_id')
         date = request.query_params.get('date')
 
+        # Input validation
         if not all([doctor_id, branch_id, date]):
             return Response(
                 {"error": "doctor_id, branch_id, and date are required query parameters"},
@@ -234,6 +236,23 @@ class DoctorAppointmentTimeListView(APIView):
             )
 
         try:
+            # Try to get the schedule first
+            schedule = Schedule.objects.filter(
+                doctor_id=doctor_id,
+                branch_id=branch_id,
+                date=date,
+                status__in=[Schedule.StatusChoices.AVAILABLE, Schedule.StatusChoices.BOOKED]
+            ).select_related('doctor', 'branch').first()
+
+            if not schedule:
+                return Response({
+                    "total_appointments": 0,
+                    "doctor_arrival": None,  # Format time as 12-hour
+                    "appointments": [],
+                },
+                    status=status.HTTP_200_OK
+                )
+
             # Get appointments for the specified criteria
             appointments = Appointment.objects.filter(
                 doctor_id=doctor_id,
@@ -246,12 +265,18 @@ class DoctorAppointmentTimeListView(APIView):
 
             # Serialize the appointments
             serializer = AppointmentTimeListSerializer(appointments, many=True)
-
+        
             return Response({
                 "total_appointments": total_count,
-                "appointments": serializer.data
+                "doctor_arrival": schedule.start_time.strftime('%I:%M %p'),  # Format time as 12-hour
+                "appointments": serializer.data,
             }, status=status.HTTP_200_OK)
 
+        except ValueError:
+            return Response(
+                {"error": "Invalid date format. Please use YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         except Exception as e:
             return Response(
                 {"error": str(e)},
