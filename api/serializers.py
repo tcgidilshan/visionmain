@@ -546,7 +546,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'branch',
             'updated_at',  # Record update timestamp
             'branch_name',
-            'appointment_id'
+            'invoice_number'
         ]
 
 class ChannelPaymentSerializer(serializers.ModelSerializer):
@@ -575,7 +575,7 @@ class ChannelListSerializer(serializers.ModelSerializer):
     address = serializers.CharField(source='patient.address', read_only=True)
     contact_number = serializers.CharField(source='patient.phone_number', read_only=True)
     first_payment = serializers.SerializerMethodField()
-    appointment_id = serializers.IntegerField(read_only=True)
+    invoice_number = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Appointment
@@ -587,7 +587,7 @@ class ChannelListSerializer(serializers.ModelSerializer):
             'patient_name',
             'channel_no',
             'first_payment',
-            'appointment_id',
+            'invoice_number',
             'date',  # For filtering
         ]
 
@@ -600,13 +600,13 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source='patient.name', read_only=True)
     address = serializers.CharField(source='patient.address', read_only=True)
     contact_number = serializers.CharField(source='patient.phone_number', read_only=True)
-
+    
     class Meta:
         model = Appointment
         fields = [
             'id', 'doctor', 'doctor_name', 'patient', 'patient_name',
             'address', 'contact_number', 'schedule', 'date', 'time',
-            'status', 'amount', 'channel_no', 'payments'
+            'status', 'amount', 'channel_no', 'payments','invoice_number'
         ]
     def get_payments(self, obj):
         """Fetch all related payments for this appointment."""
