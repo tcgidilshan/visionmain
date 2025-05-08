@@ -99,20 +99,6 @@ class Patient(models.Model):
 
     def __str__(self):
         return self.name
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=['phone_number'],
-                name='unique_phone_number_not_null',
-                condition=~Q(phone_number=None)
-            ),
-            models.UniqueConstraint(
-                fields=['nic'],
-                name='unique_nic_not_null',
-                condition=~Q(nic=None)
-            ),
-        ]
     
 class RefractionDetails(models.Model):
     refraction = models.OneToOneField(
