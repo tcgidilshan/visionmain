@@ -24,7 +24,7 @@ class DoctorScheduleService:
         return schedule, created
 
     @staticmethod
-    def get_upcoming_arrival_days(doctor_id, branch=None):
+    def get_upcoming_arrival_days(doctor_id, branch=None,status=None):
         """
         Get all upcoming arrival days for a doctor. Optionally filtered by branch.
         """
@@ -32,6 +32,8 @@ class DoctorScheduleService:
 
         if branch:
             qs = qs.filter(branch=branch)
+        if status:
+            qs = qs.filter(status=status)
 
         return qs.order_by('date')
     
