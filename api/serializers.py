@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.db.models import Sum
 from rest_framework.exceptions import ValidationError
 from .models import (
     Branch,
@@ -576,6 +577,8 @@ class ChannelListSerializer(serializers.ModelSerializer):
     contact_number = serializers.CharField(source='patient.phone_number', read_only=True)
     first_payment = serializers.SerializerMethodField()
     invoice_number = serializers.IntegerField(read_only=True)
+    total_payment = serializers.SerializerMethodField(read_only=True)
+    balance = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
@@ -589,11 +592,23 @@ class ChannelListSerializer(serializers.ModelSerializer):
             'first_payment',
             'invoice_number',
             'date',  # For filtering
+            'total_payment',
+            'balance',
+            'amount'
         ]
 
     def get_first_payment(self, obj):
         first_payment = obj.payments.first()  # Assuming related_name='payments' for ChannelPayment
         return first_payment.amount if first_payment else None
+    
+    def get_total_payment(self, obj):
+        return obj.payments.aggregate(total=Sum('amount'))['total'] or 0
+    
+    def get_balance(self, obj):
+        total_paid = self.get_total_payment(obj)
+        total_fee = obj.amount or 0  # or obj.amount, depending on your field naming
+        return total_fee - total_paid
+
 class AppointmentDetailSerializer(serializers.ModelSerializer):
     payments = serializers.SerializerMethodField()  # Custom field for payments
     doctor_name = serializers.CharField(source='doctor.name', read_only=True)
@@ -612,6 +627,7 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
         """Fetch all related payments for this appointment."""
         payments = ChannelPayment.objects.filter(appointment=obj)  # Related payments
         return ChannelPaymentSerializer(payments, many=True).data 
+        
 class OtherItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OtherItem
@@ -702,7 +718,7 @@ class ExpenseSubCategorySerializer(serializers.ModelSerializer):
 class ExpenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Expense
-        fields = ['id', 'branch', 'main_category', 'sub_category', 'amount', 'note', 'paid_from_safe', 'created_at']
+        fields = ['id', 'branch', 'main_category', 'sub_category', 'amount', 'note','paid_source', 'paid_from_safe', 'created_at']
 
 class ExpenseReportSerializer(serializers.ModelSerializer):
     main_category_name = serializers.CharField(source='main_category.name', read_only=True)
@@ -716,7 +732,8 @@ class ExpenseReportSerializer(serializers.ModelSerializer):
             'main_category_name',
             'sub_category_name',
             'amount',
-            'note'
+            'note',
+            'paid_from_safe'
         ]
 
 class OtherIncomeCategorySerializer(serializers.ModelSerializer):
