@@ -57,7 +57,7 @@ from .views import (
     OtherItemListCreateView,BankAccountListCreateView,BankAccountRetrieveUpdateDeleteView,
     OtherItemRetrieveUpdateDeleteView,ExpenseCreateView,ExpenseUpdateView,
     CreateUserView,ExpenseMainCategoryListCreateView, ExpenseMainCategoryRetrieveUpdateDestroyView,
-    ExpenseSubCategoryListCreateView, ExpenseSubCategoryRetrieveUpdateDestroyView,
+    ExpenseSubCategoryListCreateView, ExpenseSubCategoryRetrieveUpdateDestroyView,ExpenseRetrieveView,
     UserCodeCheckView,ChannelTransferView,DoctorAbsenceRescheduleView,ExpenseReportView,FrameOnlyOrderUpdateView,
     UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,
     AdminCodeCheckView,ChannelReportView,DoctorScheduleCreateView,DoctorUpcomingScheduleView,DoctorScheduleTransferView,AllRoleCheckView,
@@ -204,6 +204,7 @@ urlpatterns = [
     path("expenses/report/", ExpenseReportView.as_view(), name="expense-report"),
 
     path('expenses/<int:pk>/update/', ExpenseUpdateView.as_view(), name='expense-update'),
+    path('expenses/<int:pk>/', ExpenseRetrieveView.as_view(), name='expense-detail'),
 
     #bus
     path('bus/title/', BusSystemSettingListCreateView.as_view(), name='bus-system-title-list-create'),

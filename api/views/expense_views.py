@@ -128,3 +128,10 @@ class ExpenseUpdateView(generics.UpdateAPIView):
             self.perform_update(serializer)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    def get_object(self):
+        return super().get_object()
+
+class ExpenseRetrieveView(generics.RetrieveAPIView):
+    queryset = Expense.objects.all()
+    serializer_class = ExpenseSerializer
+
