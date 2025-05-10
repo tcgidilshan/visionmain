@@ -88,9 +88,11 @@ class DailyFinanceSummaryService:
                 "amount": deposit.amount,
                 "is_confirmed": deposit.is_confirmed,
             }
-            for deposit in today_safe_qs
+            for deposit in BankDeposit.objects.filter(
+                branch_id=branch_id,
+                date=date,
+            )
         ]
-
         today_income = today_order_payments + today_channel_payments + today_other_income
         today_balance = today_income - (today_expenses + today_safe_total)
         cash_in_hold = before_balance + today_balance
