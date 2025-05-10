@@ -9,7 +9,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from ..services.doctor_schedule_service import DoctorScheduleService
 from ..services.pagination_service import PaginationService
-
+from ..services.patient_service import PatientService
 class ChannelAppointmentView(APIView):
     @transaction.atomic
     def post(self, request, *args, **kwargs):
@@ -23,34 +23,13 @@ class ChannelAppointmentView(APIView):
 
         try:
             # Step 2: Handle Patient
-            patient = None
-            phone_number = data.get('contact_number')
-
-            if data.get('patient_id'):
-                try:
-                    patient = Patient.objects.get(id=data['patient_id'])
-                    patient.name = data['name']
-                    patient.phone_number = phone_number
-                    patient.address = data.get('address', patient.address)
-                    patient.save()
-                except Patient.DoesNotExist:
-                    return Response({"error": "Provided patient_id does not exist."}, status=status.HTTP_400_BAD_REQUEST)
-
-            else:
-                # Try to get patient by phone number
-                patient = Patient.objects.filter(phone_number=phone_number).first()
-                if patient:
-                    # Update patient info
-                    patient.name = data['name']
-                    patient.address = data.get('address', patient.address)
-                    patient.save()
-                else:
-                    # Create new patient
-                    patient = Patient.objects.create(
-                        name=data['name'],
-                        phone_number=phone_number,
-                        address=data.get('address', '')
-                    )
+            patient_payload = {
+                "id": data.get("patient_id"),
+                "name": data["name"],
+                "phone_number": data["contact_number"],
+                "address": data.get("address", "")
+            }
+            patient = PatientService.create_or_update_patient(patient_payload)
 
             # Step 3: Handle Schedule (Create If Not Exists)
             schedule, created = Schedule.objects.get_or_create(

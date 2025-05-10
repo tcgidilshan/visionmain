@@ -45,7 +45,7 @@ from .views import (
     LensTypeRetrieveUpdateDeleteView,ExternalLensCoatingListCreateView,
     ExternalLensCoatingRetrieveUpdateDeleteView,
     LensCoatingListCreateView,ExternalLensBrandListCreateView,
-    ExternalLensBrandRetrieveUpdateDeleteView,
+    ExternalLensBrandRetrieveUpdateDeleteView,SafeIncomeTotalView,
     LensCoatingRetrieveUpdateDeleteView,FrameOnlyOrderCreateView,
     ManualOrderCreateView,DoctorAppointmentTransferView,ChannelRepaymentView,
     InvoiceDetailView,BankDepositListCreateView,BankDepositRetrieveUpdateView,BankDepositConfirmView,
@@ -89,6 +89,7 @@ urlpatterns = [
     path('other-incomes/<int:pk>/', OtherIncomeRetrieveUpdateDeleteView.as_view(), name='other-income-detail'),
 
     path("safe/transactions/", SafeTransaction.as_view(), name="safe-transaction-create"),#safe
+    path('safe/income-total/', SafeIncomeTotalView.as_view(), name='safe-income-total'),
 
     #bank deposit
     path('bank-deposits/', BankDepositListCreateView.as_view(), name='bank-deposit-list'),

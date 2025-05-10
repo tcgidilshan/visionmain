@@ -1,6 +1,7 @@
 from django.db import transaction
 from decimal import Decimal
 from ..models import SafeTransaction, SafeBalance
+from ..models import Sum
 from rest_framework.exceptions import ValidationError
 
 class SafeService:
@@ -50,3 +51,16 @@ class SafeService:
 
         if safe_balance.balance < Decimal(amount):
             raise ValidationError("🚫 Insufficient funds in the Safe Locker for this expense.")
+        
+    @staticmethod
+    def get_total_income(branch_id=None, from_date=None, to_date=None):
+        queryset = SafeTransaction.objects.filter(transaction_type='income')
+
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+        if from_date:
+            queryset = queryset.filter(date__gte=from_date)
+        if to_date:
+            queryset = queryset.filter(date__lte=to_date)
+
+        return queryset.aggregate(total=Sum("amount"))["total"] or 0

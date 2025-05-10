@@ -39,3 +39,13 @@ class SafeTransaction(APIView):
                 return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class SafeIncomeTotalView(APIView):
+    def get(self, request):
+        branch_id = request.query_params.get("branch")
+        from_date = request.query_params.get("from")
+        to_date = request.query_params.get("to")
+
+        total_income = SafeService.get_total_income(branch_id, from_date, to_date)
+
+        return Response({"total_income": total_income}, status=status.HTTP_200_OK)
