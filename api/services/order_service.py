@@ -11,7 +11,6 @@ class OrderService:
     """
     Handles order and order item creation.
     """
-
     @staticmethod
     @transaction.atomic
     def create_order(order_data, order_items_data):
@@ -116,7 +115,6 @@ class OrderService:
             if bus_title_id is not None:
                 order.bus_title = BusSystemSetting.objects.get(pk=bus_title_id)
             
-
             for field in ['pd', 'height', 'right_height', 'left_height', 'left_pd', 'right_pd']:
                 if field in order_data:
                     setattr(order, field, order_data.get(field))

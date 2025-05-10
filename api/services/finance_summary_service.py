@@ -38,9 +38,10 @@ class DailyFinanceSummaryService:
             created_at__date=yesterday
         ))
 
-        yesterday_banking = DailyFinanceSummaryService._sum(BankDeposit.objects.filter(
+        yesterday_safe = DailyFinanceSummaryService._sum(SafeTransaction.objects.filter(
             branch_id=branch_id,
-            date=yesterday
+            date=yesterday,
+            transaction_type='income' 
         ))
 
         before_balance = (
@@ -49,7 +50,7 @@ class DailyFinanceSummaryService:
             yesterday_other_income
         ) - (
             yesterday_expenses +
-            yesterday_banking
+            yesterday_safe
         )
 
         # ========= TODAY (General)
@@ -74,12 +75,12 @@ class DailyFinanceSummaryService:
             created_at__date=date
         ))
 
-        today_banking_qs = BankDeposit.objects.select_related('bank_account').filter(
+        today_safe_qs = SafeTransaction.objects.filter(
             branch_id=branch_id,
-            date=date
+            date=date,
+            transaction_type='income'
         )
-        today_banking_total = DailyFinanceSummaryService._sum(today_banking_qs)
-
+        today_safe_total = DailyFinanceSummaryService._sum(today_safe_qs)
         today_banking_list = [
             {
                 "bank_name": deposit.bank_account.bank_name,
@@ -87,52 +88,12 @@ class DailyFinanceSummaryService:
                 "amount": deposit.amount,
                 "is_confirmed": deposit.is_confirmed,
             }
-            for deposit in today_banking_qs
+            for deposit in today_safe_qs
         ]
 
         today_income = today_order_payments + today_channel_payments + today_other_income
-        today_balance = today_income - (today_expenses + today_banking_total)
+        today_balance = today_income - (today_expenses + today_safe_total)
         cash_in_hold = before_balance + today_balance
-
-        # ========= SAFE LOCKER LOGIC
-        # Yesterday
-        yesterday_safe_income = DailyFinanceSummaryService._sum(SafeTransaction.objects.filter(
-            branch_id=branch_id,
-            date=yesterday,
-            transaction_type='income'
-        ))
-        yesterday_safe_expense = DailyFinanceSummaryService._sum(SafeTransaction.objects.filter(
-            branch_id=branch_id,
-            date=yesterday,
-            transaction_type='expense'
-        ))
-        yesterday_safe_deposit = DailyFinanceSummaryService._sum(SafeTransaction.objects.filter(
-            branch_id=branch_id,
-            date=yesterday,
-            transaction_type='deposit'
-        ))
-
-        safe_before_balance = yesterday_safe_income - (yesterday_safe_expense + yesterday_safe_deposit)
-
-        # Today
-        today_safe_income = DailyFinanceSummaryService._sum(SafeTransaction.objects.filter(
-            branch_id=branch_id,
-            date=date,
-            transaction_type='income'
-        ))
-        today_safe_expense = DailyFinanceSummaryService._sum(SafeTransaction.objects.filter(
-            branch_id=branch_id,
-            date=date,
-            transaction_type='expense'
-        ))
-        today_safe_deposit = DailyFinanceSummaryService._sum(SafeTransaction.objects.filter(
-            branch_id=branch_id,
-            date=date,
-            transaction_type='deposit'
-        ))
-
-        safe_today_balance = today_safe_income - (today_safe_expense + today_safe_deposit)
-        safe_cash_in_hold = safe_before_balance + safe_today_balance
 
         # ========= Final Summary
         return {
@@ -149,12 +110,4 @@ class DailyFinanceSummaryService:
             "today_balance": today_balance,
             "cash_in_hold": cash_in_hold,
             "available_for_deposit": cash_in_hold,
-
-            # -- Safe Locker --
-            "safe_before_balance": safe_before_balance,
-            "safe_income": today_safe_income,
-            "safe_expense": today_safe_expense,
-            "safe_deposit": today_safe_deposit,
-            "safe_today_balance": safe_today_balance,
-            "safe_cash_in_hold": safe_cash_in_hold,
         }
