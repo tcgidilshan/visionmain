@@ -106,6 +106,7 @@ class OrderService:
             order.discount = order_data.get('discount', order.discount)
             order.total_price = order_data.get('total_price', order.total_price)
             order.status = order_data.get('status', order.status)
+            order.progress_status = order_data.get('progress_status', order.progress_status)
             order.sales_staff_code_id = order_data.get('sales_staff_code', order.sales_staff_code_id)
             order.order_remark = order_data.get('order_remark', order.order_remark)
             order.user_date = order_data.get('user_date', order.user_date)

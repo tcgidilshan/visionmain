@@ -393,7 +393,8 @@ class OrderSerializer(serializers.ModelSerializer):
             'invoice_number',
             'user_date',
             'bus_title',
-            'bus_title_name'
+            'bus_title_name',
+            'progress_status',
         ] 
 
 class ExternalLensSerializer(serializers.ModelSerializer):

@@ -344,6 +344,16 @@ class LensCleanerStock(models.Model):
         return f"{self.lens_cleaner.name} - Qty: {self.qty} - Branch: {self.branch.branch_name if self.branch else 'N/A'}"
     
 class Order(models.Model):
+    progress_status = models.CharField(
+    max_length=30,
+    choices=[
+        ('received_from_customer', 'Received from Customer'),
+        ('issue_to_factory', 'Issued to Factory'),
+        ('received_from_factory', 'Received from Factory'),
+        ('issue_to_customer', 'Issued to Customer'),
+    ],
+    default='received_from_customer'
+    )
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('processing', 'Processing'),

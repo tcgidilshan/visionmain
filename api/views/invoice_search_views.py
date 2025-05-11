@@ -17,6 +17,7 @@ class FactoryInvoiceSearchView(APIView):
         mobile = request.query_params.get('mobile')
         nic = request.query_params.get('nic')
         branch_id = request.query_params.get('branch_id')
+        progress_status = request.query_params.get('progress_status')
 
         if not any([invoice_number, mobile, nic,branch_id]):
             return Response(
@@ -29,7 +30,8 @@ class FactoryInvoiceSearchView(APIView):
             invoice_number=invoice_number,
             mobile=mobile,
             nic=nic,
-            branch_id=branch_id
+            branch_id=branch_id,
+            progress_status=progress_status
         )
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(invoices, request)

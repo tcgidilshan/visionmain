@@ -9,23 +9,40 @@ class InvoiceProgressUpdateView(APIView):
 
     def patch(self, request, pk, *args, **kwargs):
         try:
-            invoice = Invoice.objects.get(pk=pk)
+            invoice = Invoice.objects.select_related('order').get(pk=pk)
 
             if invoice.invoice_type != 'factory':
                 return Response({"error": "This action is only allowed for factory invoices."},
                                 status=status.HTTP_400_BAD_REQUEST)
 
-            # Only allow updating progress-related fields
-            allowed_fields = {'lens_arrival_status', 'whatsapp_sent'}
+            order = invoice.order
+
+            allowed_fields = {'progress_status', 'lens_arrival_status', 'whatsapp_sent'}
             data = {k: v for k, v in request.data.items() if k in allowed_fields}
 
-            serializer = InvoiceSerializer(invoice, data=data, partial=True)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
+            # Split update targets
+            invoice_fields = {'lens_arrival_status', 'whatsapp_sent'}
+            order_fields = {'progress_status'}
+
+            invoice_data = {k: v for k, v in data.items() if k in invoice_fields}
+            order_data = {k: v for k, v in data.items() if k in order_fields}
+
+            # Update Invoice
+            if invoice_data:
+                invoice_serializer = InvoiceSerializer(invoice, data=invoice_data, partial=True)
+                invoice_serializer.is_valid(raise_exception=True)
+                invoice_serializer.save()
+
+            # Update Order
+            if order_data:
+                from api.serializers import OrderSerializer  # 🔁 Import as needed
+                order_serializer = OrderSerializer(order, data=order_data, partial=True)
+                order_serializer.is_valid(raise_exception=True)
+                order_serializer.save()
 
             return Response({
-                "message": "Invoice status updated successfully.",
-                "data": serializer.data
+                "message": "Status updated successfully.",
+                "invoice": InvoiceSerializer(invoice).data
             }, status=status.HTTP_200_OK)
 
         except Invoice.DoesNotExist:
@@ -43,8 +60,9 @@ class BulkInvoiceProgressUpdateView(APIView):
                 return Response({"error": "No invoice IDs provided."}, 
                                 status=status.HTTP_400_BAD_REQUEST)
 
-            # Fetch invoices that are of type 'factory' and match the provided IDs
-            invoices = Invoice.objects.filter(id__in=invoice_ids, invoice_type='factory')
+            invoices = Invoice.objects.select_related('order').filter(
+                id__in=invoice_ids, invoice_type='factory'
+            )
             found_ids = set(invoices.values_list('id', flat=True))
             missing_ids = set(invoice_ids) - found_ids
 
@@ -54,37 +72,44 @@ class BulkInvoiceProgressUpdateView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Extract allowed fields from request data
-            allowed_fields = {'lens_arrival_status', 'whatsapp_sent'}
-            data_to_update = {k: v for k, v in request.data.items() if k in allowed_fields}
+            # Separate invoice/order fields
+            allowed_invoice_fields = {'lens_arrival_status', 'whatsapp_sent'}
+            allowed_order_fields = {'progress_status'}
 
-            if not data_to_update:
+            invoice_data = {k: v for k, v in request.data.items() if k in allowed_invoice_fields}
+            order_data = {k: v for k, v in request.data.items() if k in allowed_order_fields}
+
+            if not (invoice_data or order_data):
                 return Response({"error": "No valid fields to update."},
                                 status=status.HTTP_400_BAD_REQUEST)
 
-            # Validate data for each invoice and prepare for bulk update
             updated_invoices = []
+            updated_orders = []
+
             for invoice in invoices:
-                serializer = InvoiceSerializer(invoice, data=data_to_update, partial=True)
-                serializer.is_valid(raise_exception=True)  # Validate each invoice
-                # Manually update the instance
-                for field, value in data_to_update.items():
+                # Update invoice fields
+                for field, value in invoice_data.items():
                     setattr(invoice, field, value)
                 updated_invoices.append(invoice)
 
-            # Perform bulk update
-            Invoice.objects.bulk_update(updated_invoices, fields=data_to_update.keys())
+                # Update order fields
+                if invoice.order and order_data:
+                    for field, value in order_data.items():
+                        setattr(invoice.order, field, value)
+                    updated_orders.append(invoice.order)
 
-            # Serialize the response
-            serializer = InvoiceSerializer(updated_invoices, many=True)
+            # Bulk update both models
+            if updated_invoices:
+                Invoice.objects.bulk_update(updated_invoices, fields=invoice_data.keys())
+            if updated_orders:
+                from api.models import Order  # in case not imported
+                Order.objects.bulk_update(updated_orders, fields=order_data.keys())
+
             return Response({
-                "message": f"Successfully updated {len(updated_invoices)} invoices.",
-                "data": serializer.data
+                "message": f"Updated {len(updated_invoices)} invoices.",
+                "updated_ids": list(found_ids)
             }, status=status.HTTP_200_OK)
 
-        except Invoice.DoesNotExist:
-            return Response({"error": "One or more invoices not found."},
-                            status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, 
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
