@@ -64,3 +64,15 @@ class SafeService:
             queryset = queryset.filter(date__lte=to_date)
 
         return queryset.aggregate(total=Sum("amount"))["total"] or 0
+    
+    @staticmethod
+    def get_total_safe(branch_id=None):
+        if branch_id:
+            try:
+                balance = SafeBalance.objects.get(branch_id=branch_id).balance
+                return balance or Decimal('0.00')
+            except SafeBalance.DoesNotExist:
+                return Decimal('0.00')
+        else:
+            return SafeBalance.objects.aggregate(total=Sum('balance'))['total'] or Decimal('0.00')
+

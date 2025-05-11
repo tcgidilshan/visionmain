@@ -49,3 +49,10 @@ class SafeIncomeTotalView(APIView):
         total_income = SafeService.get_total_income(branch_id, from_date, to_date)
 
         return Response({"total_income": total_income}, status=status.HTTP_200_OK)
+class SafeAll(APIView):
+    def get(self, request):
+            branch_id = request.query_params.get("branch")
+            total_safe = SafeService.get_total_safe(branch_id)
+            return Response({"total_balance": total_safe}, status=status.HTTP_200_OK)
+
+
