@@ -345,15 +345,18 @@ class LensCleanerStock(models.Model):
     
 class Order(models.Model):
     progress_status = models.CharField(
-    max_length=30,
-    choices=[
-        ('received_from_customer', 'Received from Customer'),
-        ('issue_to_factory', 'Issued to Factory'),
-        ('received_from_factory', 'Received from Factory'),
-        ('issue_to_customer', 'Issued to Customer'),
-    ],
-    default='received_from_customer'
+        max_length=30,
+        choices=[
+            ('received_from_customer', 'Received from Customer'),
+            ('issue_to_factory', 'Issued to Factory'),
+            ('received_from_factory', 'Received from Factory'),
+            ('issue_to_customer', 'Issued to Customer'),
+        ],
+        default='received_from_customer',
+        null=True,
+        blank=True
     )
+
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('processing', 'Processing'),
@@ -442,7 +445,6 @@ class Invoice(models.Model):
     )
 
     whatsapp_sent = models.BooleanField(default=False)
-
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="invoice")
     invoice_type = models.CharField(max_length=10, choices=INVOICE_TYPES)  #  Identifies invoice type
     daily_invoice_no = models.CharField(max_length=10,null=True, blank=True)  #  Factory invoices get a daily number
