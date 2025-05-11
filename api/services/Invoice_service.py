@@ -15,7 +15,6 @@ class InvoiceService:
         Generates an invoice for the given order.
         Assigns a daily invoice number for factory invoices.
         """
-
         # ✅ Step 1: Determine Invoice Type
         if RefractionDetails.objects.filter(refraction_id=order.refraction_id).exists():
             invoice_type = "factory"  # ✅ Factory if refraction details exist
@@ -83,6 +82,8 @@ class InvoiceService:
         qs = Invoice.objects.filter(invoice_type='factory')
 
         # Handle invoice_number filtering by user branch
+        if branch_id:
+            qs = qs.filter(order__branch_id=branch_id)
         if invoice_number:
             user_branches = user.user_branches.all().values_list('branch_id', flat=True)
             if not user_branches:
@@ -102,14 +103,25 @@ class InvoiceService:
         return qs.select_related('order', 'order__customer').order_by('-invoice_date')
     
     @staticmethod
-    def get_invoice_by_invoice_number(invoice_type, invoice_number):
+    def get_invoice_by_invoice_number(invoice_type, invoice_number, is_frame_only=None):
         try:
-            invoice = Invoice.objects.select_related('order__customer', 'order__refraction').get(
-                invoice_type=invoice_type,
-                invoice_number=invoice_number
-            )
+            filters = {
+                "invoice_type__iexact": invoice_type,
+                "invoice_number": invoice_number
+            }
+
+            if is_frame_only is not None:
+                filters["order__is_frame_only"] = int(is_frame_only)
+
+            invoice = Invoice.objects.select_related(
+                "order__customer", "order__refraction"
+            ).get(**filters)
+
             return InvoiceSerializer(invoice).data
+
         except Invoice.DoesNotExist:
             raise NotFound("Invoice not found with the given type and number.")
+
+
 
 

@@ -34,19 +34,20 @@ from .views import (
     DoctorListCreateView,
     DoctorRetrieveUpdateDeleteView,
     PatientListView,
-    PatientUpdateView,# Added by Lahiru
+    PatientUpdateView,
     ChannelAppointmentView,
     ChannelListView,
+    DoctorAppointmentTimeListView,
     AppointmentRetrieveUpdateDeleteView,
     LensStockListCreateView,
     LensStockRetrieveUpdateDeleteView,
-    LensTypeListCreateView,
+    LensTypeListCreateView,SafeTransaction,
     LensTypeRetrieveUpdateDeleteView,ExternalLensCoatingListCreateView,
     ExternalLensCoatingRetrieveUpdateDeleteView,
     LensCoatingListCreateView,ExternalLensBrandListCreateView,
-    ExternalLensBrandRetrieveUpdateDeleteView,
+    ExternalLensBrandRetrieveUpdateDeleteView,SafeIncomeTotalView,
     LensCoatingRetrieveUpdateDeleteView,FrameOnlyOrderCreateView,
-    ManualOrderCreateView,DoctorAppointmentTransferView,
+    ManualOrderCreateView,DoctorAppointmentTransferView,ChannelRepaymentView,
     InvoiceDetailView,BankDepositListCreateView,BankDepositRetrieveUpdateView,BankDepositConfirmView,
     OrderUpdateView,DailyFinanceSummaryView,FrameReportView,
     RefractionDetailRetrieveUpdateDeleteView,BusSystemSettingListCreateView,BusSystemSettingRetrieveUpdateDeleteView,
@@ -56,8 +57,8 @@ from .views import (
     OtherItemListCreateView,BankAccountListCreateView,BankAccountRetrieveUpdateDeleteView,
     OtherItemRetrieveUpdateDeleteView,ExpenseCreateView,ExpenseUpdateView,
     CreateUserView,ExpenseMainCategoryListCreateView, ExpenseMainCategoryRetrieveUpdateDestroyView,
-    ExpenseSubCategoryListCreateView, ExpenseSubCategoryRetrieveUpdateDestroyView,
-    UserCodeCheckView,ChannelTransferView,DoctorAbsenceRescheduleView,ExpenseReportView,
+    ExpenseSubCategoryListCreateView, ExpenseSubCategoryRetrieveUpdateDestroyView,ExpenseRetrieveView,
+    UserCodeCheckView,ChannelTransferView,DoctorAbsenceRescheduleView,ExpenseReportView,FrameOnlyOrderUpdateView,
     UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,
     AdminCodeCheckView,ChannelReportView,DoctorScheduleCreateView,DoctorUpcomingScheduleView,DoctorScheduleTransferView,AllRoleCheckView,
     UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,BulkInvoiceProgressUpdateView,
@@ -86,6 +87,9 @@ urlpatterns = [
 
     path('other-incomes/', OtherIncomeListCreateView.as_view(), name='other-income-list'),
     path('other-incomes/<int:pk>/', OtherIncomeRetrieveUpdateDeleteView.as_view(), name='other-income-detail'),
+
+    path("safe/transactions/", SafeTransaction.as_view(), name="safe-transaction-create"),#safe
+    path('safe/income-total/', SafeIncomeTotalView.as_view(), name='safe-income-total'),
 
     #bank deposit
     path('bank-deposits/', BankDepositListCreateView.as_view(), name='bank-deposit-list'),
@@ -151,6 +155,7 @@ urlpatterns = [
 
     #frame only
     path('orders/frame-only/', FrameOnlyOrderCreateView.as_view(), name='frame-only-order-create'),
+    path('orders/frame-only/<int:pk>/update/', FrameOnlyOrderUpdateView.as_view(), name='frame-only-update'),
 
     path('invoices/<int:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'), #invoice
     path('invoices/', InvoiceDetailView.as_view(), name='invoice-by-order'),  # ✅ Filter by order_id
@@ -172,8 +177,12 @@ urlpatterns = [
     path('patients/<int:pk>/', PatientUpdateView.as_view(), name='patient-update'),
     path('channel/', ChannelAppointmentView.as_view(), name='channel-appointment'),
     path('channels/', ChannelListView.as_view(), name='channel-list'),
+    path('channels/time-slots/', DoctorAppointmentTimeListView.as_view(), name='doctor-appointment-time-list'),#time slots
     path('channels/<int:pk>/', AppointmentRetrieveUpdateDeleteView.as_view(), name='appointment-detail'),
     path("channel/transfer/", ChannelTransferView.as_view(), name="channel-transfer"),
+
+    #channel repayment
+    path('channel/repayments/', ChannelRepaymentView.as_view(), name='channel-repayments'),
     path('doctor/transfer-appointments/', DoctorAppointmentTransferView.as_view(), name='doctor-appointment-transfer'), #appointment trans
     path('lens-stocks/', LensStockListCreateView.as_view(), name='lens-stock-list-create'),
     path('lens-stocks/<int:pk>/', LensStockRetrieveUpdateDeleteView.as_view(), name='lens-stock-detail'),
@@ -195,11 +204,11 @@ urlpatterns = [
     path("expenses/report/", ExpenseReportView.as_view(), name="expense-report"),
 
     path('expenses/<int:pk>/update/', ExpenseUpdateView.as_view(), name='expense-update'),
+    path('expenses/<int:pk>/', ExpenseRetrieveView.as_view(), name='expense-detail'),
 
     #bus
     path('bus/title/', BusSystemSettingListCreateView.as_view(), name='bus-system-title-list-create'),
     path('bus/title/<int:pk>/', BusSystemSettingRetrieveUpdateDeleteView.as_view(), name='bus-system-title-rud'),
-
 
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),

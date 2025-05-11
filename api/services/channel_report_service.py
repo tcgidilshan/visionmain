@@ -29,6 +29,7 @@ class ChannelReportService:
                     "total_paid": 0,
                     "total_due": float(payment.appointment.amount),  # channeling_fee
                     "balance": 0,
+                    'appointment_id': payment.appointment_id
                 }
 
             method = payment.payment_method
