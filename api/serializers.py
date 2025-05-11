@@ -807,6 +807,17 @@ class FrameOnlyOrderSerializer(serializers.Serializer):
     payments = serializers.ListField(required=False, write_only=True)  
 
     status = serializers.CharField(required=False, default='pending')
+    progress_status = serializers.ChoiceField(
+        choices=[
+            ('received_from_customer', 'Received from Customer'),
+            ('issue_to_factory', 'Issued to Factory'),
+            ('received_from_factory', 'Received from Factory'),
+            ('issue_to_customer', 'Issued to Customer'),
+        ],
+        required=False,
+        allow_null=True,
+        default='received_from_customer'
+    )
     sub_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     discount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0.00)
     total_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
