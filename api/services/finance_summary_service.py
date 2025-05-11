@@ -12,7 +12,7 @@ class DailyFinanceSummaryService:
     @staticmethod
     def get_summary(branch_id, date=None):
         if date is None:
-            date = date.today()
+            date = timezone.localdate()
 
         yesterday = date - timedelta(days=1)
 
@@ -38,20 +38,12 @@ class DailyFinanceSummaryService:
             created_at__date=yesterday
         ))
 
-        yesterday_safe = DailyFinanceSummaryService._sum(SafeTransaction.objects.filter(
-            branch_id=branch_id,
-            date=yesterday,
-            transaction_type='income' 
-        ))
-
+        # ✅ DO NOT subtract safe income — it's already part of income
         before_balance = (
             yesterday_order_payments +
             yesterday_channel_payments +
             yesterday_other_income
-        ) - (
-            yesterday_expenses +
-            yesterday_safe
-        )
+        ) - yesterday_expenses
 
         # ========= TODAY (General)
         today_order_payments = DailyFinanceSummaryService._sum(OrderPayment.objects.filter(
@@ -75,12 +67,14 @@ class DailyFinanceSummaryService:
             created_at__date=date
         ))
 
-        today_safe_qs = SafeTransaction.objects.filter(
+        # ✅ Correct banking section
+        today_banking_qs = BankDeposit.objects.select_related('bank_account').filter(
             branch_id=branch_id,
-            date=date,
-            transaction_type='income'
+            date=date
         )
-        today_safe_total = DailyFinanceSummaryService._sum(today_safe_qs)
+
+        today_banking_total = DailyFinanceSummaryService._sum(today_banking_qs)
+
         today_banking_list = [
             {
                 "bank_name": deposit.bank_account.bank_name,
@@ -88,14 +82,13 @@ class DailyFinanceSummaryService:
                 "amount": deposit.amount,
                 "is_confirmed": deposit.is_confirmed,
             }
-            for deposit in today_safe_qs
+            for deposit in today_banking_qs
         ]
 
         today_income = today_order_payments + today_channel_payments + today_other_income
-        today_balance = today_income - (today_expenses + today_safe_total)
+        today_balance = today_income - (today_expenses + today_banking_total)
         cash_in_hold = before_balance + today_balance
 
-        # ========= Final Summary
         return {
             "branch": branch_id,
             "date": str(date),
@@ -109,5 +102,5 @@ class DailyFinanceSummaryService:
             "today_banking": today_banking_list,
             "today_balance": today_balance,
             "cash_in_hold": cash_in_hold,
-            "available_for_deposit": cash_in_hold,
+            "available_for_deposit": cash_in_hold
         }
