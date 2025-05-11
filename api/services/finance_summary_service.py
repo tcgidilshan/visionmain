@@ -35,7 +35,8 @@ class DailyFinanceSummaryService:
 
         yesterday_expenses = DailyFinanceSummaryService._sum(Expense.objects.filter(
             branch_id=branch_id,
-            created_at__date=yesterday
+            created_at__date=yesterday,
+            paid_source ='cash'
         ))
 
         yesterday_safe = DailyFinanceSummaryService._sum(SafeTransaction.objects.filter(
@@ -70,7 +71,8 @@ class DailyFinanceSummaryService:
 
         today_expenses = DailyFinanceSummaryService._sum(Expense.objects.filter(
             branch_id=branch_id,
-            created_at__date=date
+            created_at__date=date,
+            paid_source = 'cash'
         ))
 
         today_safe_qs = SafeTransaction.objects.filter(
@@ -85,9 +87,7 @@ class DailyFinanceSummaryService:
             branch_id=branch_id,
             date=date
         )
-
         today_banking_total = DailyFinanceSummaryService._sum(today_banking_qs)
-
         today_banking_list = [
             {
                 "bank_name": deposit.bank_account.bank_name,
@@ -115,5 +115,6 @@ class DailyFinanceSummaryService:
             "today_banking": today_banking_list,
             "today_balance": today_balance,
             "cash_in_hold": cash_in_hold,
-            "available_for_deposit": cash_in_hold
+            "available_for_deposit": cash_in_hold,
+            "today_banking_total":today_banking_total
         }

@@ -702,7 +702,7 @@ class Expense(models.Model):
     ('cash', 'Cash'),
     ('bank', 'Bank'),
     ]
-    paid_source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='safe')
+    paid_source = models.CharField(max_length=20, choices=SOURCE_CHOICES)
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE)
     main_category = models.ForeignKey(ExpenseMainCategory, on_delete=models.CASCADE)
     sub_category = models.ForeignKey(ExpenseSubCategory, on_delete=models.CASCADE)
