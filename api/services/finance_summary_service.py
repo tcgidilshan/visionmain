@@ -38,12 +38,18 @@ class DailyFinanceSummaryService:
             created_at__date=yesterday
         ))
 
+        yesterday_safe = DailyFinanceSummaryService._sum(SafeTransaction.objects.filter(
+            branch_id=branch_id,
+            date=yesterday,
+            transaction_type='income' 
+        ))
+
         # ✅ DO NOT subtract safe income — it's already part of income
         before_balance = (
             yesterday_order_payments +
             yesterday_channel_payments +
             yesterday_other_income
-        ) - yesterday_expenses
+        ) - (yesterday_expenses + yesterday_safe)
 
         # ========= TODAY (General)
         today_order_payments = DailyFinanceSummaryService._sum(OrderPayment.objects.filter(
@@ -67,6 +73,13 @@ class DailyFinanceSummaryService:
             created_at__date=date
         ))
 
+        today_safe_qs = SafeTransaction.objects.filter(
+            branch_id=branch_id,
+            date=date,
+            transaction_type='income'
+        )
+        today_safe_total = DailyFinanceSummaryService._sum(today_safe_qs)
+
         # ✅ Correct banking section
         today_banking_qs = BankDeposit.objects.select_related('bank_account').filter(
             branch_id=branch_id,
@@ -86,7 +99,7 @@ class DailyFinanceSummaryService:
         ]
 
         today_income = today_order_payments + today_channel_payments + today_other_income
-        today_balance = today_income - (today_expenses + today_banking_total)
+        today_balance = today_income - (today_expenses + today_safe_total)
         cash_in_hold = before_balance + today_balance
 
         return {

@@ -16,7 +16,7 @@ class InvoiceProgressUpdateView(APIView):
                                 status=status.HTTP_400_BAD_REQUEST)
 
             # Only allow updating progress-related fields
-            allowed_fields = {'progress_status', 'lens_arrival_status', 'whatsapp_sent'}
+            allowed_fields = {'lens_arrival_status', 'whatsapp_sent'}
             data = {k: v for k, v in request.data.items() if k in allowed_fields}
 
             serializer = InvoiceSerializer(invoice, data=data, partial=True)
@@ -55,7 +55,7 @@ class BulkInvoiceProgressUpdateView(APIView):
                 )
 
             # Extract allowed fields from request data
-            allowed_fields = {'progress_status', 'lens_arrival_status', 'whatsapp_sent'}
+            allowed_fields = {'lens_arrival_status', 'whatsapp_sent'}
             data_to_update = {k: v for k, v in request.data.items() if k in allowed_fields}
 
             if not data_to_update:

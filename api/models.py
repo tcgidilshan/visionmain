@@ -425,17 +425,6 @@ class Invoice(models.Model):
         ('manual', 'Manual Invoice')  # Linked to an order without refraction
     ]
 
-    progress_status = models.CharField(
-        max_length=30,
-        choices=[
-            ('received_from_customer', 'Received from Customer'),
-            ('issue_to_factory', 'Issued to Factory'),
-            ('received_from_factory', 'Received from Factory'),
-            ('issue_to_customer', 'Issued to Customer'),
-        ],
-        default='received_from_customer'
-    )
-
     lens_arrival_status = models.CharField(
         max_length=20,
         choices=[('received', 'Received'), ('not_received', 'Not Received')],

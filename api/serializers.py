@@ -479,7 +479,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'order_details',  #  Full order details (optional)
 
               #  NEW fields for tracking factory invoice progress
-            'progress_status',
             'lens_arrival_status',
             'whatsapp_sent',
         ]
@@ -684,7 +683,6 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
             'invoice_number',
             'invoice_date',
             'total_price',
-            'progress_status',
             'lens_arrival_status',
             'whatsapp_sent',
             'fitting_on_collection',
