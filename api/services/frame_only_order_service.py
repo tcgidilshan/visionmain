@@ -19,6 +19,7 @@ class FrameOnlyOrderService:
         price_per_unit = data["price_per_unit"]
         branch_id = data["branch_id"]
         sales_staff_code = data.get("sales_staff_code", None)
+        progress_status = data.get("progress_status", None)
 
         # 🧠 Step 1: Get or create patient
         customer = None
@@ -51,6 +52,7 @@ class FrameOnlyOrderService:
             total_price=total_price,
             discount=discount,
             status=data.get("status", "pending"),
+            progress_status=data.get("progress_status"),
             user_date=date.today()
         )
 
@@ -173,6 +175,7 @@ class FrameOnlyOrderService:
         order.discount = discount
         order.total_price = total_price
         order.status = data.get("status", order.status)
+        order.progress_status = data.get("progress_status", order.progress_status)
         order.save()
 
         # 🔹 Step 6: Replace order item
