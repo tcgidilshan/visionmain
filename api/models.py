@@ -765,5 +765,21 @@ class SafeTransaction(models.Model):
         return f"{self.branch.branch_name} – {self.transaction_type} – LKR {self.amount} on {self.date}"
 
 
+class DoctorClaimInvoice(models.Model):
+    invoice_number = models.CharField(max_length=20, unique=True)  
+    created_at = models.DateTimeField(auto_now_add=True)
+    branch = models.ForeignKey("Branch", on_delete=models.CASCADE, related_name="doctor_claim_invoices")
+    
+    def __str__(self):
+        return f"{self.invoice_number} on {self.date}"
+
+class DoctorClaimChannel(models.Model):
+    invoice_number = models.CharField(max_length=20,)  
+    created_at = models.DateTimeField(auto_now_add=True)
+    branch = models.ForeignKey("Branch", on_delete=models.CASCADE, related_name="doctor_claim_channels")
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name="doctor_claim_channels")
+
+    def __str__(self):
+        return f"{self.invoice_number} on {self.date}"
 
     

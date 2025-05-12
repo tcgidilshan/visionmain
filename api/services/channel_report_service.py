@@ -23,6 +23,7 @@ class ChannelReportService:
                 results[appt_id] = {
                     "channel_id": appt_id,
                     "channel_no": payment.appointment.channel_no,
+                    "invoice_number": payment.appointment.invoice_number,
                     "amount_cash": 0,
                     "amount_credit_card": 0,
                     "amount_online": 0,

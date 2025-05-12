@@ -62,6 +62,8 @@ from .views import (
     UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,
     AdminCodeCheckView,ChannelReportView,DoctorScheduleCreateView,DoctorUpcomingScheduleView,DoctorScheduleTransferView,AllRoleCheckView,
     UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,BulkInvoiceProgressUpdateView,
+    DoctorClaimInvoiceListCreateView,DoctorClaimInvoiceRetrieveUpdateDestroyView,
+    DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView
 )
 # from .views import CustomAuthToken
 
@@ -211,6 +213,13 @@ urlpatterns = [
     #bus
     path('bus/title/', BusSystemSettingListCreateView.as_view(), name='bus-system-title-list-create'),
     path('bus/title/<int:pk>/', BusSystemSettingRetrieveUpdateDeleteView.as_view(), name='bus-system-title-rud'),
+
+    #doctor-claim
+    path('doctor-claims-invoices/', DoctorClaimInvoiceListCreateView.as_view(), name='doctor-claim-invoice-list-create'),
+    path('doctor-claims-invoices/<int:pk>/', DoctorClaimInvoiceRetrieveUpdateDestroyView.as_view(), name='doctor-claim-invoice-rud'),
+
+    path('doctor-claims-channels/', DoctorClaimChannelListCreateView.as_view(), name='doctor-claim-channel-list-create'),
+    path('doctor-claims-channels/<int:pk>/', DoctorClaimChannelRetrieveUpdateDestroyView.as_view(), name='doctor-claim-channel-rud'),
 
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),

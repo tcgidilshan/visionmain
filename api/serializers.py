@@ -31,7 +31,8 @@ from .models import (
     ExternalLens,BusSystemSetting,
     OtherItem,BankAccount,BankDeposit,
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
-    UserBranch,ExpenseMainCategory, ExpenseSubCategory
+    UserBranch,ExpenseMainCategory, ExpenseSubCategory,
+    DoctorClaimInvoice,DoctorClaimChannel
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -895,3 +896,29 @@ class SafeTransactionSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["date", "created_at"]
+
+class DoctorClaimInvoiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DoctorClaimInvoice
+        fields = [
+            "id",
+            "invoice_number",
+            "created_at",
+            "branch",
+        ]
+        read_only_fields = ["created_at"]
+
+class DoctorClaimChannelSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source="doctor.name", read_only=True)
+    class Meta:
+        model = DoctorClaimChannel
+        fields = [
+            "id",
+            "invoice_number",
+            "created_at",
+            "branch",
+            "doctor",
+            "doctor_name"
+        ]
+        read_only_fields = ["created_at"]
+
