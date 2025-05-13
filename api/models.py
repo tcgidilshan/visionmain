@@ -444,7 +444,7 @@ class Invoice(models.Model):
         null=True, blank=True
     )
 
-    whatsapp_sent = models.BooleanField(default=False)
+    
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="invoice")
     invoice_type = models.CharField(max_length=10, choices=INVOICE_TYPES)  #  Identifies invoice type
     daily_invoice_no = models.CharField(max_length=10,null=True, blank=True)  #  Factory invoices get a daily number
@@ -525,7 +525,14 @@ class OrderItem(models.Model):
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     is_non_stock = models.BooleanField(default=False)  # ✅ Mark Non-Stock Items
     note = models.TextField(blank=True, null=True)
-
+    whatsapp_sent = models.CharField(max_length=20,
+    choices=[
+        ('sent', 'Sent'),
+        ('not_sent', 'Not Sent'),
+    ],
+    null=True,
+    blank=True
+    )
     def save(self, *args, **kwargs):
        # Dynamically calculate subtotal on save
        self.subtotal = self.quantity * self.price_per_unit

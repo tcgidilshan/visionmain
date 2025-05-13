@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from api.models import Invoice,Order
+from api.models import Invoice,Order,OrderItem
 from api.serializers import InvoiceSerializer
 
 class InvoiceProgressUpdateView(APIView):
@@ -51,6 +51,8 @@ class InvoiceProgressUpdateView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 class BulkUpdateOrderProgressStatus(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
     def patch(self, request, *args, **kwargs):
         order_ids = request.data.get('order_ids')
         new_status = request.data.get('progress_status')
@@ -70,3 +72,22 @@ class BulkUpdateOrderProgressStatus(APIView):
             'progress_status': new_status,
             'order_ids': order_ids
         }, status=status.HTTP_200_OK)
+class BulkUpdateOrderWhatAppMsgSent(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    def patch(self, request):
+        order_ids = request.data.get('order_ids', [])
+        whatsapp_sent = request.data.get('whatsapp_sent')
+
+        if not order_ids or whatsapp_sent not in ['sent', 'not_sent']:
+            return Response(
+                {"error": "Invalid input. Provide 'order_ids' and a valid 'whatsapp_sent' value ('sent' or 'not_sent')."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Filter and bulk update
+        updated_count = OrderItem.objects.filter(order_id__in=order_ids).update(whatsapp_sent=whatsapp_sent)
+
+        return Response(
+            {"message": f"Updated {updated_count} order items successfully."},
+            status=status.HTTP_200_OK
+        )

@@ -483,7 +483,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
               #  NEW fields for tracking factory invoice progress
             'lens_arrival_status',
-            'whatsapp_sent',
         ]
 
     def get_refraction_details(self, obj):
@@ -927,3 +926,42 @@ class DoctorClaimChannelSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["created_at"]
 
+# serializers.py
+
+class ExternalLensOrderItemSerializer(serializers.ModelSerializer):
+    order_id = serializers.IntegerField(source='order.id', read_only=True)
+    invoice_number = serializers.CharField(source='order.invoice.invoice_number', read_only=True)
+    invoice_date = serializers.DateTimeField(source='order.invoice.invoice_date', read_only=True)
+    branch_name = serializers.CharField(source='order.branch.branch_name', read_only=True)
+    customer_name = serializers.CharField(source='order.customer.name', read_only=True)
+    progress_status = serializers.CharField(
+        source='order.progress_status', read_only=True
+    )
+    total_price = serializers.CharField(
+        source='order.total_price', read_only=True
+    )
+    fitting_on_collection = serializers.BooleanField(
+        source='order.fitting_on_collection', read_only=True
+    )
+    on_hold = serializers.BooleanField(
+        source='order.on_hold', read_only=True
+    )
+    payments = serializers.SerializerMethodField()
+    class Meta:
+        model = OrderItem
+        fields = [
+            'id', 'external_lens', 'quantity', 'price_per_unit', 'subtotal',
+            'whatsapp_sent',
+            'order_id', 'invoice_number', 'invoice_date', 'branch_name','customer_name',
+            'progress_status', 'total_price', 'fitting_on_collection', 'on_hold', 'payments'
+        ]
+    def get_payments(self, obj):
+            # Get the order related to this invoice
+            order = obj.order
+            if order:
+                # Get all payments related to this order
+                payments = order.orderpayment_set.all()
+                # Serialize them
+                from .serializers import OrderPaymentSerializer  # Avoid circular import if needed
+                return OrderPaymentSerializer(payments, many=True).data
+            return []
