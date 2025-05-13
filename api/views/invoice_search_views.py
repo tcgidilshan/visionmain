@@ -19,7 +19,7 @@ class FactoryInvoiceSearchView(APIView):
         branch_id = request.query_params.get('branch_id')
         progress_status = request.query_params.get('progress_status')
 
-        if not any([invoice_number, mobile, nic,branch_id]):
+        if not any([invoice_number, mobile, nic,branch_id,progress_status]):
             return Response(
                 {"error": "Please provide at least one search parameter: invoice_number, mobile, or nic."},
                 status=status.HTTP_400_BAD_REQUEST

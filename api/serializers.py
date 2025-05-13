@@ -139,6 +139,7 @@ class FrameSerializer(serializers.ModelSerializer):
             'image',
             'brand_type',
             'brand_type_display',
+            'is_active',
         ]
         
 class FrameStockSerializer(serializers.ModelSerializer):
@@ -174,7 +175,7 @@ class LensSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lens
-        fields = ['id', 'type', 'coating', 'price','brand', 'brand_name','type_name','coating_name']
+        fields = ['id', 'type', 'coating', 'price','brand', 'brand_name','type_name','coating_name','is_active']
 
     def validate(self, data):
         if 'brand' not in data:
@@ -668,6 +669,9 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
     decimal_places=2,  # Use the same as your model
     read_only=True
 )
+    progress_status = serializers.CharField(
+        source='order.progress_status', read_only=True
+    )
     fitting_on_collection = serializers.BooleanField(
         source='order.fitting_on_collection', read_only=True
     )
@@ -689,7 +693,8 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
             'whatsapp_sent',
             'fitting_on_collection',
             'on_hold',
-            'payments'
+            'payments',
+            'progress_status'
         ]
     def get_payments(self, obj):
             # Get the order related to this invoice

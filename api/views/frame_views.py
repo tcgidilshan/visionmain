@@ -12,11 +12,25 @@ class FrameListCreateView(generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        List all frames along with their stock details across different branches.
+        List frames with optional status filter (?status=active|inactive|all).
+        Includes stock information for the branch.
         """
         branch = BranchProtectionsService.validate_branch_id(request)
-        frames = self.get_queryset().filter(is_active=True)
+        status_filter = request.query_params.get("status", "active").lower()
 
+        frames = self.get_queryset()
+
+        if status_filter == "active":
+            frames = frames.filter(is_active=True)
+        elif status_filter == "inactive":
+            frames = frames.filter(is_active=False)
+        elif status_filter == "all":
+            pass  # no filter
+        else:
+            return Response(
+                {"error": "Invalid status filter. Use 'active', 'inactive', or 'all'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         data = []
 
         for frame in frames:
