@@ -689,7 +689,6 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
             'invoice_date',
             'total_price',
             'lens_arrival_status',
-            'whatsapp_sent',
             'fitting_on_collection',
             'on_hold',
             'payments',
