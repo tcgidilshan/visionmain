@@ -444,7 +444,7 @@ class Invoice(models.Model):
         null=True, blank=True
     )
 
-    whatsapp_sent = models.BooleanField(default=False)
+    
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="invoice")
     invoice_type = models.CharField(max_length=10, choices=INVOICE_TYPES)  #  Identifies invoice type
     daily_invoice_no = models.CharField(max_length=10,null=True, blank=True)  #  Factory invoices get a daily number
@@ -525,7 +525,14 @@ class OrderItem(models.Model):
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     is_non_stock = models.BooleanField(default=False)  # ✅ Mark Non-Stock Items
     note = models.TextField(blank=True, null=True)
-
+    whatsapp_sent = models.CharField(max_length=20,
+    choices=[
+        ('sent', 'Sent'),
+        ('not_sent', 'Not Sent'),
+    ],
+    null=True,
+    blank=True
+    )
     def save(self, *args, **kwargs):
        # Dynamically calculate subtotal on save
        self.subtotal = self.quantity * self.price_per_unit
@@ -765,5 +772,21 @@ class SafeTransaction(models.Model):
         return f"{self.branch.branch_name} – {self.transaction_type} – LKR {self.amount} on {self.date}"
 
 
+class DoctorClaimInvoice(models.Model):
+    invoice_number = models.CharField(max_length=20, unique=True)  
+    created_at = models.DateTimeField(auto_now_add=True)
+    branch = models.ForeignKey("Branch", on_delete=models.CASCADE, related_name="doctor_claim_invoices")
+    
+    def __str__(self):
+        return f"{self.invoice_number} on {self.date}"
+
+class DoctorClaimChannel(models.Model):
+    invoice_number = models.CharField(max_length=20,)  
+    created_at = models.DateTimeField(auto_now_add=True)
+    branch = models.ForeignKey("Branch", on_delete=models.CASCADE, related_name="doctor_claim_channels")
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name="doctor_claim_channels")
+
+    def __str__(self):
+        return f"{self.invoice_number} on {self.date}"
 
     

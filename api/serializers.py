@@ -31,7 +31,8 @@ from .models import (
     ExternalLens,BusSystemSetting,
     OtherItem,BankAccount,BankDeposit,
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
-    UserBranch,ExpenseMainCategory, ExpenseSubCategory
+    UserBranch,ExpenseMainCategory, ExpenseSubCategory,
+    DoctorClaimInvoice,DoctorClaimChannel
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -138,6 +139,7 @@ class FrameSerializer(serializers.ModelSerializer):
             'image',
             'brand_type',
             'brand_type_display',
+            'is_active',
         ]
         
 class FrameStockSerializer(serializers.ModelSerializer):
@@ -173,7 +175,7 @@ class LensSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lens
-        fields = ['id', 'type', 'coating', 'price','brand', 'brand_name','type_name','coating_name']
+        fields = ['id', 'type', 'coating', 'price','brand', 'brand_name','type_name','coating_name','is_active']
 
     def validate(self, data):
         if 'brand' not in data:
@@ -481,7 +483,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
               #  NEW fields for tracking factory invoice progress
             'lens_arrival_status',
-            'whatsapp_sent',
         ]
 
     def get_refraction_details(self, obj):
@@ -667,6 +668,9 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
     decimal_places=2,  # Use the same as your model
     read_only=True
 )
+    progress_status = serializers.CharField(
+        source='order.progress_status', read_only=True
+    )
     fitting_on_collection = serializers.BooleanField(
         source='order.fitting_on_collection', read_only=True
     )
@@ -685,10 +689,10 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
             'invoice_date',
             'total_price',
             'lens_arrival_status',
-            'whatsapp_sent',
             'fitting_on_collection',
             'on_hold',
-            'payments'
+            'payments',
+            'progress_status'
         ]
     def get_payments(self, obj):
             # Get the order related to this invoice
@@ -895,3 +899,68 @@ class SafeTransactionSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["date", "created_at"]
+
+class DoctorClaimInvoiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DoctorClaimInvoice
+        fields = [
+            "id",
+            "invoice_number",
+            "created_at",
+            "branch",
+        ]
+        read_only_fields = ["created_at"]
+
+class DoctorClaimChannelSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source="doctor.name", read_only=True)
+    class Meta:
+        model = DoctorClaimChannel
+        fields = [
+            "id",
+            "invoice_number",
+            "created_at",
+            "branch",
+            "doctor",
+            "doctor_name"
+        ]
+        read_only_fields = ["created_at"]
+
+# serializers.py
+
+class ExternalLensOrderItemSerializer(serializers.ModelSerializer):
+    order_id = serializers.IntegerField(source='order.id', read_only=True)
+    invoice_number = serializers.CharField(source='order.invoice.invoice_number', read_only=True)
+    invoice_date = serializers.DateTimeField(source='order.invoice.invoice_date', read_only=True)
+    branch_name = serializers.CharField(source='order.branch.branch_name', read_only=True)
+    customer_name = serializers.CharField(source='order.customer.name', read_only=True)
+    progress_status = serializers.CharField(
+        source='order.progress_status', read_only=True
+    )
+    total_price = serializers.CharField(
+        source='order.total_price', read_only=True
+    )
+    fitting_on_collection = serializers.BooleanField(
+        source='order.fitting_on_collection', read_only=True
+    )
+    on_hold = serializers.BooleanField(
+        source='order.on_hold', read_only=True
+    )
+    payments = serializers.SerializerMethodField()
+    class Meta:
+        model = OrderItem
+        fields = [
+            'id', 'external_lens', 'quantity', 'price_per_unit', 'subtotal',
+            'whatsapp_sent',
+            'order_id', 'invoice_number', 'invoice_date', 'branch_name','customer_name',
+            'progress_status', 'total_price', 'fitting_on_collection', 'on_hold', 'payments'
+        ]
+    def get_payments(self, obj):
+            # Get the order related to this invoice
+            order = obj.order
+            if order:
+                # Get all payments related to this order
+                payments = order.orderpayment_set.all()
+                # Serialize them
+                from .serializers import OrderPaymentSerializer  # Avoid circular import if needed
+                return OrderPaymentSerializer(payments, many=True).data
+            return []

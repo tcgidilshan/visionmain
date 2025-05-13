@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from api.models import Invoice
+from api.models import Invoice,Order,OrderItem
 from api.serializers import InvoiceSerializer
 
 class InvoiceProgressUpdateView(APIView):
@@ -50,66 +50,44 @@ class InvoiceProgressUpdateView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-class BulkInvoiceProgressUpdateView(APIView):
+class BulkUpdateOrderProgressStatus(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def patch(self, request, *args, **kwargs):
-        try:
-            invoice_ids = request.data.get('ids', [])
-            if not invoice_ids:
-                return Response({"error": "No invoice IDs provided."}, 
-                                status=status.HTTP_400_BAD_REQUEST)
+        order_ids = request.data.get('order_ids')
+        new_status = request.data.get('progress_status')
 
-            invoices = Invoice.objects.select_related('order').filter(
-                id__in=invoice_ids, invoice_type='factory'
+        if not order_ids or not isinstance(order_ids, list):
+            return Response({'error': 'Invalid or missing "order_ids". Must be a list of IDs.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        valid_statuses = dict(Order._meta.get_field('progress_status').choices).keys()
+        if new_status not in valid_statuses:
+            return Response({'error': f'Invalid progress_status. Valid options: {list(valid_statuses)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update orders
+        updated_count = Order.objects.filter(id__in=order_ids).update(progress_status=new_status)
+
+        return Response({
+            'message': f'{updated_count} order(s) updated successfully.',
+            'progress_status': new_status,
+            'order_ids': order_ids
+        }, status=status.HTTP_200_OK)
+class BulkUpdateOrderWhatAppMsgSent(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    def patch(self, request):
+        order_ids = request.data.get('order_ids', [])
+        whatsapp_sent = request.data.get('whatsapp_sent')
+
+        if not order_ids or whatsapp_sent not in ['sent', 'not_sent']:
+            return Response(
+                {"error": "Invalid input. Provide 'order_ids' and a valid 'whatsapp_sent' value ('sent' or 'not_sent')."},
+                status=status.HTTP_400_BAD_REQUEST
             )
-            found_ids = set(invoices.values_list('id', flat=True))
-            missing_ids = set(invoice_ids) - found_ids
 
-            if missing_ids:
-                return Response(
-                    {"error": f"Invoices not found or not factory type: {list(missing_ids)}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        # Filter and bulk update
+        updated_count = OrderItem.objects.filter(order_id__in=order_ids).update(whatsapp_sent=whatsapp_sent)
 
-            # Separate invoice/order fields
-            allowed_invoice_fields = {'lens_arrival_status', 'whatsapp_sent'}
-            allowed_order_fields = {'progress_status'}
-
-            invoice_data = {k: v for k, v in request.data.items() if k in allowed_invoice_fields}
-            order_data = {k: v for k, v in request.data.items() if k in allowed_order_fields}
-
-            if not (invoice_data or order_data):
-                return Response({"error": "No valid fields to update."},
-                                status=status.HTTP_400_BAD_REQUEST)
-
-            updated_invoices = []
-            updated_orders = []
-
-            for invoice in invoices:
-                # Update invoice fields
-                for field, value in invoice_data.items():
-                    setattr(invoice, field, value)
-                updated_invoices.append(invoice)
-
-                # Update order fields
-                if invoice.order and order_data:
-                    for field, value in order_data.items():
-                        setattr(invoice.order, field, value)
-                    updated_orders.append(invoice.order)
-
-            # Bulk update both models
-            if updated_invoices:
-                Invoice.objects.bulk_update(updated_invoices, fields=invoice_data.keys())
-            if updated_orders:
-                from api.models import Order  # in case not imported
-                Order.objects.bulk_update(updated_orders, fields=order_data.keys())
-
-            return Response({
-                "message": f"Updated {len(updated_invoices)} invoices.",
-                "updated_ids": list(found_ids)
-            }, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response({"error": str(e)}, 
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {"message": f"Updated {updated_count} order items successfully."},
+            status=status.HTTP_200_OK
+        )

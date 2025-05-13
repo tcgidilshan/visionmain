@@ -59,9 +59,10 @@ from .views import (
     CreateUserView,ExpenseMainCategoryListCreateView, ExpenseMainCategoryRetrieveUpdateDestroyView,
     ExpenseSubCategoryListCreateView, ExpenseSubCategoryRetrieveUpdateDestroyView,ExpenseRetrieveView,
     UserCodeCheckView,ChannelTransferView,DoctorAbsenceRescheduleView,ExpenseReportView,FrameOnlyOrderUpdateView,
-    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,
     AdminCodeCheckView,ChannelReportView,DoctorScheduleCreateView,DoctorUpcomingScheduleView,DoctorScheduleTransferView,AllRoleCheckView,
-    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,BulkInvoiceProgressUpdateView,
+    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,BulkUpdateOrderProgressStatus,FactoryInvoiceExternalLenseSearchView,BulkUpdateOrderWhatAppMsgSent,
+    DoctorClaimInvoiceListCreateView,DoctorClaimInvoiceRetrieveUpdateDestroyView,
+    DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView
 )
 # from .views import CustomAuthToken
 
@@ -154,16 +155,22 @@ urlpatterns = [
     # path("manual-orders/", ManualOrderCreateView.as_view(), name="manual-order-create"),
     path('orders/update-payments/', PaymentView.as_view(), name='update-payments'),
     path('orders/payments/', PaymentView.as_view(), name='order-payments'),
-
+    
     #frame only
     path('orders/frame-only/', FrameOnlyOrderCreateView.as_view(), name='frame-only-order-create'),
     path('orders/frame-only/<int:pk>/update/', FrameOnlyOrderUpdateView.as_view(), name='frame-only-update'),
-
+    
+    #whatapp msg sent
+    path('factory-invoice/external-lense/search/', FactoryInvoiceExternalLenseSearchView.as_view(), name='factory-invoice-external-lense-search'),
+    path('factory-invoices/bulk-update-status/', BulkUpdateOrderProgressStatus.as_view(), 
+     name='factory-invoice-bulk-status-update'),
+    path('factory-invoices/bulk-update-whatsapp-sent/', BulkUpdateOrderWhatAppMsgSent.as_view(), 
+     name='factory-invoice-bulk-whatsapp-sent'),
+    #invoice
     path('invoices/<int:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'), #invoice
     path('invoices/', InvoiceDetailView.as_view(), name='invoice-by-order'),  # ✅ Filter by order_id
     path('factory-invoices/<int:pk>/update-status/', InvoiceProgressUpdateView.as_view(), name='factory-invoice-status-update'),
-    path('factory-invoices/bulk-update-status/', BulkInvoiceProgressUpdateView.as_view(), 
-     name='factory-invoice-bulk-status-update'),
+   
     path("factory-invoices/search/", FactoryInvoiceSearchView.as_view(), name="factory-invoice-search"),
     path('reports/invoices/', InvoiceReportView.as_view(), name='invoice-report'),
 
@@ -211,6 +218,13 @@ urlpatterns = [
     #bus
     path('bus/title/', BusSystemSettingListCreateView.as_view(), name='bus-system-title-list-create'),
     path('bus/title/<int:pk>/', BusSystemSettingRetrieveUpdateDeleteView.as_view(), name='bus-system-title-rud'),
+
+    #doctor-claim
+    path('doctor-claims-invoices/', DoctorClaimInvoiceListCreateView.as_view(), name='doctor-claim-invoice-list-create'),
+    path('doctor-claims-invoices/<int:pk>/', DoctorClaimInvoiceRetrieveUpdateDestroyView.as_view(), name='doctor-claim-invoice-rud'),
+
+    path('doctor-claims-channels/', DoctorClaimChannelListCreateView.as_view(), name='doctor-claim-channel-list-create'),
+    path('doctor-claims-channels/<int:pk>/', DoctorClaimChannelRetrieveUpdateDestroyView.as_view(), name='doctor-claim-channel-rud'),
 
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),

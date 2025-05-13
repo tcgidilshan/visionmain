@@ -80,7 +80,7 @@ class InvoiceService:
     @staticmethod
     def search_factory_invoices(user, invoice_number=None, mobile=None, nic=None, branch_id=None,progress_status=None):
         qs = Invoice.objects.filter(invoice_type='factory')
-
+        
         # Handle invoice_number filtering by user branch
         if branch_id:
             qs = qs.filter(order__branch_id=branch_id)
