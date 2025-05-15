@@ -66,6 +66,9 @@ class OrderService:
     @staticmethod
     @transaction.atomic
     def update_order(order, order_data, order_items_data, payments_data):
+        if order.is_deleted:
+            raise ValidationError("This order has been deleted and cannot be modified.")
+
         """
         Updates an order along with its items and payments.
         Handles on-hold orders differently:

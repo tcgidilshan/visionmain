@@ -3,6 +3,7 @@ from django.db.models import Max
 from ..models import Invoice, RefractionDetails
 from rest_framework.exceptions import NotFound
 from ..serializers import InvoiceSerializer,RefractionDetailsSerializer
+from rest_framework.exceptions import ValidationError
 
 class InvoiceService:
     """
@@ -11,6 +12,8 @@ class InvoiceService:
 
     @staticmethod
     def create_invoice(order):
+        if order.is_deleted:
+            raise ValidationError("Cannot generate invoice for a deleted order.")
         """
         Generates an invoice for the given order.
         Assigns a daily invoice number for factory invoices.
@@ -77,32 +80,31 @@ class InvoiceService:
         except Invoice.DoesNotExist:
             raise NotFound("Invoice not found.")
         
-    @staticmethod
-    def search_factory_invoices(user, invoice_number=None, mobile=None, nic=None, branch_id=None,progress_status=None):
-        qs = Invoice.objects.filter(invoice_type='factory')
-        
-        # Handle invoice_number filtering by user branch
-        if branch_id:
-            qs = qs.filter(order__branch_id=branch_id)
-        if invoice_number:
-            user_branches = user.user_branches.all().values_list('branch_id', flat=True)
-            if not user_branches:
-                raise ValueError("User has no branches assigned.")
+@staticmethod
+def search_factory_invoices(user, invoice_number=None, mobile=None, nic=None, branch_id=None, progress_status=None):
+    qs = Invoice.objects.filter(invoice_type='factory', is_deleted=False)  # exclude deleted invoices
 
-            qs = qs.filter(invoice_number=invoice_number, order__branch_id__in=user_branches)
+    # Handle invoice_number filtering by user branch
+    if branch_id:
+        qs = qs.filter(order__branch_id=branch_id)
+    if invoice_number:
+        user_branches = user.user_branches.all().values_list('branch_id', flat=True)
+        if not user_branches:
+            raise ValueError("User has no branches assigned.")
 
-        if mobile:
-            qs = qs.filter(order__customer__phone_number=mobile)
+        qs = qs.filter(invoice_number=invoice_number, order__branch_id__in=user_branches)
 
-        if nic:
-            qs = qs.filter(order__customer__nic=nic)
-        #branch what user curently using branch_id as param
+    if mobile:
+        qs = qs.filter(order__customer__phone_number=mobile)
 
-        if progress_status:
-            qs = qs.filter(order__progress_status=progress_status)
-        
+    if nic:
+        qs = qs.filter(order__customer__nic=nic)
 
-        return qs.select_related('order', 'order__customer').order_by('-invoice_date')
+    if progress_status:
+        qs = qs.filter(order__progress_status=progress_status)
+
+    return qs.select_related('order', 'order__customer').order_by('-invoice_date')
+
     
     @staticmethod
     def get_invoice_by_invoice_number(invoice_type, invoice_number, is_frame_only=None):

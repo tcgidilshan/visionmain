@@ -41,7 +41,7 @@ from .views import (
     AppointmentRetrieveUpdateDeleteView,
     LensStockListCreateView,
     LensStockRetrieveUpdateDeleteView,
-    LensTypeListCreateView,SafeTransaction,
+    LensTypeListCreateView,SafeTransaction,OrderSoftDeleteView,
     LensTypeRetrieveUpdateDeleteView,ExternalLensCoatingListCreateView,
     ExternalLensCoatingRetrieveUpdateDeleteView,SafeAll,
     LensCoatingListCreateView,ExternalLensBrandListCreateView,
@@ -159,6 +159,8 @@ urlpatterns = [
     #frame only
     path('orders/frame-only/', FrameOnlyOrderCreateView.as_view(), name='frame-only-order-create'),
     path('orders/frame-only/<int:pk>/update/', FrameOnlyOrderUpdateView.as_view(), name='frame-only-update'),
+
+    path('orders/<int:order_id>/delete/', OrderSoftDeleteView.as_view(), name='order-soft-delete'),
     
     #whatapp msg sent
     path('factory-invoice/external-lense/search/', FactoryInvoiceExternalLenseSearchView.as_view(), name='factory-invoice-external-lense-search'),

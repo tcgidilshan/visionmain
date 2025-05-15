@@ -11,6 +11,8 @@ from ..services.patient_service import PatientService
 from ..services.Invoice_service import InvoiceService
 from ..services.refraction_details_service import RefractionDetailsService
 from django.utils import timezone
+from django.shortcuts import get_object_or_404
+from ..services.soft_delete_service import OrderSoftDeleteService
 
 class OrderCreateView(APIView):
     @transaction.atomic
@@ -94,3 +96,21 @@ class OrderCreateView(APIView):
         except Exception as e:
             transaction.set_rollback(True)
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class OrderSoftDeleteView(APIView):
+    """
+    Soft deletes an order and cascades to related records.
+    """
+
+    def delete(self, request, order_id):
+        order = get_object_or_404(Order.all_objects, id=order_id)
+
+        if order.is_deleted:
+            return Response({"detail": "Order already deleted."}, status=status.HTTP_400_BAD_REQUEST)
+
+        reason = request.data.get("reason", "No reason provided.")
+        deleted_by = request.user if request.user.is_authenticated else None
+
+        OrderSoftDeleteService.soft_delete_order(order_id=order.id, deleted_by=deleted_by, reason=reason)
+
+        return Response({"detail": "Order soft-deleted successfully."}, status=status.HTTP_200_OK)

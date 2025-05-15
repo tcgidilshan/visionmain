@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Max,Sum,Q
+from .managers import SoftDeleteManager
 
 class Item(models.Model):
     name = models.CharField(max_length=100)
@@ -398,8 +399,19 @@ class Order(models.Model):
         blank=True,
         related_name='orders'
     )
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = SoftDeleteManager()      # Only active records
+    all_objects = models.Manager() 
+
     def __str__(self):
         return f"Order {self.id} - Status: {self.status} - Customer: {self.customer.id}"
+    
+    def delete(self, using=None, keep_parents=False):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save()
     
 class ExternalLens(models.Model):
     BRAND_CHOICES = (
@@ -450,12 +462,22 @@ class Invoice(models.Model):
     daily_invoice_no = models.CharField(max_length=10,null=True, blank=True)  #  Factory invoices get a daily number
     invoice_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
     invoice_date = models.DateTimeField(auto_now_add=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = SoftDeleteManager()
+    all_objects = models.Manager()
 
     class Meta:
         unique_together = ['invoice_date', 'daily_invoice_no']  # Ensures daily numbering uniqueness
         constraints = [
             models.UniqueConstraint(fields=["invoice_number"], name="unique_invoice_number")
         ]
+        
+    def delete(self, using=None, keep_parents=False):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save()
 
     def save(self, *args, **kwargs):
         # Always ensure invoice_date is set
@@ -533,6 +555,12 @@ class OrderItem(models.Model):
     null=True,
     blank=True
     )
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = SoftDeleteManager()
+    all_objects = models.Manager()
+
     def save(self, *args, **kwargs):
        # Dynamically calculate subtotal on save
        self.subtotal = self.quantity * self.price_per_unit
@@ -540,6 +568,11 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return f"Order {self.order.id} Item - Subtotal: {self.subtotal}"
+    
+    def delete(self, using=None, keep_parents=False):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save()
     
 class OrderPayment(models.Model):
     PAYMENT_METHOD_CHOICES = [
@@ -561,9 +594,16 @@ class OrderPayment(models.Model):
     transaction_status = models.CharField(max_length=20, choices=TRANSACTION_STATUS_CHOICES, default='pending')
     is_final_payment = models.BooleanField(default=False)
     is_partial = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Payment for Order {self.order.id} - Amount: {self.amount}"
+
+    def delete(self, using=None, keep_parents=False):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save()
     
 class Doctor(models.Model):
     STATUS_CHOICES = [

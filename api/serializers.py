@@ -365,6 +365,15 @@ class OrderSerializer(serializers.ModelSerializer):
         queryset=BusSystemSetting.objects.all(), required=False, allow_null=True
     )
     bus_title_name = serializers.PrimaryKeyRelatedField(source='bus_title.title', read_only=True)
+
+    def to_representation(self, instance):
+        if instance.is_deleted:
+            raise serializers.ValidationError("This order has been deleted.")
+        return super().to_representation(instance)
+    
+    def get_order_items(self, obj):
+        items = obj.order_items.filter(is_deleted=False)
+        return OrderItemSerializer(items, many=True).data
     class Meta:
         model = Order
         fields = [

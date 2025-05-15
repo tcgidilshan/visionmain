@@ -49,8 +49,14 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
     serializer_class = ExternalLensOrderItemSerializer
     pagination_class = PaginationService
     def get_queryset(self):
-        queryset = OrderItem.objects.filter(external_lens__isnull=False).select_related(
+        queryset = OrderItem.objects.filter(
+            external_lens__isnull=False,
+            is_deleted=False,               # exclude soft-deleted order items
+            order__is_deleted=False         # exclude orders soft-deleted
+        ).select_related(
             'order__invoice', 'order__branch'
+        ).filter(
+            order__invoice__is_deleted=False  # exclude invoices soft-deleted
         )
 
         invoice_number = self.request.query_params.get('invoice_number')
@@ -75,10 +81,10 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
         if start_date and end_date:
             try:
                 start = datetime.strptime(start_date, "%Y-%m-%d")
-                end = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)  # add one day to include full day
+                end = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)  # inclusive end
                 queryset = queryset.filter(order__order_date__gte=start, order__order_date__lt=end)
             except ValueError:
-                # Optional: Add validation error response
+                # Could raise a ValidationError or return empty queryset here
                 pass
 
         return queryset
