@@ -6,7 +6,9 @@ from rest_framework.authtoken.models import Token as BaseToken
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Max
+from django.db.models import Max,Sum,Q
+from .managers import SoftDeleteManager
+from django.db import IntegrityError
 
 class Item(models.Model):
     name = models.CharField(max_length=100)
@@ -40,7 +42,6 @@ class BankDeposit(models.Model):
     is_confirmed = models.BooleanField(default=False)  # ✅ For "ticking" confirmed deposits
     note = models.TextField(blank=True, null=True)
 
-    
 class CustomUser(AbstractUser):
     mobile = models.CharField(max_length=15, blank=True, null=True)
     user_code = models.CharField(max_length=10, null=True, blank=True) 
@@ -90,16 +91,16 @@ class Refraction(models.Model):
 class Patient(models.Model):
     name = models.CharField(max_length=50)
     date_of_birth = models.DateField(null=True, blank=True)
-    phone_number = models.CharField(null=True, blank=True,max_length=15, unique=True)
+    phone_number = models.CharField(max_length=15, null=True, blank=True)
     address = models.TextField(null=True, blank=True)
-    nic = models.CharField(max_length=15, unique=True, null=True, blank=True)
+    nic = models.CharField(max_length=15, null=True, blank=True)
     refraction = models.ForeignKey(
         Refraction, null=True, blank=True, on_delete=models.SET_NULL, related_name="patients"
-    )  #  Added refraction_id (nullable)
-    #new feature
-    patient_note=models.CharField(max_length=100,null=True,blank=True)
+    )
+    patient_note = models.CharField(max_length=100, null=True, blank=True)
+
     def __str__(self):
-        return f"{self.name}"
+        return self.name
     
 class RefractionDetails(models.Model):
     refraction = models.OneToOneField(
@@ -217,7 +218,12 @@ class Code(models.Model):
         return self.name
     
 class Frame(models.Model):
+    BRAND_CHOICES = (
+        ('branded', 'Branded'),
+        ('non_branded', 'Non-Branded'),
+    )
     brand = models.ForeignKey(Brand, related_name='frames', on_delete=models.CASCADE)
+    brand_type = models.CharField(max_length=20, choices=BRAND_CHOICES)
     code = models.ForeignKey(Code, related_name='frames', on_delete=models.CASCADE)
     color = models.ForeignKey(Color, related_name='frames', on_delete=models.CASCADE)
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -227,7 +233,18 @@ class Frame(models.Model):
     is_active = models.BooleanField(default=True) 
 
     def __str__(self):
-        return f"{self.brand.name} - {self.code.name} - {self.color.name}"
+        return f"{self.brand.name} - {self.code.name} - {self.color.name} - {self.get_brand_type_display()}"
+    class Meta:
+        unique_together = (
+            'brand',
+            'brand_type',
+            'code',
+            'color',
+            'species',
+            'size',
+        )
+    verbose_name = "Frame"
+    verbose_name_plural = "Frames"
     
 class FrameStock(models.Model):
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="frame_stocks", null=True, blank=True)
@@ -329,6 +346,19 @@ class LensCleanerStock(models.Model):
         return f"{self.lens_cleaner.name} - Qty: {self.qty} - Branch: {self.branch.branch_name if self.branch else 'N/A'}"
     
 class Order(models.Model):
+    progress_status = models.CharField(
+        max_length=30,
+        choices=[
+            ('received_from_customer', 'Received from Customer'),
+            ('issue_to_factory', 'Issued to Factory'),
+            ('received_from_factory', 'Received from Factory'),
+            ('issue_to_customer', 'Issued to Customer'),
+        ],
+        default='received_from_customer',
+        null=True,
+        blank=True
+    )
+
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('processing', 'Processing'),
@@ -370,8 +400,19 @@ class Order(models.Model):
         blank=True,
         related_name='orders'
     )
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = SoftDeleteManager()      # Only active records
+    all_objects = models.Manager() 
+
     def __str__(self):
         return f"Order {self.id} - Status: {self.status} - Customer: {self.customer.id}"
+    
+    def delete(self, using=None, keep_parents=False):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save()
     
 class ExternalLens(models.Model):
     BRAND_CHOICES = (
@@ -410,36 +451,34 @@ class Invoice(models.Model):
         ('manual', 'Manual Invoice')  # Linked to an order without refraction
     ]
 
-    progress_status = models.CharField(
-        max_length=30,
-        choices=[
-            ('received_from_customer', 'Received from Customer'),
-            ('issue_to_factory', 'Issued to Factory'),
-            ('received_from_factory', 'Received from Factory'),
-            ('issue_to_customer', 'Issued to Customer'),
-        ],
-        default='received_from_customer'
-    )
-
     lens_arrival_status = models.CharField(
         max_length=20,
         choices=[('received', 'Received'), ('not_received', 'Not Received')],
         null=True, blank=True
     )
 
-    whatsapp_sent = models.BooleanField(default=False)
-
+    
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="invoice")
     invoice_type = models.CharField(max_length=10, choices=INVOICE_TYPES)  #  Identifies invoice type
     daily_invoice_no = models.CharField(max_length=10,null=True, blank=True)  #  Factory invoices get a daily number
     invoice_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
     invoice_date = models.DateTimeField(auto_now_add=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = SoftDeleteManager()
+    all_objects = models.Manager()
 
     class Meta:
         unique_together = ['invoice_date', 'daily_invoice_no']  # Ensures daily numbering uniqueness
         constraints = [
             models.UniqueConstraint(fields=["invoice_number"], name="unique_invoice_number")
         ]
+        
+    def delete(self, using=None, keep_parents=False):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save()
 
     def save(self, *args, **kwargs):
         # Always ensure invoice_date is set
@@ -509,6 +548,19 @@ class OrderItem(models.Model):
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     is_non_stock = models.BooleanField(default=False)  # ✅ Mark Non-Stock Items
     note = models.TextField(blank=True, null=True)
+    whatsapp_sent = models.CharField(max_length=20,
+    choices=[
+        ('sent', 'Sent'),
+        ('not_sent', 'Not Sent'),
+    ],
+    null=True,
+    blank=True
+    )
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = SoftDeleteManager()
+    all_objects = models.Manager()
 
     def save(self, *args, **kwargs):
        # Dynamically calculate subtotal on save
@@ -517,6 +569,11 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return f"Order {self.order.id} Item - Subtotal: {self.subtotal}"
+    
+    def delete(self, using=None, keep_parents=False):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save()
     
 class OrderPayment(models.Model):
     PAYMENT_METHOD_CHOICES = [
@@ -538,9 +595,16 @@ class OrderPayment(models.Model):
     transaction_status = models.CharField(max_length=20, choices=TRANSACTION_STATUS_CHOICES, default='pending')
     is_final_payment = models.BooleanField(default=False)
     is_partial = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Payment for Order {self.order.id} - Amount: {self.amount}"
+
+    def delete(self, using=None, keep_parents=False):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save()
     
 class Doctor(models.Model):
     STATUS_CHOICES = [
@@ -598,22 +662,39 @@ class Appointment(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)  # Amount in LKR
     channel_no = models.IntegerField(null=True, blank=True) 
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="appointments", null=True, blank=True)
-    appointment_id = models.IntegerField(null=True, blank=True) 
+    invoice_number = models.IntegerField(null=True, blank=True) 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        unique_together = ('branch', 'invoice_number')
+
+
     def save(self, *args, **kwargs):
-        if self.appointment_id is None and self.branch:
-            # Find the current highest appointment_id for this branch
-            max_id = Appointment.objects.filter(branch=self.branch).aggregate(Max('appointment_id'))['appointment_id__max']
-            if max_id:
-                self.appointment_id = max_id + 1
-            else:
-                self.appointment_id = 1  # First appointment for this branch
-        super().save(*args, **kwargs)
+        if self.invoice_number is None and self.branch:
+            for _ in range(5):  # retry up to 5 times
+                try:
+                    with transaction.atomic():
+                        max_id = Appointment.objects.select_for_update().filter(
+                            branch=self.branch
+                        ).aggregate(Max('invoice_number'))['invoice_number__max']
+                        self.invoice_number = (max_id or 0) + 1
+                        super().save(*args, **kwargs)
+                    break
+                except IntegrityError:
+                    continue
+        else:
+            super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Appointment with {self.doctor} for {self.patient} on {self.date} at {self.time}"
+    
+    def get_total_paid(self):
+        return self.payments.aggregate(total=Sum('amount'))['total'] or 0
+
+    def get_remaining_amount(self):
+        return float(self.total_fee) - self.get_total_paid()
+
 
 class ChannelPayment(models.Model):
     PAYMENT_METHOD_CHOICES = [
@@ -674,11 +755,18 @@ class ExpenseSubCategory(models.Model):
 
 
 class Expense(models.Model):
+    SOURCE_CHOICES = [
+    ('safe', 'Safe'),
+    ('cash', 'Cash'),
+    ('bank', 'Bank'),
+    ]
+    paid_source = models.CharField(max_length=20, choices=SOURCE_CHOICES)
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE)
     main_category = models.ForeignKey(ExpenseMainCategory, on_delete=models.CASCADE)
     sub_category = models.ForeignKey(ExpenseSubCategory, on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     note = models.TextField(blank=True)
+    paid_from_safe = models.BooleanField(default=True) 
     created_at = models.DateTimeField(auto_now_add=True)
 
 class OtherIncomeCategory(models.Model):
@@ -708,6 +796,48 @@ class BusSystemSetting(models.Model):
 
     def __str__(self):
         return self.title
+    
+class SafeBalance(models.Model):
+    branch = models.OneToOneField("Branch", on_delete=models.CASCADE, related_name="safe_balance")
+    balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    last_updated = models.DateTimeField(auto_now=True)
 
+    def __str__(self):
+        return f"{self.branch.branch_name} Safe – LKR {self.balance}"
+    
+class SafeTransaction(models.Model):
+    class TransactionType(models.TextChoices):
+        INCOME = 'income', 'Income'
+        EXPENSE = 'expense', 'Expense'
+        DEPOSIT = 'deposit', 'Bank Deposit'
+
+    branch = models.ForeignKey("Branch", on_delete=models.CASCADE, related_name="safe_transactions")
+    transaction_type = models.CharField(max_length=10, choices=TransactionType.choices)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    reason = models.TextField(blank=True, null=True)
+    reference_id = models.CharField(max_length=100, blank=True, null=True)  # Optional: links to invoice/expense/etc.
+    date = models.DateField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.branch.branch_name} – {self.transaction_type} – LKR {self.amount} on {self.date}"
+
+
+class DoctorClaimInvoice(models.Model):
+    invoice_number = models.CharField(max_length=20, unique=True)  
+    created_at = models.DateTimeField(auto_now_add=True)
+    branch = models.ForeignKey("Branch", on_delete=models.CASCADE, related_name="doctor_claim_invoices")
+    
+    def __str__(self):
+        return f"{self.invoice_number} on {self.date}"
+
+class DoctorClaimChannel(models.Model):
+    invoice_number = models.CharField(max_length=20,)  
+    created_at = models.DateTimeField(auto_now_add=True)
+    branch = models.ForeignKey("Branch", on_delete=models.CASCADE, related_name="doctor_claim_channels")
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name="doctor_claim_channels")
+
+    def __str__(self):
+        return f"{self.invoice_number} on {self.date}"
 
     

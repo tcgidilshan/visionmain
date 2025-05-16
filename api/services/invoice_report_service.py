@@ -40,7 +40,9 @@ class InvoiceReportService:
         # Get all invoices where related order has at least 1 payment on that date
         invoice_qs = Invoice.objects.select_related("order").filter(
             order_id__in=payments_by_order.keys(),
-            order__branch_id=branch_id
+            order__branch_id=branch_id,
+            is_deleted=False,
+            order__is_deleted=False
         )
 
         results = []

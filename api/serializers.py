@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.db.models import Sum
 from rest_framework.exceptions import ValidationError
 from .models import (
     Branch,
@@ -25,12 +26,13 @@ from .models import (
     Schedule,
     Appointment,
     ChannelPayment,
-    CustomUser,
+    CustomUser,SafeTransaction,SafeBalance,
     Invoice,ExternalLensCoating, ExternalLensBrand,
     ExternalLens,BusSystemSetting,
     OtherItem,BankAccount,BankDeposit,
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
-    UserBranch,ExpenseMainCategory, ExpenseSubCategory
+    UserBranch,ExpenseMainCategory, ExpenseSubCategory,
+    DoctorClaimInvoice,DoctorClaimChannel
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -122,6 +124,7 @@ class FrameSerializer(serializers.ModelSerializer):
     brand_name = serializers.CharField(source='brand.name', read_only=True)  # Get brand name
     code_name = serializers.CharField(source='code.name', read_only=True)    # Get code name
     color_name = serializers.CharField(source='color.name', read_only=True)  # Get color name
+    brand_type_display = serializers.CharField(source='get_brand_type_display', read_only=True)
 
     class Meta:
         model = Frame
@@ -134,6 +137,9 @@ class FrameSerializer(serializers.ModelSerializer):
             'size',
             'species',
             'image',
+            'brand_type',
+            'brand_type_display',
+            'is_active',
         ]
         
 class FrameStockSerializer(serializers.ModelSerializer):
@@ -169,7 +175,7 @@ class LensSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lens
-        fields = ['id', 'type', 'coating', 'price','brand', 'brand_name','type_name','coating_name']
+        fields = ['id', 'type', 'coating', 'price','brand', 'brand_name','type_name','coating_name','is_active']
 
     def validate(self, data):
         if 'brand' not in data:
@@ -355,7 +361,19 @@ class OrderSerializer(serializers.ModelSerializer):
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
     invoice_number = serializers.PrimaryKeyRelatedField(source='invoice.invoice_number', read_only=True)
     user_date = serializers.DateField(required=False)
-    bus_title = serializers.PrimaryKeyRelatedField(source='bus_title.title', read_only=True)
+    bus_title = serializers.PrimaryKeyRelatedField(
+        queryset=BusSystemSetting.objects.all(), required=False, allow_null=True
+    )
+    bus_title_name = serializers.PrimaryKeyRelatedField(source='bus_title.title', read_only=True)
+
+    def to_representation(self, instance):
+        if instance.is_deleted:
+            raise serializers.ValidationError("This order has been deleted.")
+        return super().to_representation(instance)
+    
+    def get_order_items(self, obj):
+        items = obj.order_items.filter(is_deleted=False)
+        return OrderItemSerializer(items, many=True).data
     class Meta:
         model = Order
         fields = [
@@ -385,7 +403,9 @@ class OrderSerializer(serializers.ModelSerializer):
             'sales_staff_username',
             'invoice_number',
             'user_date',
-            'bus_title'
+            'bus_title',
+            'bus_title_name',
+            'progress_status',
         ] 
 
 class ExternalLensSerializer(serializers.ModelSerializer):
@@ -471,9 +491,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'order_details',  #  Full order details (optional)
 
               #  NEW fields for tracking factory invoice progress
-            'progress_status',
             'lens_arrival_status',
-            'whatsapp_sent',
         ]
 
     def get_refraction_details(self, obj):
@@ -518,7 +536,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True)  # Patient's name
     schedule_date = serializers.DateField(source='schedule.date', read_only=True)  # Schedule date
     schedule_start_time = serializers.TimeField(source='schedule.start_time', read_only=True)  # Schedule start time
-
+    invoice_number = serializers.IntegerField(read_only=True)
     class Meta:
         model = Appointment
         fields = [
@@ -539,7 +557,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'branch',
             'updated_at',  # Record update timestamp
             'branch_name',
-            'appointment_id'
+            'invoice_number'
         ]
 
 class ChannelPaymentSerializer(serializers.ModelSerializer):
@@ -568,6 +586,9 @@ class ChannelListSerializer(serializers.ModelSerializer):
     address = serializers.CharField(source='patient.address', read_only=True)
     contact_number = serializers.CharField(source='patient.phone_number', read_only=True)
     first_payment = serializers.SerializerMethodField()
+    invoice_number = serializers.IntegerField(read_only=True)
+    total_payment = serializers.SerializerMethodField(read_only=True)
+    balance = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
@@ -579,30 +600,44 @@ class ChannelListSerializer(serializers.ModelSerializer):
             'patient_name',
             'channel_no',
             'first_payment',
+            'invoice_number',
             'date',  # For filtering
+            'total_payment',
+            'balance',
+            'amount'
         ]
 
     def get_first_payment(self, obj):
         first_payment = obj.payments.first()  # Assuming related_name='payments' for ChannelPayment
         return first_payment.amount if first_payment else None
+    
+    def get_total_payment(self, obj):
+        return obj.payments.aggregate(total=Sum('amount'))['total'] or 0
+    
+    def get_balance(self, obj):
+        total_paid = self.get_total_payment(obj)
+        total_fee = obj.amount or 0  # or obj.amount, depending on your field naming
+        return total_fee - total_paid
+
 class AppointmentDetailSerializer(serializers.ModelSerializer):
     payments = serializers.SerializerMethodField()  # Custom field for payments
     doctor_name = serializers.CharField(source='doctor.name', read_only=True)
     patient_name = serializers.CharField(source='patient.name', read_only=True)
     address = serializers.CharField(source='patient.address', read_only=True)
     contact_number = serializers.CharField(source='patient.phone_number', read_only=True)
-
+    
     class Meta:
         model = Appointment
         fields = [
             'id', 'doctor', 'doctor_name', 'patient', 'patient_name',
             'address', 'contact_number', 'schedule', 'date', 'time',
-            'status', 'amount', 'channel_no', 'payments'
+            'status', 'amount', 'channel_no', 'payments','invoice_number'
         ]
     def get_payments(self, obj):
         """Fetch all related payments for this appointment."""
         payments = ChannelPayment.objects.filter(appointment=obj)  # Related payments
         return ChannelPaymentSerializer(payments, many=True).data 
+        
 class OtherItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OtherItem
@@ -635,8 +670,16 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
     customer = serializers.PrimaryKeyRelatedField(source='order.customer.name', read_only=True)  # ✅ Fetch customer ID
     # customer_details = PatientSerializer(source='order.customer', read_only=True)  #  Full customer details
     # refraction_details = RefractionSerializer(source='order.refraction', read_only=True)  # Refraction details (if exists)
-    # order_details = OrderSerializer(source='order', read_only=True)  #  Full order details
-
+    payments = serializers.SerializerMethodField()
+    total_price = serializers.DecimalField(
+    source='order.total_price',
+    max_digits=10,  # Use the same as your model
+    decimal_places=2,  # Use the same as your model
+    read_only=True
+)
+    progress_status = serializers.CharField(
+        source='order.progress_status', read_only=True
+    )
     fitting_on_collection = serializers.BooleanField(
         source='order.fitting_on_collection', read_only=True
     )
@@ -648,23 +691,28 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'order',       # Order ID (ForeignKey)
-            'customer',    # Customer ID (from Order)
-            # 'customer_details',  #  Full customer details
-            # 'refraction_details',  #  Full refraction details (if available)
+            'customer',   
             'invoice_type',  # "factory" or "manual"
             'daily_invoice_no',  # Unique daily number for factory invoices
             'invoice_number',
             'invoice_date',
-            # 'order_details',  #  Full order details (optional)
-
-              #  NEW fields for tracking factory invoice progress
-            'progress_status',
+            'total_price',
             'lens_arrival_status',
-            'whatsapp_sent',
             'fitting_on_collection',
-            'on_hold'
+            'on_hold',
+            'payments',
+            'progress_status'
         ]
-
+    def get_payments(self, obj):
+            # Get the order related to this invoice
+            order = obj.order
+            if order:
+                # Get all payments related to this order
+                payments = order.orderpayment_set.all()
+                # Serialize them
+                from .serializers import OrderPaymentSerializer  # Avoid circular import if needed
+                return OrderPaymentSerializer(payments, many=True).data
+            return []
 class ExpenseMainCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ExpenseMainCategory
@@ -680,9 +728,11 @@ class ExpenseSubCategorySerializer(serializers.ModelSerializer):
 
 # serializers.py
 class ExpenseSerializer(serializers.ModelSerializer):
+    main_category_name = serializers.CharField(source='main_category.name', read_only=True)
+    sub_category_name = serializers.CharField(source='sub_category.name', read_only=True)
     class Meta:
         model = Expense
-        fields = ['id', 'branch', 'main_category', 'sub_category', 'amount', 'note', 'created_at']
+        fields = ['id', 'branch', 'main_category', 'sub_category', 'amount', 'note','paid_source', 'paid_from_safe', 'created_at','main_category_name','sub_category_name']
 
 class ExpenseReportSerializer(serializers.ModelSerializer):
     main_category_name = serializers.CharField(source='main_category.name', read_only=True)
@@ -696,14 +746,14 @@ class ExpenseReportSerializer(serializers.ModelSerializer):
             'main_category_name',
             'sub_category_name',
             'amount',
-            'note'
+            'note',
+            'paid_from_safe'
         ]
 
 class OtherIncomeCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = OtherIncomeCategory
         fields = ['id', 'name', 'description']
-
 
 class OtherIncomeSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
@@ -770,6 +820,17 @@ class FrameOnlyOrderSerializer(serializers.Serializer):
     payments = serializers.ListField(required=False, write_only=True)  
 
     status = serializers.CharField(required=False, default='pending')
+    progress_status = serializers.ChoiceField(
+        choices=[
+            ('received_from_customer', 'Received from Customer'),
+            ('issue_to_factory', 'Issued to Factory'),
+            ('received_from_factory', 'Received from Factory'),
+            ('issue_to_customer', 'Issued to Customer'),
+        ],
+        required=False,
+        allow_null=True,
+        default='received_from_customer'
+    )
     sub_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     discount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0.00)
     total_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
@@ -777,3 +838,138 @@ class FrameOnlyOrderSerializer(serializers.Serializer):
         if not data.get('frame').is_active:
             raise serializers.ValidationError("Selected frame is inactive.")
         return data
+    
+class FrameOnlyOrderUpdateSerializer(serializers.Serializer):
+    patient = FrameOnlyPatientInputSerializer(required=False)
+    frame = serializers.PrimaryKeyRelatedField(queryset=Frame.objects.all())
+    quantity = serializers.IntegerField(min_value=1)
+    price_per_unit = serializers.DecimalField(max_digits=10, decimal_places=2)
+    branch_id = serializers.IntegerField()
+    sales_staff_code = serializers.IntegerField(required=False)
+    payments = serializers.ListField(child=serializers.DictField(), required=False)
+
+    status = serializers.CharField(required=False, default='pending')
+    sub_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    discount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0.00)
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+
+    def validate(self, data):
+        if not data.get('frame').is_active:
+            raise serializers.ValidationError("Selected frame is inactive.")
+        return data
+
+class AppointmentTimeListSerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source='patient.name', read_only=True)
+    time = serializers.TimeField(format='%I:%M %p')  # Format time as 12-hour with AM/PM
+
+    class Meta:
+        model = Appointment
+        fields = ['time', 'patient_name', 'channel_no']
+
+class SingleRepaymentSerializer(serializers.Serializer):
+    appointment_id = serializers.IntegerField()
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    payment_method = serializers.ChoiceField(choices=ChannelPayment.PAYMENT_METHOD_CHOICES)
+    is_final = serializers.BooleanField(required=False, default=False)
+
+class MultipleRepaymentSerializer(serializers.Serializer):
+    payments = SingleRepaymentSerializer(many=True)
+
+class SafeBalanceSerializer(serializers.ModelSerializer):
+    branch_name = serializers.CharField(source="branch.branch_name", read_only=True)
+
+    class Meta:
+        model = SafeBalance
+        fields = [
+            "id",
+            "branch",
+            "branch_name",
+            "balance",
+            "last_updated",
+        ]
+        read_only_fields = ["balance", "last_updated"]
+
+class SafeTransactionSerializer(serializers.ModelSerializer):
+    branch_name = serializers.CharField(source="branch.branch_name", read_only=True)
+    transaction_type_display = serializers.CharField(source="get_transaction_type_display", read_only=True)
+
+    class Meta:
+        model = SafeTransaction
+        fields = [
+            "id",
+            "branch",
+            "branch_name",
+            "transaction_type",
+            "transaction_type_display",
+            "amount",
+            "reason",
+            "reference_id",
+            "date",
+            "created_at",
+        ]
+        read_only_fields = ["date", "created_at"]
+
+class DoctorClaimInvoiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DoctorClaimInvoice
+        fields = [
+            "id",
+            "invoice_number",
+            "created_at",
+            "branch",
+        ]
+        read_only_fields = ["created_at"]
+
+class DoctorClaimChannelSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source="doctor.name", read_only=True)
+    class Meta:
+        model = DoctorClaimChannel
+        fields = [
+            "id",
+            "invoice_number",
+            "created_at",
+            "branch",
+            "doctor",
+            "doctor_name"
+        ]
+        read_only_fields = ["created_at"]
+
+# serializers.py
+
+class ExternalLensOrderItemSerializer(serializers.ModelSerializer):
+    order_id = serializers.IntegerField(source='order.id', read_only=True)
+    invoice_number = serializers.CharField(source='order.invoice.invoice_number', read_only=True)
+    invoice_date = serializers.DateTimeField(source='order.invoice.invoice_date', read_only=True)
+    branch_name = serializers.CharField(source='order.branch.branch_name', read_only=True)
+    customer_name = serializers.CharField(source='order.customer.name', read_only=True)
+    progress_status = serializers.CharField(
+        source='order.progress_status', read_only=True
+    )
+    total_price = serializers.CharField(
+        source='order.total_price', read_only=True
+    )
+    fitting_on_collection = serializers.BooleanField(
+        source='order.fitting_on_collection', read_only=True
+    )
+    on_hold = serializers.BooleanField(
+        source='order.on_hold', read_only=True
+    )
+    payments = serializers.SerializerMethodField()
+    class Meta:
+        model = OrderItem
+        fields = [
+            'id', 'external_lens', 'quantity', 'price_per_unit', 'subtotal',
+            'whatsapp_sent',
+            'order_id', 'invoice_number', 'invoice_date', 'branch_name','customer_name',
+            'progress_status', 'total_price', 'fitting_on_collection', 'on_hold', 'payments'
+        ]
+    def get_payments(self, obj):
+            # Get the order related to this invoice
+            order = obj.order
+            if order:
+                # Get all payments related to this order
+                payments = order.orderpayment_set.all()
+                # Serialize them
+                from .serializers import OrderPaymentSerializer  # Avoid circular import if needed
+                return OrderPaymentSerializer(payments, many=True).data
+            return []

@@ -1,4 +1,4 @@
-from ..models import Order, OrderItem, LensStock, LensCleanerStock, FrameStock,Lens,LensCleaner,Frame,ExternalLens,OtherItemStock
+from ..models import Order, OrderItem, LensStock, LensCleanerStock, FrameStock,Lens,LensCleaner,Frame,ExternalLens,OtherItemStock,BusSystemSetting
 from ..serializers import OrderSerializer, OrderItemSerializer, ExternalLensSerializer
 from django.db import transaction
 from ..services.order_payment_service import OrderPaymentService
@@ -11,7 +11,6 @@ class OrderService:
     """
     Handles order and order item creation.
     """
-
     @staticmethod
     @transaction.atomic
     def create_order(order_data, order_items_data):
@@ -67,6 +66,9 @@ class OrderService:
     @staticmethod
     @transaction.atomic
     def update_order(order, order_data, order_items_data, payments_data):
+        if order.is_deleted:
+            raise ValidationError("This order has been deleted and cannot be modified.")
+
         """
         Updates an order along with its items and payments.
         Handles on-hold orders differently:
@@ -107,12 +109,16 @@ class OrderService:
             order.discount = order_data.get('discount', order.discount)
             order.total_price = order_data.get('total_price', order.total_price)
             order.status = order_data.get('status', order.status)
+            order.progress_status = order_data.get('progress_status', order.progress_status)
             order.sales_staff_code_id = order_data.get('sales_staff_code', order.sales_staff_code_id)
             order.order_remark = order_data.get('order_remark', order.order_remark)
             order.user_date = order_data.get('user_date', order.user_date)
             order.on_hold = will_be_on_hold  # ✅ Update hold status
-            order.bus_title = order_data.get('bus_title', order.bus_title)
-
+            order.fitting_on_collection = order_data.get('fitting_on_collection', order.fitting_on_collection)  # ✅ Update hold status
+            bus_title_id = order_data.get('bus_title')
+            if bus_title_id is not None:
+                order.bus_title = BusSystemSetting.objects.get(pk=bus_title_id)
+            
             for field in ['pd', 'height', 'right_height', 'left_height', 'left_pd', 'right_pd']:
                 if field in order_data:
                     setattr(order, field, order_data.get(field))

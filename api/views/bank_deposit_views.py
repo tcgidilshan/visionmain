@@ -4,6 +4,7 @@ from rest_framework.filters import OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from ..models import BankDeposit
 from ..serializers import BankDepositSerializer
+from ..services.safe_service import SafeService
 from rest_framework.response import Response
 
 
@@ -23,10 +24,26 @@ class BankDepositConfirmView(APIView):
     def put(self, request, pk):
         try:
             deposit = BankDeposit.objects.get(pk=pk)
+
             if deposit.is_confirmed:
                 return Response({"message": "Deposit already confirmed"}, status=200)
+
+            # ✅ Mark as confirmed
             deposit.is_confirmed = True
             deposit.save()
-            return Response({"message": "Deposit confirmed ✅"}, status=200)
+
+            # ✅ Log SafeTransaction (if not already done)
+            SafeService.record_transaction(
+                branch=deposit.branch,
+                amount=deposit.amount,
+                transaction_type="deposit",
+                reason=f"Bank deposit to {deposit.bank_account.bank_name}",
+                reference_id=f"bank-deposit-{deposit.id}"
+            )
+
+            return Response({"message": "Deposit confirmed and Safe updated ✅"}, status=200)
+
         except BankDeposit.DoesNotExist:
             return Response({"error": "Bank deposit not found"}, status=404)
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)

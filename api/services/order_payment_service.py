@@ -1,5 +1,6 @@
 from ..models import OrderPayment,Order
 from ..serializers import OrderPaymentSerializer
+from rest_framework.exceptions import ValidationError
 
 class OrderPaymentService:
     """
@@ -7,6 +8,8 @@ class OrderPaymentService:
     """
     @staticmethod
     def process_payments(order, payments_data):
+        if order.is_deleted:
+            raise ValidationError("Cannot process payments for a deleted order.")
         total_payment = 0
         for payment_data in payments_data:
             payment_data['order'] = order.id

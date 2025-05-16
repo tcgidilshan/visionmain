@@ -19,9 +19,22 @@ class LensListCreateView(generics.ListCreateAPIView):
         """
         BranchProtectionsService.validate_branch_id(request)
         branch_id = request.query_params.get('branch_id', None)
+        status_filter = request.query_params.get('status', 'active').lower()
 
-        # 🔥 Filter only active lenses
-        lenses = self.get_queryset().filter(is_active=True)
+        lenses = self.get_queryset()
+
+        # 🔍 Apply is_active filter
+        if status_filter == 'active':
+            lenses = lenses.filter(is_active=True)
+        elif status_filter == 'inactive':
+            lenses = lenses.filter(is_active=False)
+        elif status_filter == 'all':
+            pass  # no filtering
+        else:
+            return Response(
+                {"error": "Invalid status. Allowed values: active, inactive, all."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         data = []
 
