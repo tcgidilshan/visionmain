@@ -10,6 +10,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from ..services.doctor_schedule_service import DoctorScheduleService
 from ..services.pagination_service import PaginationService
 from ..services.patient_service import PatientService
+from django.shortcuts import get_object_or_404
 class ChannelAppointmentView(APIView):
     @transaction.atomic
     def post(self, request, *args, **kwargs):
@@ -261,3 +262,115 @@ class DoctorAppointmentTimeListView(APIView):
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+class ChannelUpdateView(APIView):
+    @transaction.atomic
+    def put(self, request, *args, **kwargs):
+        appointment_id = kwargs.get('pk')  # Assuming this view is routed as /channels/<pk>/
+        data = request.data
+
+        # Step 1: Validate required fields
+        required_fields = ['doctor_id', 'name', 'address', 'contact_number', 'channel_date',
+                           'time', 'channeling_fee', 'branch_id', 'payments']
+        for field in required_fields:
+            if field not in data:
+                return Response({"error": f"{field} is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Step 2: Fetch & update patient
+            appointment = get_object_or_404(Appointment, pk=appointment_id)
+            patient = appointment.patient
+
+            patient_payload = {
+                "id": patient.id,
+                "name": data["name"],
+                "phone_number": data["contact_number"],
+                "address": data.get("address", "")
+            }
+            patient = PatientService.create_or_update_patient(patient_payload)
+
+            # Step 3: Handle schedule (create or reassign)
+            new_schedule, created = Schedule.objects.get_or_create(
+                doctor_id=data['doctor_id'],
+                date=data['channel_date'],
+                start_time=data['time'],
+                branch_id=data['branch_id'],
+                defaults={'status': 'Available'}
+            )
+
+            if not created and new_schedule.status != 'Available' and appointment.schedule_id != new_schedule.id:
+                return Response({"error": "The selected schedule is not available."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # If the schedule changed, release old and book new
+            if appointment.schedule_id != new_schedule.id:
+                if appointment.schedule:
+                    appointment.schedule.status = 'Available'
+                    appointment.schedule.save()
+                new_schedule.status = 'Booked'
+                new_schedule.save()
+
+            # Step 4: Recalculate channel number if branch/date changed
+            is_same_date_branch = (
+                str(appointment.date) == data['channel_date'] and
+                str(appointment.branch_id) == str(data['branch_id'])
+            )
+            if not is_same_date_branch:
+                appointments_today = Appointment.objects.filter(
+                    date=data['channel_date'],
+                    branch_id=data['branch_id']
+                ).count()
+                channel_no = appointments_today + 1
+            else:
+                channel_no = appointment.channel_no  # keep current number
+
+            # Step 5: Update appointment
+            appointment_data = {
+                "doctor": data['doctor_id'],
+                "patient": patient.id,
+                "schedule": new_schedule.id,
+                "date": data['channel_date'],
+                "time": data['time'],
+                "status": "Pending",
+                "amount": data['channeling_fee'],
+                "channel_no": channel_no,
+                "branch": data['branch_id']
+            }
+            serializer = AppointmentSerializer(appointment, data=appointment_data)
+            serializer.is_valid(raise_exception=True)
+            appointment = serializer.save()
+
+            # Step 6: Replace payments
+            existing_payments = ChannelPayment.objects.filter(appointment=appointment)
+            existing_payments.delete()
+
+            total_paid = 0
+            payment_records = []
+            for payment in data['payments']:
+                payment_data = {
+                    "appointment": appointment.id,
+                    "amount": payment['amount'],
+                    "payment_method": payment['payment_method'],
+                    "is_final": False
+                }
+                total_paid += payment['amount']
+                payment_serializer = ChannelPaymentSerializer(data=payment_data)
+                payment_serializer.is_valid(raise_exception=True)
+                payment_records.append(payment_serializer.save())
+
+            # Step 7: Final payment logic
+            if total_paid == data['channeling_fee']:
+                payment_records[-1].is_final = True
+                payment_records[-1].save()
+            elif total_paid > data['channeling_fee']:
+                raise ValueError("Total payments exceed the channeling fee.")
+
+            # Step 8: Return updated response
+            return Response({
+                "patient": PatientSerializer(patient).data,
+                "schedule": ScheduleSerializer(new_schedule).data,
+                "appointment": AppointmentSerializer(appointment).data,
+                "payments": ChannelPaymentSerializer(payment_records, many=True).data
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            transaction.set_rollback(True)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

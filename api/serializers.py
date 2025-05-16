@@ -536,7 +536,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True)  # Patient's name
     schedule_date = serializers.DateField(source='schedule.date', read_only=True)  # Schedule date
     schedule_start_time = serializers.TimeField(source='schedule.start_time', read_only=True)  # Schedule start time
-
+    invoice_number = serializers.IntegerField(read_only=True)
     class Meta:
         model = Appointment
         fields = [

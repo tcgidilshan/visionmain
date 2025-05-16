@@ -6,7 +6,6 @@ from ..models import Order, OrderItem, Invoice, Patient, FrameStock
 from datetime import date
 from django.db.models import Q
 from ..services.patient_service import PatientService
-
 class FrameOnlyOrderService:
 
     @staticmethod

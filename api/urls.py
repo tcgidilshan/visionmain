@@ -40,7 +40,7 @@ from .views import (
     DoctorAppointmentTimeListView,
     AppointmentRetrieveUpdateDeleteView,
     LensStockListCreateView,
-    LensStockRetrieveUpdateDeleteView,
+    LensStockRetrieveUpdateDeleteView,ChannelUpdateView,
     LensTypeListCreateView,SafeTransaction,OrderSoftDeleteView,
     LensTypeRetrieveUpdateDeleteView,ExternalLensCoatingListCreateView,
     ExternalLensCoatingRetrieveUpdateDeleteView,SafeAll,
@@ -191,6 +191,7 @@ urlpatterns = [
     path('channels/time-slots/', DoctorAppointmentTimeListView.as_view(), name='doctor-appointment-time-list'),#time slots
     path('channels/<int:pk>/', AppointmentRetrieveUpdateDeleteView.as_view(), name='appointment-detail'),
     path("channel/transfer/", ChannelTransferView.as_view(), name="channel-transfer"),
+    path('channels/<int:pk>/update/', ChannelUpdateView.as_view(), name='channel-update'),
 
     #channel repayment
     path('channel/repayments/', ChannelRepaymentView.as_view(), name='channel-repayments'),

@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.db import transaction
 from django.db.models import Max,Sum,Q
 from .managers import SoftDeleteManager
+from django.db import IntegrityError
 
 class Item(models.Model):
     name = models.CharField(max_length=100)
@@ -665,15 +666,25 @@ class Appointment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        unique_together = ('branch', 'invoice_number')
+
+
     def save(self, *args, **kwargs):
         if self.invoice_number is None and self.branch:
-            # Find the current highest invoice_number for this branch
-            max_id = Appointment.objects.filter(branch=self.branch).aggregate(Max('invoice_number'))['invoice_number__max']
-            if max_id:
-                self.invoice_number = max_id + 1
-            else:
-                self.invoice_number = 1  # First appointment for this branch
-        super().save(*args, **kwargs)
+            for _ in range(5):  # retry up to 5 times
+                try:
+                    with transaction.atomic():
+                        max_id = Appointment.objects.select_for_update().filter(
+                            branch=self.branch
+                        ).aggregate(Max('invoice_number'))['invoice_number__max']
+                        self.invoice_number = (max_id or 0) + 1
+                        super().save(*args, **kwargs)
+                    break
+                except IntegrityError:
+                    continue
+        else:
+            super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Appointment with {self.doctor} for {self.patient} on {self.date} at {self.time}"
