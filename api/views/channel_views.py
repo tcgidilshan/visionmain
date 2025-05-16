@@ -58,6 +58,7 @@ class ChannelAppointmentView(APIView):
                 "date": data['channel_date'],
                 "time": data['time'],
                 "status": "Pending",
+                "note": data.get('note', ''),
                 "amount": data['channeling_fee'],
                 "channel_no": channel_no,
                 "branch": branch_id
@@ -330,6 +331,7 @@ class ChannelUpdateView(APIView):
                 "date": data['channel_date'],
                 "time": data['time'],
                 "status": "Pending",
+                "note": data.get('note', ''),
                 "amount": data['channeling_fee'],
                 "channel_no": channel_no,
                 "branch": data['branch_id']

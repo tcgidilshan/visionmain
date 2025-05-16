@@ -665,6 +665,7 @@ class Appointment(models.Model):
     invoice_number = models.IntegerField(null=True, blank=True) 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    note = models.TextField(blank=True, null=True, max_length=20)
 
     class Meta:
         unique_together = ('branch', 'invoice_number')

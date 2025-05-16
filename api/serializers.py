@@ -557,7 +557,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'branch',
             'updated_at',  # Record update timestamp
             'branch_name',
-            'invoice_number'
+            'invoice_number',
+            'note'
         ]
 
 class ChannelPaymentSerializer(serializers.ModelSerializer):
@@ -602,9 +603,11 @@ class ChannelListSerializer(serializers.ModelSerializer):
             'first_payment',
             'invoice_number',
             'date',  # For filtering
+            'time',
             'total_payment',
             'balance',
-            'amount'
+            'amount',
+            'note'
         ]
 
     def get_first_payment(self, obj):

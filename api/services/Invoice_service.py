@@ -80,30 +80,30 @@ class InvoiceService:
         except Invoice.DoesNotExist:
             raise NotFound("Invoice not found.")
         
-@staticmethod
-def search_factory_invoices(user, invoice_number=None, mobile=None, nic=None, branch_id=None, progress_status=None):
-    qs = Invoice.objects.filter(invoice_type='factory', is_deleted=False)  # exclude deleted invoices
+    @staticmethod
+    def search_factory_invoices(user, invoice_number=None, mobile=None, nic=None, branch_id=None, progress_status=None):
+        qs = Invoice.objects.filter(invoice_type='factory', is_deleted=False)  # exclude deleted invoices
 
-    # Handle invoice_number filtering by user branch
-    if branch_id:
-        qs = qs.filter(order__branch_id=branch_id)
-    if invoice_number:
-        user_branches = user.user_branches.all().values_list('branch_id', flat=True)
-        if not user_branches:
-            raise ValueError("User has no branches assigned.")
+        # Handle invoice_number filtering by user branch
+        if branch_id:
+            qs = qs.filter(order__branch_id=branch_id)
+        if invoice_number:
+            user_branches = user.user_branches.all().values_list('branch_id', flat=True)
+            if not user_branches:
+                raise ValueError("User has no branches assigned.")
 
-        qs = qs.filter(invoice_number=invoice_number, order__branch_id__in=user_branches)
+            qs = qs.filter(invoice_number=invoice_number, order__branch_id__in=user_branches)
 
-    if mobile:
-        qs = qs.filter(order__customer__phone_number=mobile)
+        if mobile:
+            qs = qs.filter(order__customer__phone_number=mobile)
 
-    if nic:
-        qs = qs.filter(order__customer__nic=nic)
+        if nic:
+            qs = qs.filter(order__customer__nic=nic)
 
-    if progress_status:
-        qs = qs.filter(order__progress_status=progress_status)
+        if progress_status:
+            qs = qs.filter(order__progress_status=progress_status)
 
-    return qs.select_related('order', 'order__customer').order_by('-invoice_date')
+        return qs.select_related('order', 'order__customer').order_by('-invoice_date')
 
     
     @staticmethod
