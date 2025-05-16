@@ -670,7 +670,6 @@ class Appointment(models.Model):
     class Meta:
         unique_together = ('branch', 'invoice_number')
 
-
     def save(self, *args, **kwargs):
         if self.invoice_number is None and self.branch:
             for _ in range(5):  # retry up to 5 times
