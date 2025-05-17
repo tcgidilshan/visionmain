@@ -21,22 +21,17 @@ class ExpenseMainCategoryListCreateView(generics.ListCreateAPIView):
     queryset = ExpenseMainCategory.objects.all()
     serializer_class = ExpenseMainCategorySerializer
 
-
 class ExpenseMainCategoryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ExpenseMainCategory.objects.all()
     serializer_class = ExpenseMainCategorySerializer
-
 
 # ---------- Sub Category Views ----------
 class ExpenseSubCategoryListCreateView(generics.ListCreateAPIView):
     queryset = ExpenseSubCategory.objects.select_related('main_category').all()
     serializer_class = ExpenseSubCategorySerializer
-
-
 class ExpenseSubCategoryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ExpenseSubCategory.objects.all()
     serializer_class = ExpenseSubCategorySerializer
-
 class ExpenseCreateView(APIView):
     def post(self, request):
         serializer = ExpenseSerializer(data=request.data)

@@ -683,6 +683,9 @@ class Appointment(models.Model):
     note = models.TextField(blank=True, null=True, max_length=20)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
+    is_refund = models.BooleanField(default=False)
+    refunded_at = models.DateTimeField(null=True, blank=True)
+    refund_note = models.TextField(blank=True, null=True)
 
     objects = SoftDeleteManager()      # Only active records
     all_objects = models.Manager() 

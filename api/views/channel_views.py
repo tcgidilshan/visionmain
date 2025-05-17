@@ -12,6 +12,11 @@ from ..services.pagination_service import PaginationService
 from ..services.patient_service import PatientService
 from ..services.soft_delete_service import ChannelSoftDeleteService
 from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from ..services.channel_payment_service import ChannelPaymentService  # Update path as per your structure
+from rest_framework.exceptions import ValidationError
 class ChannelAppointmentView(APIView):
     @transaction.atomic
     def post(self, request, *args, **kwargs):
@@ -385,3 +390,16 @@ class CancelChannelView(APIView):
             return Response(result, status=status.HTTP_200_OK)
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+class RefundChannelView(APIView):
+    def post(self, request, pk):
+        expense_data = request.data
+
+        try:
+            result = ChannelPaymentService.refund_channel(appointment_id=pk, expense_data=expense_data)
+            return Response(result, status=status.HTTP_201_CREATED)
+
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": f"Refund failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
