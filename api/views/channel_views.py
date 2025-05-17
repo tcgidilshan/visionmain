@@ -10,6 +10,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from ..services.doctor_schedule_service import DoctorScheduleService
 from ..services.pagination_service import PaginationService
 from ..services.patient_service import PatientService
+from ..services.soft_delete_service import ChannelSoftDeleteService
 from django.shortcuts import get_object_or_404
 class ChannelAppointmentView(APIView):
     @transaction.atomic
@@ -375,4 +376,12 @@ class ChannelUpdateView(APIView):
 
         except Exception as e:
             transaction.set_rollback(True)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+class CancelChannelView(APIView):
+    def delete(self, request, pk):
+        try:
+            result = ChannelSoftDeleteService.soft_delete_channel(pk)
+            return Response(result, status=status.HTTP_200_OK)
+        except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

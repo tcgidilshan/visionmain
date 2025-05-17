@@ -216,6 +216,11 @@ class Code(models.Model):
 
     def __str__(self):
         return self.name
+    class Meta:
+        unique_together = (
+            'brand',
+            'name'
+        )
     
 class Frame(models.Model):
     BRAND_CHOICES = (
@@ -635,6 +640,16 @@ class Schedule(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = SoftDeleteManager()      # Only active records
+    all_objects = models.Manager() 
+
+    def delete(self, using=None, keep_parents=False):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save()
 
     class Meta:
         unique_together = ('doctor', 'branch', 'date', 'start_time') 
@@ -666,9 +681,18 @@ class Appointment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     note = models.TextField(blank=True, null=True, max_length=20)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
+    objects = SoftDeleteManager()      # Only active records
+    all_objects = models.Manager() 
     class Meta:
         unique_together = ('branch', 'invoice_number')
+
+    def delete(self, using=None, keep_parents=False):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save()
 
     def save(self, *args, **kwargs):
         if self.invoice_number is None and self.branch:
@@ -710,6 +734,16 @@ class ChannelPayment(models.Model):
     is_final = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = SoftDeleteManager()      # Only active records
+    all_objects = models.Manager() 
+
+    def delete(self, using=None, keep_parents=False):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save()
 
     def __str__(self):
         return f"Payment for {self.appointment.id} - {self.amount} ({self.payment_method})"
