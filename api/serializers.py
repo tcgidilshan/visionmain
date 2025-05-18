@@ -116,9 +116,10 @@ class ColorSerializer(serializers.ModelSerializer):
         fields = ['id', 'name']
         
 class CodeSerializer(serializers.ModelSerializer):
+    brand_name = serializers.CharField(source='brand.name', read_only=True)
     class Meta:
         model = Code
-        fields = ['id', 'name', 'brand']
+        fields = ['id', 'name', 'brand','brand_name']
         
 class FrameSerializer(serializers.ModelSerializer):
     brand_name = serializers.CharField(source='brand.name', read_only=True)  # Get brand name
@@ -557,7 +558,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'branch',
             'updated_at',  # Record update timestamp
             'branch_name',
-            'invoice_number'
+            'invoice_number',
+            'note'
         ]
 
 class ChannelPaymentSerializer(serializers.ModelSerializer):
@@ -602,9 +604,11 @@ class ChannelListSerializer(serializers.ModelSerializer):
             'first_payment',
             'invoice_number',
             'date',  # For filtering
+            'time',
             'total_payment',
             'balance',
-            'amount'
+            'amount',
+            'note'
         ]
 
     def get_first_payment(self, obj):

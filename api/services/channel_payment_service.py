@@ -1,6 +1,11 @@
 from ..models import ChannelPayment,Appointment
 from decimal import Decimal
-
+from django.utils import timezone
+from django.db import transaction
+from django.core.exceptions import ValidationError
+from ..models import Appointment
+from ..models import Expense
+from ..serializers import ExpenseSerializer
 
 class ChannelPaymentService:
     @staticmethod
@@ -34,3 +39,37 @@ class ChannelPaymentService:
             appointment.save()
 
         return payment
+    
+    @staticmethod
+    @transaction.atomic
+    def refund_channel(appointment_id, expense_data):
+        try:
+            appointment = Appointment.all_objects.get(id=appointment_id)
+        except Appointment.DoesNotExist:
+            raise ValidationError("Appointment not found.")
+
+        if appointment.is_refund:
+            raise ValidationError("This appointment has already been refunded.")
+
+        # Step 1: Mark as refunded
+        appointment.is_refund = True
+        appointment.refunded_at = timezone.now()
+        appointment.refund_note = f"Refunded via expense #{timezone.now().isoformat()}"
+        appointment.save()
+
+        # Step 2: Enrich expense data
+        expense_data['amount'] = str(appointment.amount)
+        expense_data['note'] = f"Refund for cancelled appointment #{appointment.id}"
+        expense_data['paid_source'] = "cash"
+
+        # Step 3: Create expense
+        serializer = ExpenseSerializer(data=expense_data)
+        serializer.is_valid(raise_exception=True)
+        expense = serializer.save()
+
+        return {
+            "message": "Refund processed successfully.",
+            "appointment_id": appointment.id,
+            "refund_expense_id": expense.id
+        }
+

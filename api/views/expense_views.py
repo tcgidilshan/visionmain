@@ -10,28 +10,28 @@ from ..services.safe_service import SafeService
 from django.db.models import Sum
 from django.utils.dateparse import parse_date
 from django.db import transaction
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.db import transaction
+from decimal import Decimal
 
 # ---------- Main Category Views ----------
 class ExpenseMainCategoryListCreateView(generics.ListCreateAPIView):
     queryset = ExpenseMainCategory.objects.all()
     serializer_class = ExpenseMainCategorySerializer
 
-
 class ExpenseMainCategoryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ExpenseMainCategory.objects.all()
     serializer_class = ExpenseMainCategorySerializer
-
 
 # ---------- Sub Category Views ----------
 class ExpenseSubCategoryListCreateView(generics.ListCreateAPIView):
     queryset = ExpenseSubCategory.objects.select_related('main_category').all()
     serializer_class = ExpenseSubCategorySerializer
-
-
 class ExpenseSubCategoryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ExpenseSubCategory.objects.all()
     serializer_class = ExpenseSubCategorySerializer
-
 class ExpenseCreateView(APIView):
     def post(self, request):
         serializer = ExpenseSerializer(data=request.data)
@@ -96,40 +96,75 @@ class ExpenseReportView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-class ExpenseUpdateView(generics.UpdateAPIView):
-    queryset = Expense.objects.all()
-    serializer_class = ExpenseSerializer
-
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-
-        # Capture the original amount
-        original_amount = instance.amount
-        original_date = instance.created_at.date()
-        branch_id = instance.branch_id
-
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-
-        updated_amount = serializer.validated_data.get('amount', original_amount)
-
-        # Calculate adjusted total: (current total - original + new)
+class ExpenseUpdateView(APIView):
+    def put(self, request, pk):
         try:
-            ExpenseValidationService.validate_expense_update(
-                expense_instance=instance,
-                new_amount=updated_amount,
-                branch_id=branch_id,
-                date=original_date
-            )
-        except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            expense = Expense.objects.get(pk=pk)
+        except Expense.DoesNotExist:
+            return Response({"error": "Expense not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        with transaction.atomic():
-            self.perform_update(serializer)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        old_amount = expense.amount
+        old_paid_source = expense.paid_source
+        serializer = ExpenseSerializer(expense, data=request.data, partial=True)
 
-    def get_object(self):
-        return super().get_object()
+        if serializer.is_valid():
+            new_amount = Decimal(str(serializer.validated_data.get('amount', expense.amount)))
+            new_paid_source = serializer.validated_data.get('paid_source', expense.paid_source)
+            branch_id = serializer.validated_data.get('branch', expense.branch).id
+
+            try:
+                with transaction.atomic():
+                    # Validate only if new paid source is safe
+                    if new_paid_source == 'safe':
+                        if old_paid_source != 'safe':
+                            # Full amount must now be covered by safe
+                            SafeService.validate_sufficient_balance(branch_id, new_amount)
+                        elif new_amount > old_amount:
+                            # Only the delta must be available
+                            SafeService.validate_sufficient_balance(branch_id, new_amount - old_amount)
+                    else:
+                        ExpenseValidationService.validate_expense_limit(branch_id, new_amount)
+
+                    # Update expense
+                    expense = serializer.save()
+
+                    # Update safe transaction if necessary
+                    if old_paid_source == 'safe' and new_paid_source != 'safe':
+                        # Revert old expense from safe
+                        SafeService.record_transaction(
+                            branch=expense.branch,
+                            amount=old_amount,
+                            transaction_type='income',
+                            reason=f"Revert: {expense.main_category.name} - {expense.sub_category.name}",
+                            reference_id=f"expense-{expense.id}"
+                        )
+                    elif old_paid_source != 'safe' and new_paid_source == 'safe':
+                        # New expense from safe
+                        SafeService.record_transaction(
+                            branch=expense.branch,
+                            amount=new_amount,
+                            transaction_type='expense',
+                            reason=f"{expense.main_category.name} - {expense.sub_category.name}",
+                            reference_id=f"expense-{expense.id}"
+                        )
+                    elif old_paid_source == 'safe' and new_paid_source == 'safe':
+                        delta = new_amount - old_amount
+                        if delta != 0:
+                            txn_type = 'expense' if delta > 0 else 'income'
+                            SafeService.record_transaction(
+                                branch=expense.branch,
+                                amount=abs(delta),
+                                transaction_type=txn_type,
+                                reason=f"Adjustment: {expense.main_category.name} - {expense.sub_category.name}",
+                                reference_id=f"expense-{expense.id}"
+                            )
+
+                    return Response(ExpenseSerializer(expense).data, status=status.HTTP_200_OK)
+
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ExpenseRetrieveView(generics.RetrieveAPIView):
     queryset = Expense.objects.all()
