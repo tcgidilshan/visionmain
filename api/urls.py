@@ -46,7 +46,7 @@ from .views import (
     ExternalLensCoatingRetrieveUpdateDeleteView,SafeAll,
     LensCoatingListCreateView,ExternalLensBrandListCreateView,
     ExternalLensBrandRetrieveUpdateDeleteView,SafeIncomeTotalView,
-    LensCoatingRetrieveUpdateDeleteView,FrameOnlyOrderCreateView,
+    LensCoatingRetrieveUpdateDeleteView,FrameOnlyOrderCreateView,CreateSolderingOrderView,
     ManualOrderCreateView,DoctorAppointmentTransferView,ChannelRepaymentView,
     InvoiceDetailView,BankDepositListCreateView,BankDepositRetrieveUpdateView,BankDepositConfirmView,
     OrderUpdateView,DailyFinanceSummaryView,FrameReportView,
@@ -231,6 +231,8 @@ urlpatterns = [
     path('doctor-claims-channels/', DoctorClaimChannelListCreateView.as_view(), name='doctor-claim-channel-list-create'),
     path('doctor-claims-channels/<int:pk>/', DoctorClaimChannelRetrieveUpdateDestroyView.as_view(), name='doctor-claim-channel-rud'),
 
+    #soldering
+    path('soldering/orders/create/', CreateSolderingOrderView.as_view(), name='create-soldering-order'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

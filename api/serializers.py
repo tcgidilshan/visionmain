@@ -2,30 +2,17 @@ from rest_framework import serializers
 from django.db.models import Sum
 from rest_framework.exceptions import ValidationError
 from .models import (
-    Branch,
-    Refraction,
-    RefractionDetails,
-    Brand,
-    Color,
-    Code,
-    Frame,
+    Branch,Refraction,RefractionDetails,
+    Brand,Color,Code,Frame,
     FrameStock,
     LenseType,
     Coating,
     Lens,
     LensStock,
     Power,
-    LensPower,
-    LensCleaner,
-    LensCleanerStock,
-    Order,
-    OrderItem,
-    OrderPayment,
-    Doctor,
-    Patient,
-    Schedule,
-    Appointment,
-    ChannelPayment,
+    LensPower,LensCleaner,
+    LensCleanerStock,Order,OrderItem,OrderPayment,Doctor,Patient,Schedule,Appointment,
+    ChannelPayment,SolderingOrder, SolderingInvoice, SolderingPayment,
     CustomUser,SafeTransaction,SafeBalance,
     Invoice,ExternalLensCoating, ExternalLensBrand,
     ExternalLens,BusSystemSetting,
@@ -977,3 +964,18 @@ class ExternalLensOrderItemSerializer(serializers.ModelSerializer):
                 from .serializers import OrderPaymentSerializer  # Avoid circular import if needed
                 return OrderPaymentSerializer(payments, many=True).data
             return []
+    
+class SolderingOrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SolderingOrder
+        fields = '__all__'
+
+class SolderingInvoiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SolderingInvoice
+        fields = '__all__'
+
+class SolderingPaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SolderingPayment
+        fields = '__all__'

@@ -876,5 +876,79 @@ class DoctorClaimChannel(models.Model):
 
     def __str__(self):
         return f"{self.invoice_number} on {self.date}"
+    
+class SolderingOrder(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        IN_PROGRESS = 'in_progress', 'In Progress'
+        READY = 'ready', 'Ready'
+        COMPLETED = 'completed', 'Completed'
+        CANCELLED = 'cancelled', 'Cancelled'
+
+    note = models.TextField(blank=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    patient = models.ForeignKey(Patient, related_name='soldering_orders', on_delete=models.CASCADE)
+    branch = models.ForeignKey(
+        'Branch',
+        on_delete=models.CASCADE,
+        related_name='soldering_orders',
+        null=True,
+        blank=True 
+    )
+    order_date = models.DateField(auto_now_add=True)
+    order_updated_date = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = SoftDeleteManager()      # Only active payments
+    all_objects = models.Manager()     # Include soft-deleted
+
+    def __str__(self):
+        return f"Soldering Order #{self.id} for {self.patient}"
+    
+class SolderingInvoice(models.Model):
+    invoice_number = models.CharField(max_length=50, unique=True)
+    invoice_date = models.DateField(auto_now_add=True)
+    order = models.ForeignKey(SolderingOrder, related_name='invoices', on_delete=models.CASCADE)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = SoftDeleteManager()      # Only active payments
+    all_objects = models.Manager()     # Include soft-deleted
+
+    def __str__(self):
+        return f"Invoice #{self.invoice_number}"
+class SolderingPayment(models.Model):
+    PAYMENT_METHOD_CHOICES = [
+    ('credit_card', 'Credit Card'),
+    ('cash', 'Cash'),
+    ('online_transfer', 'Online Transfer'),
+]
+    class TransactionStatus(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        COMPLETED = 'completed', 'Completed'
+        FAILED = 'failed', 'Failed'
+        REFUNDED = 'refunded', 'Refunded'
+
+    payment_date = models.DateTimeField(auto_now_add=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_method = models.CharField(max_length=30, choices=PAYMENT_METHOD_CHOICES)
+    transaction_status = models.CharField(max_length=20, choices=TransactionStatus.choices, default=TransactionStatus.COMPLETED)
+    is_final_payment = models.BooleanField(default=False)
+    is_partial = models.BooleanField(default=False)
+    order = models.ForeignKey('SolderingOrder', related_name='payments', on_delete=models.CASCADE)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = SoftDeleteManager()      # Only active payments
+    all_objects = models.Manager()     # Include soft-deleted
+
+    def __str__(self):
+        return f"Payment #{self.id} - Order #{self.order.id}"
+
+
+
 
     
