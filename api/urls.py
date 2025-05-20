@@ -47,7 +47,7 @@ from .views import (
     LensCoatingListCreateView,ExternalLensBrandListCreateView,
     ExternalLensBrandRetrieveUpdateDeleteView,SafeIncomeTotalView,
     LensCoatingRetrieveUpdateDeleteView,FrameOnlyOrderCreateView,CreateSolderingOrderView,
-    ManualOrderCreateView,DoctorAppointmentTransferView,ChannelRepaymentView,
+   ChannelRepaymentView,ManualOrderCreateView,DoctorAppointmentTransferView,ChannelRepaymentView,AppointmentStatusListView,
     InvoiceDetailView,BankDepositListCreateView,BankDepositRetrieveUpdateView,BankDepositConfirmView,
     OrderUpdateView,DailyFinanceSummaryView,FrameReportView,
     RefractionDetailRetrieveUpdateDeleteView,BusSystemSettingListCreateView,BusSystemSettingRetrieveUpdateDeleteView,
@@ -194,6 +194,7 @@ urlpatterns = [
     path('channels/<int:pk>/update/', ChannelUpdateView.as_view(), name='channel-update'),
     path('channel/<int:pk>/cancel/', CancelChannelView.as_view(), name='cancel-channel'), #soft delete
     path('channel/<int:pk>/refund/', RefundChannelView.as_view(), name='refund-channel'),
+    path('channels/status/', AppointmentStatusListView.as_view(), name='channel-status-list'),#deleted refunded filter
 
     #channel repayment
     path('channel/repayments/', ChannelRepaymentView.as_view(), name='channel-repayments'),

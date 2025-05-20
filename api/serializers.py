@@ -578,6 +578,10 @@ class ChannelListSerializer(serializers.ModelSerializer):
     invoice_number = serializers.IntegerField(read_only=True)
     total_payment = serializers.SerializerMethodField(read_only=True)
     balance = serializers.SerializerMethodField()
+    is_deleted = serializers.BooleanField(read_only=True)
+    is_refund = serializers.BooleanField(read_only=True)
+    deleted_at = serializers.DateTimeField(read_only=True)
+    refunded_at = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = Appointment
@@ -595,7 +599,11 @@ class ChannelListSerializer(serializers.ModelSerializer):
             'total_payment',
             'balance',
             'amount',
-            'note'
+            'note',
+            'is_deleted',
+            'is_refund',
+            'deleted_at',
+            'refunded_at'
         ]
 
     def get_first_payment(self, obj):
@@ -622,7 +630,7 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'doctor', 'doctor_name', 'patient', 'patient_name',
             'address', 'contact_number', 'schedule', 'date', 'time',
-            'status', 'amount', 'channel_no', 'payments','invoice_number'
+            'status', 'amount', 'channel_no', 'payments','invoice_number','note',
         ]
     def get_payments(self, obj):
         """Fetch all related payments for this appointment."""
