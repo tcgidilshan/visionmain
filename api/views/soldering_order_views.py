@@ -97,6 +97,7 @@ class SolderingInvoiceSearchView(ListAPIView):
         patient_mobile = self.request.query_params.get('mobile')
         progress_status = self.request.query_params.get('progress_status')
         branch_id = self.request.query_params.get('branch_id')
+        nic = self.request.query_params.get('nic')
 
         if invoice_number:
             queryset = queryset.filter(invoice_number__icontains=invoice_number)
@@ -122,6 +123,8 @@ class SolderingInvoiceSearchView(ListAPIView):
             queryset = queryset.filter(order__progress_status=progress_status)
         if branch_id:
             queryset = queryset.filter(order__branch_id=branch_id)
+        if nic:
+            queryset = queryset.filter(order__patient__nic__icontains=nic)
         queryset = queryset.order_by('-invoice_date', '-id')
         return queryset
 
