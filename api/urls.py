@@ -62,7 +62,8 @@ from .views import (
     AdminCodeCheckView,ChannelReportView,DoctorScheduleCreateView,DoctorUpcomingScheduleView,DoctorScheduleTransferView,AllRoleCheckView,
     UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,BulkUpdateOrderProgressStatus,FactoryInvoiceExternalLenseSearchView,BulkUpdateOrderWhatAppMsgSent,
     DoctorClaimInvoiceListCreateView,DoctorClaimInvoiceRetrieveUpdateDestroyView,
-    DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView
+    DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView,
+    SolderingOrderProgressUpdateView,SolderingInvoiceSearchView
 )
 # from .views import CustomAuthToken
 
@@ -233,6 +234,8 @@ urlpatterns = [
 
     #soldering
     path('soldering/orders/create/', CreateSolderingOrderView.as_view(), name='create-soldering-order'),
+    path('soldering/orders/<int:pk>/update-progress/', SolderingOrderProgressUpdateView.as_view(), name='soldering-order-progress-update'),
+    path('soldering/invoices/search/', SolderingInvoiceSearchView.as_view(), name='soldering-invoice-search'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 
