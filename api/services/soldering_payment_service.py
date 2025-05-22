@@ -1,6 +1,7 @@
-from django.core.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError
 from ..models import SolderingPayment
 from decimal import Decimal
+from django.db import models
 
 class SolderingPaymentService:
     @staticmethod
@@ -48,3 +49,44 @@ class SolderingPaymentService:
             payment.save()
 
         return payment_instances
+
+    @staticmethod
+    def add_repayment(order, amount, payment_method, is_final_payment=False):
+        """
+        Add a repayment for a soldering order with validation.
+        This method now uses DRF's ValidationError to ensure API-friendly errors.
+        """
+        # Block repayments to deleted orders
+        if order.is_deleted:
+            raise ValidationError("Cannot add repayment to a deleted order.")
+
+        # Sum existing payments (exclude soft-deleted)
+        total_paid = SolderingPayment.objects.filter(
+            order=order, is_deleted=False
+        ).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
+        remaining = order.price - total_paid
+
+        # Block invalid or overpayment amounts
+        if amount <= 0:
+            raise ValidationError("Repayment amount must be positive.")
+        if amount > remaining:
+            raise ValidationError("Repayment exceeds remaining order balance.")
+
+        # Allow only one final payment
+        if is_final_payment and SolderingPayment.objects.filter(
+            order=order, is_final_payment=True, is_deleted=False
+        ).exists():
+            raise ValidationError("A final payment has already been made for this order.")
+
+        # Create and return the payment instance
+        payment = SolderingPayment.objects.create(
+            order=order,
+            amount=amount,
+            payment_method=payment_method,
+            transaction_status=SolderingPayment.TransactionStatus.COMPLETED,
+            is_final_payment=is_final_payment,
+            is_partial=(amount != remaining)
+        )
+        return payment
+
+        

@@ -1010,3 +1010,13 @@ class SolderingPaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = SolderingPayment
         fields = '__all__'
+
+class SolderingRepaymentInputSerializer(serializers.Serializer):
+    order_id = serializers.IntegerField()
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    payment_method = serializers.ChoiceField(choices=[
+        ('credit_card', 'Credit Card'),
+        ('cash', 'Cash'),
+        ('online_transfer', 'Online Transfer'),
+    ])
+    is_final_payment = serializers.BooleanField(default=False)
