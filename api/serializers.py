@@ -971,9 +971,32 @@ class SolderingOrderSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class SolderingInvoiceSerializer(serializers.ModelSerializer):
+    order_details = serializers.SerializerMethodField()
+    payments = serializers.SerializerMethodField()
+    patient= serializers.SerializerMethodField()
     class Meta:
         model = SolderingInvoice
-        fields = '__all__'
+        fields = [
+            "id",
+            "invoice_number",
+            "invoice_date",
+            "order_id",
+            "deleted_at",
+            "is_deleted",
+            "order_details",
+            "payments",
+            "patient"
+        ]
+    def get_order_details(self, obj):
+        return SolderingOrderSerializer(obj.order).data
+    
+    def get_patient(self, obj):
+        return PatientSerializer(obj.order.patient).data
+    def get_payments(self, obj):
+        # Get all payments for the linked order, and use your existing serializer
+        payments_qs = obj.order.payments.filter(is_deleted=False).order_by('payment_date')
+        return SolderingPaymentSerializer(payments_qs, many=True).data
+    
 
 class SolderingPaymentSerializer(serializers.ModelSerializer):
     class Meta:

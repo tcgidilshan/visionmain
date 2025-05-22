@@ -884,10 +884,17 @@ class SolderingOrder(models.Model):
         READY = 'ready', 'Ready'
         COMPLETED = 'completed', 'Completed'
         CANCELLED = 'cancelled', 'Cancelled'
+    class ProgressStatus(models.TextChoices):
+        RECEIVED_FROM_CUSTOMER = 'received_from_customer', 'Received from Customer'
+        ISSUE_TO_FACTORY = 'issue_to_factory', 'Issued to Factory'
+        RECEIVED_FROM_FACTORY = 'received_from_factory', 'Received from Factory'
+        ISSUE_TO_CUSTOMER = 'issue_to_customer', 'Issued to Customer'
 
     note = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    progress_status = models.CharField(max_length=30, choices=ProgressStatus.choices, default=ProgressStatus.RECEIVED_FROM_CUSTOMER)
+    progress_status_updated_at = models.DateTimeField(auto_now=True)
     patient = models.ForeignKey(Patient, related_name='soldering_orders', on_delete=models.CASCADE)
     branch = models.ForeignKey(
         'Branch',
@@ -907,6 +914,18 @@ class SolderingOrder(models.Model):
 
     def __str__(self):
         return f"Soldering Order #{self.id} for {self.patient}"
+    
+    def save(self, *args, **kwargs):
+        if self.pk:
+            orig = SolderingOrder.all_objects.filter(pk=self.pk).first()
+            # Compare the original progress_status to the new one
+            if orig and orig.progress_status != self.progress_status:
+                self.progress_status_updated_at = timezone.now()
+        else:
+            # On creation, set to now
+            self.progress_status_updated_at = timezone.now()
+        super().save(*args, **kwargs)
+
     
 class SolderingInvoice(models.Model):
     invoice_number = models.CharField(max_length=50, unique=True)

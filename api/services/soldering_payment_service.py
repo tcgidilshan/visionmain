@@ -5,8 +5,6 @@ from decimal import Decimal
 class SolderingPaymentService:
     @staticmethod
     def process_solder_payments(order, payments_data):
-        if not payments_data:
-            raise ValidationError("At least one payment record is required.")
 
         total_paid = Decimal('0.00')
         payment_instances = []
@@ -14,8 +12,10 @@ class SolderingPaymentService:
 
         for payment in payments_data:
             amount = Decimal(str(payment.get('amount', 0)))
-            if amount <= 0:
-                raise ValidationError("Each payment amount must be greater than zero.")
+
+            # 1. Block all negative payments. Block zero unless order price is zero.
+            if amount < 0 or (amount == 0 and order.price != 0):
+                raise ValidationError("Zero-amount payment is only allowed if order price is zero.")
 
             method = payment.get('payment_method')
             is_final = payment.get('is_final_payment', False)
@@ -33,7 +33,7 @@ class SolderingPaymentService:
                 payment_method=method,
                 transaction_status=SolderingPayment.TransactionStatus.COMPLETED,
                 is_final_payment=is_final,
-                is_partial=False  # We'll adjust this after total is known
+                is_partial=False,  
             )
 
             payment_instances.append(payment_instance)
