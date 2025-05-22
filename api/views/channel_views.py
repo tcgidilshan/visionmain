@@ -403,3 +403,44 @@ class RefundChannelView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": f"Refund failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class AppointmentStatusListView(ListAPIView):
+    pagination_class = PaginationService
+    serializer_class = ChannelListSerializer
+
+    def get_queryset(self):
+        status_filter = self.request.query_params.get("status")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        queryset = Appointment.all_objects.prefetch_related('payments').select_related('doctor', 'patient', 'branch')
+
+        # Decide status and which date field to filter on
+        if status_filter == "deactivated":
+            queryset = queryset.filter(is_deleted=True, is_refund=False)
+            date_field = "deleted_at"
+        elif status_filter == "deactivated_refunded":
+            queryset = queryset.filter(is_deleted=True, is_refund=True)
+            date_field = "refunded_at"  # Use refund date for reporting
+        elif status_filter == "refunded":
+            queryset = queryset.filter(is_refund=True, is_deleted=False)
+            date_field = "refunded_at"
+        else:  # active or missing
+            queryset = queryset.filter(is_deleted=False, is_refund=False)
+            date_field = "date"
+
+        # Date filtering (on the selected field)
+        if start_date and end_date:
+            if start_date == end_date:
+                filter_kwargs = {f"{date_field}__date": start_date}
+                queryset = queryset.filter(**filter_kwargs)
+            else:
+                filter_kwargs = {f"{date_field}__date__range": [start_date, end_date]}
+                queryset = queryset.filter(**filter_kwargs)
+        elif start_date:
+            filter_kwargs = {f"{date_field}__date__gte": start_date}
+            queryset = queryset.filter(**filter_kwargs)
+        elif end_date:
+            filter_kwargs = {f"{date_field}__date__lte": end_date}
+            queryset = queryset.filter(**filter_kwargs)
+
+        return queryset
