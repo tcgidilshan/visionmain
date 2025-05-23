@@ -145,6 +145,17 @@ class SolderingOrderEditView(APIView):
         order = get_object_or_404(SolderingOrder, pk=pk, is_deleted=False)
         data = request.data
 
+        # --- Patient update ---
+        patient_data = data.get('patient')
+        if patient_data:
+            try:
+                # //TODO: Update or create patient using PatientService
+                patient = PatientService.create_or_update_patient(patient_data)
+                order.patient = patient
+            except Exception as ex:
+                transaction.set_rollback(True)
+                return Response({"error": f"Patient update failed: {ex}"}, status=400)
+
         # --- Only update allowed fields ---
         allowed_fields = ['price', 'note', 'progress_status']
         for field in allowed_fields:
@@ -187,7 +198,6 @@ class SolderingOrderEditView(APIView):
                     if not payment:
                         transaction.set_rollback(True)
                         return Response({"error": f"Payment with id {payment_id} not found."}, status=400)
-                    # Update existing payment
                     for field in ['amount', 'payment_method', 'is_final_payment']:
                         if field in payment_data:
                             setattr(payment, field, payment_data[field])
@@ -205,8 +215,6 @@ class SolderingOrderEditView(APIView):
                     )
 
             # --- Business Rule Validation ---
-            # //TODO: Use Decimal for calculations in production
-            from decimal import Decimal
             non_deleted_payments = order.payments.filter(is_deleted=False)
             total_paid = sum(Decimal(str(p.amount)) for p in non_deleted_payments)
             if total_paid > Decimal(str(order.price)):
@@ -218,5 +226,5 @@ class SolderingOrderEditView(APIView):
                 transaction.set_rollback(True)
                 return Response({"error": "Only one final payment is allowed."}, status=400)
 
-        # --- Output full, up-to-date order (ignores patient field in input) ---
+        # --- Output full, up-to-date order ---
         return Response(SolderingOrderSerializer(order).data, status=status.HTTP_200_OK)
