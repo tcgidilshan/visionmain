@@ -145,17 +145,6 @@ class SolderingOrderEditView(APIView):
         order = get_object_or_404(SolderingOrder, pk=pk, is_deleted=False)
         data = request.data
 
-        # --- Patient update ---
-        patient_data = data.get('patient')
-        if patient_data:
-            try:
-                # //TODO: Update or create patient using PatientService
-                patient = PatientService.create_or_update_patient(patient_data)
-                order.patient = patient
-            except Exception as ex:
-                transaction.set_rollback(True)
-                return Response({"error": f"Patient update failed: {ex}"}, status=400)
-
         # --- Only update allowed fields ---
         allowed_fields = ['price', 'note', 'progress_status']
         for field in allowed_fields:
