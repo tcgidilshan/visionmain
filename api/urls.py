@@ -63,7 +63,7 @@ from .views import (
     UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,BulkUpdateOrderProgressStatus,FactoryInvoiceExternalLenseSearchView,BulkUpdateOrderWhatAppMsgSent,
     DoctorClaimInvoiceListCreateView,DoctorClaimInvoiceRetrieveUpdateDestroyView,
     DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView,
-    SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView
+    SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,OrderUpdateFitStatusView,FittingStatusReportView
 )
 # from .views import CustomAuthToken
 
@@ -153,6 +153,12 @@ urlpatterns = [
     path('other-items/<int:pk>/', OtherItemRetrieveUpdateDeleteView.as_view(), name='other-item-detail'),
     path('orders/', OrderCreateView.as_view(), name='order-create'),
     path('orders/<int:pk>/', OrderUpdateView.as_view(), name='order-update'),
+    #feature fitting on collection
+    path('orders/<int:pk>/update-fit-status/', OrderUpdateFitStatusView.as_view(), name='order-update-fit-status'),
+    
+    path('reports/fitting-status/', FittingStatusReportView.as_view(), name='fitting-status-report'),
+
+
     # path("manual-orders/", ManualOrderCreateView.as_view(), name="manual-order-create"),
     path('orders/update-payments/', PaymentView.as_view(), name='update-payments'),
     path('orders/payments/', PaymentView.as_view(), name='order-payments'),
