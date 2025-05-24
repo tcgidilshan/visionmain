@@ -58,3 +58,21 @@ class OrderUpdateView(APIView):
         except Exception as e:
             transaction.set_rollback(True)
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class OrderUpdateFitStatusView(APIView):
+    """
+    API View to update the fit status of an order.
+    """
+
+    @transaction.atomic
+    def put(self, request, pk, *args, **kwargs):
+        try:
+            order = Order.objects.get(pk=pk)
+            order.fitting_status = request.data.get("fitting_status")
+            order.save()
+            return Response({"message": "Order fit status updated successfully."}, status=status.HTTP_200_OK)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            transaction.set_rollback(True)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

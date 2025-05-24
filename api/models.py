@@ -370,6 +370,12 @@ class Order(models.Model):
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
     ]
+    FITTING_CHOICES = [
+        ('fitting_ok', 'Pending'),
+        ('not_fitting', 'Not Fitting'),
+        ('damage', 'Damage'),
+    
+    ]
 
     customer = models.ForeignKey(Patient, related_name='orders', on_delete=models.CASCADE)
     refraction = models.ForeignKey(Refraction, null=True, blank=True, on_delete=models.SET_NULL)
@@ -408,6 +414,8 @@ class Order(models.Model):
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
+    fitting_status = models.CharField(max_length=20, choices=FITTING_CHOICES, default='not_fitting')
+    fitting_status_updated_date = models.DateTimeField(null=True, blank=True)
     objects = SoftDeleteManager()      # Only active records
     all_objects = models.Manager() 
 
@@ -418,6 +426,18 @@ class Order(models.Model):
         self.is_deleted = True
         self.deleted_at = timezone.now()
         self.save()
+    def save(self, *args, **kwargs):
+        if self.pk:
+            # Fetch the original from the database
+            orig = Order.all_objects.filter(pk=self.pk).first()
+            # Only update the timestamp if status actually changed
+            if orig and orig.fitting_status != self.fitting_status:
+                self.fitting_status_updated_date = timezone.now()
+        else:
+            # On create, set timestamp if not already set
+            if not self.fitting_status_updated_date:
+                self.fitting_status_updated_date = timezone.now()
+        super().save(*args, **kwargs)
     
 class ExternalLens(models.Model):
     BRAND_CHOICES = (

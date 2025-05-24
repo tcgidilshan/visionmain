@@ -21,7 +21,7 @@ from .lens_type_views import LensTypeListCreateView,LensTypeRetrieveUpdateDelete
 from .lens_coating_views import LensCoatingListCreateView,LensCoatingRetrieveUpdateDeleteView
 from .manual_order_views import ManualOrderCreateView
 from .Invoice_detail_view import InvoiceDetailView
-from .order_update_view import OrderUpdateView
+from .order_update_view import OrderUpdateView,OrderUpdateFitStatusView
 from .lens_search_views import LensSearchView
 from .frame_color_views import FrameColorListView
 from .payment_view import PaymentView
@@ -51,3 +51,4 @@ from .channel_repayment_views import ChannelRepaymentView
 from .safe_transaction_views import SafeTransaction,SafeIncomeTotalView,SafeAll
 from .doctor_claim_views import DoctorClaimInvoiceListCreateView,DoctorClaimInvoiceRetrieveUpdateDestroyView,DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView
 from .soldering_order_views import CreateSolderingOrderView,SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView
+from .order_report import FittingStatusReportView

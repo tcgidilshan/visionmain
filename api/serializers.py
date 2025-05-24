@@ -353,7 +353,7 @@ class OrderSerializer(serializers.ModelSerializer):
         queryset=BusSystemSetting.objects.all(), required=False, allow_null=True
     )
     bus_title_name = serializers.PrimaryKeyRelatedField(source='bus_title.title', read_only=True)
-
+    
     def to_representation(self, instance):
         if instance.is_deleted:
             raise serializers.ValidationError("This order has been deleted.")
@@ -394,6 +394,8 @@ class OrderSerializer(serializers.ModelSerializer):
             'bus_title',
             'bus_title_name',
             'progress_status',
+            'fitting_status',
+            'fitting_status_updated_date',
         ] 
 
 class ExternalLensSerializer(serializers.ModelSerializer):
@@ -685,6 +687,12 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
     on_hold = serializers.BooleanField(
         source='order.on_hold', read_only=True
     )
+    fitting_status = serializers.CharField(
+        source='order.fitting_status', read_only=True
+    )
+    fitting_status_updated_date = serializers.DateTimeField(
+        source='order.fitting_status_updated_date', read_only=True
+    )
     class Meta:
         model = Invoice
         fields = [
@@ -700,7 +708,9 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
             'fitting_on_collection',
             'on_hold',
             'payments',
-            'progress_status'
+            'progress_status',
+            'fitting_status',
+            'fitting_status_updated_date'
         ]
     def get_payments(self, obj):
             # Get the order related to this invoice
