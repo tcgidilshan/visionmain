@@ -155,7 +155,6 @@ urlpatterns = [
     path('orders/<int:pk>/', OrderUpdateView.as_view(), name='order-update'),
     #feature fitting on collection
     path('orders/<int:pk>/update-fit-status/', OrderUpdateFitStatusView.as_view(), name='order-update-fit-status'),
-    
     path('reports/fitting-status/', FittingStatusReportView.as_view(), name='fitting-status-report'),
 
 
@@ -243,7 +242,7 @@ urlpatterns = [
     path('soldering/orders/create/', CreateSolderingOrderView.as_view(), name='create-soldering-order'),
     path('soldering/orders/<int:pk>/update-progress/', SolderingOrderProgressUpdateView.as_view(), name='soldering-order-progress-update'),
     path('soldering/invoices/search/', SolderingInvoiceSearchView.as_view(), name='soldering-invoice-search'),
-     path('soldering/orders/<int:pk>/edit/', SolderingOrderEditView.as_view(), name='soldering-order-edit'),
+    path('soldering/orders/<int:pk>/edit/', SolderingOrderEditView.as_view(), name='soldering-order-edit'),
 
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
