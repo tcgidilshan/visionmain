@@ -2,31 +2,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from datetime import datetime
-from ..models import Order
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from datetime import datetime
-from ..models import Order
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from datetime import datetime
-from ..models import Order
-from ..services.pagination_service import PaginationService
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from datetime import datetime
 from ..models import Order, Invoice
 from ..serializers import InvoiceSearchSerializer
 from ..services.pagination_service import PaginationService
 
 class FittingStatusReportView(APIView):
     permission_classes = [IsAuthenticated]
-    VALID_STATUSES = {'fitting_ok', 'not_fitting', 'damage'}
+    VALID_STATUSES = {'fitting_ok', 'not_fitting', 'damage', 'Pending'}
 
     def get(self, request):
         branch_id = request.query_params.get('branch_id')
@@ -46,22 +28,21 @@ class FittingStatusReportView(APIView):
             except ValueError:
                 return Response({'error': 'Invalid date format, use YYYY-MM-DD'}, status=400)
 
-        # Fitting status filter
-        if fitting_status:
-            if fitting_status not in self.VALID_STATUSES:
-                return Response({'error': f"Invalid fitting_status. Choose one of: {', '.join(self.VALID_STATUSES)}"}, status=400)
+        # Fitting status filter: skip "Pending" by default
+        if fitting_status is not None and fitting_status.strip() != "":
             orders_qs = orders_qs.filter(fitting_status=fitting_status)
+        else:
+            orders_qs = orders_qs.exclude(fitting_status="Pending")
 
-        # --- ONLY ORDERS WITH FACTORY INVOICE ---
+        # Only orders with factory invoice
         factory_order_ids = Invoice.objects.filter(
             is_deleted=False,
             invoice_type='factory',
             order__in=orders_qs
         ).values_list("order_id", flat=True)
-
         orders_qs = orders_qs.filter(id__in=factory_order_ids)
 
-        # --- SUMMARY METRICS (all for this branch and filters) ---
+        # Metrics & pagination as before...
         damage_count = orders_qs.filter(fitting_status='damage').count()
         fitting_ok_count = orders_qs.filter(fitting_status='fitting_ok').count()
         fitting_not_ok_count = orders_qs.filter(fitting_status='not_fitting').count()
@@ -74,7 +55,6 @@ class FittingStatusReportView(APIView):
         ]
         non_stock_lens_orders_count = len(non_stock_order_ids)
 
-        # --- PAGINATE THE FACTORY INVOICE LIST ---
         invoice_qs = Invoice.objects.filter(
             order__in=orders_qs,
             is_deleted=False,
@@ -84,7 +64,6 @@ class FittingStatusReportView(APIView):
         paginated_invoices = paginator.paginate_queryset(invoice_qs, request)
         serialized_invoices = InvoiceSearchSerializer(paginated_invoices, many=True).data
 
-        # Combine metrics and results in paginated response
         result = {
             "branch_id": branch_id,
             "damage_count": damage_count,

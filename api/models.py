@@ -371,7 +371,8 @@ class Order(models.Model):
         ('cancelled', 'Cancelled'),
     ]
     FITTING_CHOICES = [
-        ('fitting_ok', 'Pending'),
+        ('pending', 'Pending'),
+        ('fitting_ok', 'Fitting Ok'),
         ('not_fitting', 'Not Fitting'),
         ('damage', 'Damage'),
     
@@ -414,7 +415,7 @@ class Order(models.Model):
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
-    fitting_status = models.CharField(max_length=20, choices=FITTING_CHOICES, default='not_fitting')
+    fitting_status = models.CharField(max_length=20, choices=FITTING_CHOICES, default='Pending')
     fitting_status_updated_date = models.DateTimeField(null=True, blank=True)
     objects = SoftDeleteManager()      # Only active records
     all_objects = models.Manager() 
