@@ -419,7 +419,7 @@ class Order(models.Model):
         blank=True,
         related_name='issued_orders'
     )
-    issued_date = models.DateTimeField(auto_now_add=True)
+    issued_date = models.DateTimeField(default=timezone.now)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
