@@ -377,7 +377,7 @@ class Order(models.Model):
         ('damage', 'Damage'),
     
     ]
-
+    urgent=models.BooleanField(default=False)
     customer = models.ForeignKey(Patient, related_name='orders', on_delete=models.CASCADE)
     refraction = models.ForeignKey(Refraction, null=True, blank=True, on_delete=models.SET_NULL)
     branch = models.ForeignKey(
@@ -412,6 +412,14 @@ class Order(models.Model):
         blank=True,
         related_name='orders'
     )
+    issued_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='issued_orders'
+    )
+    issued_date = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
@@ -574,14 +582,6 @@ class OrderItem(models.Model):
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     is_non_stock = models.BooleanField(default=False)  # ✅ Mark Non-Stock Items
     note = models.TextField(blank=True, null=True)
-    whatsapp_sent = models.CharField(max_length=20,
-    choices=[
-        ('sent', 'Sent'),
-        ('not_sent', 'Not Sent'),
-    ],
-    null=True,
-    blank=True
-    )
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
@@ -600,7 +600,18 @@ class OrderItem(models.Model):
         self.is_deleted = True
         self.deleted_at = timezone.now()
         self.save()
-    
+class OrderItemWhatsAppLog(models.Model):
+    # Only log when a WhatsApp message is actually sent
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name='whatsapp_logs'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)  # When sent
+
+    def __str__(self):
+        return f"Order {self.order.id} WhatsApp sent at {self.created_at}"
+
 class OrderPayment(models.Model):
     PAYMENT_METHOD_CHOICES = [
         ('credit_card', 'Credit Card'),

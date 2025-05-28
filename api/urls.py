@@ -60,10 +60,10 @@ from .views import (
     ExpenseSubCategoryListCreateView, ExpenseSubCategoryRetrieveUpdateDestroyView,ExpenseRetrieveView,
     UserCodeCheckView,ChannelTransferView,DoctorAbsenceRescheduleView,ExpenseReportView,FrameOnlyOrderUpdateView,
     AdminCodeCheckView,ChannelReportView,DoctorScheduleCreateView,DoctorUpcomingScheduleView,DoctorScheduleTransferView,AllRoleCheckView,
-    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,BulkUpdateOrderProgressStatus,FactoryInvoiceExternalLenseSearchView,BulkUpdateOrderWhatAppMsgSent,
+    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,BulkUpdateOrderProgressStatus,FactoryInvoiceExternalLenseSearchView,BulkOrderWhatsAppLogView,
     DoctorClaimInvoiceListCreateView,DoctorClaimInvoiceRetrieveUpdateDestroyView,
     DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView,
-    SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,OrderUpdateFitStatusView,FittingStatusReportView
+    SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView
 )
 # from .views import CustomAuthToken
 
@@ -172,7 +172,7 @@ urlpatterns = [
     path('factory-invoice/external-lense/search/', FactoryInvoiceExternalLenseSearchView.as_view(), name='factory-invoice-external-lense-search'),
     path('factory-invoices/bulk-update-status/', BulkUpdateOrderProgressStatus.as_view(), 
      name='factory-invoice-bulk-status-update'),
-    path('factory-invoices/bulk-update-whatsapp-sent/', BulkUpdateOrderWhatAppMsgSent.as_view(), 
+    path('factory-invoices/bulk-update-whatsapp-sent/', BulkOrderWhatsAppLogView.as_view(), 
      name='factory-invoice-bulk-whatsapp-sent'),
     #invoice
     path('invoices/<int:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'), #invoice
@@ -243,7 +243,7 @@ urlpatterns = [
     path('soldering/orders/<int:pk>/update-progress/', SolderingOrderProgressUpdateView.as_view(), name='soldering-order-progress-update'),
     path('soldering/invoices/search/', SolderingInvoiceSearchView.as_view(), name='soldering-invoice-search'),
     path('soldering/orders/<int:pk>/edit/', SolderingOrderEditView.as_view(), name='soldering-order-edit'),
-
+    path('invoices/search-by-number/', InvoiceNumberSearchView.as_view(), name='invoice-number-mini-search'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 
