@@ -44,14 +44,12 @@ class GlassSenderReportView(ListAPIView):
 
         return queryset
 
-def list(self, request, *args, **kwargs):
-    queryset = self.get_queryset()
-    user_id = request.query_params.get('user_id')
-    response = super().list(request, *args, **kwargs)
-    if user_id:
-        user_total_count = queryset.count()
-        # Only add extra key, don't replace results!
-        if isinstance(response.data, dict) and 'results' in response.data:
-            response.data['user_total_count'] = user_total_count
-    return response
-
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        user_id = request.query_params.get('user_id')
+        response = super().list(request, *args, **kwargs)
+        if user_id:
+            user_total_count = queryset.count()
+            if isinstance(response.data, dict) and 'results' in response.data:
+                response.data['user_total_count'] = user_total_count
+        return response
