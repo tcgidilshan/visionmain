@@ -419,7 +419,7 @@ class Order(models.Model):
         blank=True,
         related_name='issued_orders'
     )
-    issued_date = models.DateTimeField(default=timezone.now)
+    issued_date = models.DateTimeField(null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
@@ -442,10 +442,17 @@ class Order(models.Model):
             # Only update the timestamp if status actually changed
             if orig and orig.fitting_status != self.fitting_status:
                 self.fitting_status_updated_date = timezone.now()
+               # If issued_by was previously None and is now set, or issued_by changes
+            if orig and orig.issued_by != self.issued_by and self.issued_by is not None:
+                self.issued_date = timezone.now()
         else:
             # On create, set timestamp if not already set
             if not self.fitting_status_updated_date:
                 self.fitting_status_updated_date = timezone.now()
+
+            # On create, set issued_date only if issued_by is set at creation
+            if self.issued_by is not None:
+                self.issued_date = timezone.now()   
         super().save(*args, **kwargs)
     
 class ExternalLens(models.Model):

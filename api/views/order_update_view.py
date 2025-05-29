@@ -2,12 +2,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-from ..models import Order,ExternalLens
+from ..models import Order,ExternalLens,Invoice, CustomUser
 from ..serializers import OrderSerializer,ExternalLensSerializer
 from ..services.order_service import OrderService
 from ..services.patient_service import PatientService
 from ..services.external_lens_service import ExternalLensService
 from rest_framework.exceptions import ValidationError
+from django.utils import timezone
 
 class OrderUpdateView(APIView):
     """
@@ -76,3 +77,42 @@ class OrderUpdateFitStatusView(APIView):
         except Exception as e:
             transaction.set_rollback(True)
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class OrderDeliveryMarkView(APIView):
+    """
+    Mark order as delivered to customer.
+    Expects: invoice_number, user_code, password in POST body.
+    """
+    def post(self, request):
+        invoice_number = request.data.get('invoice_number')
+        user_code = request.data.get('user_code')
+        password = request.data.get('password')
+
+        if not invoice_number or not user_code or not password:
+            return Response({'detail': 'All fields are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate user
+        try:
+            user = CustomUser.objects.get(user_code=user_code)
+        except CustomUser.DoesNotExist:
+            return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user.check_password(password):
+            return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Find the order by invoice number
+        try:
+            invoice = Invoice.objects.get(invoice_number=invoice_number)
+            order = invoice.order
+        except Invoice.DoesNotExist:
+            return Response({'detail': 'Invalid invoice number.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if order.issued_by:
+            return Response({'detail': 'This order is already marked as delivered.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Mark as delivered
+        order.issued_by = user
+        order.issued_date = timezone.now()
+        order.save()
+
+        return Response({'detail': 'Order marked as delivered.', 'order_id': order.id}, status=status.HTTP_200_OK)

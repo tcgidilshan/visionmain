@@ -12,7 +12,7 @@ class PatientListView(ListAPIView):
     """
     API View to List All Patients with Pagination and Search by Name or Phone
     """
-    queryset = Patient.objects.all()
+    queryset = Patient.objects.all().order_by('id')
     serializer_class = PatientSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = PaginationService

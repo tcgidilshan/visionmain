@@ -705,15 +705,23 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
     on_hold = serializers.BooleanField(
         source='order.on_hold', read_only=True
     )
-    issued_by = serializers.PrimaryKeyRelatedField(
-        queryset=CustomUser.objects.all(), allow_null=True, required=False
-    )
-    issued_by_user_name = serializers.CharField(source='issued_by.username', read_only=True)
-    issued_by_user_code = serializers.CharField(source='issued_by.user_code', read_only=True)
-    issued_date = serializers.DateTimeField(read_only=True)
     urgent = serializers.BooleanField(
         source='order.urgent', read_only=True
     )
+    #TODO: Access issued_by via the related Order object.
+    issued_by_user_name = serializers.CharField(
+        source='order.issued_by.username', read_only=True
+    )
+    issued_by_user_code = serializers.CharField(
+        source='order.issued_by.user_code', read_only=True
+    )
+    issued_by = serializers.PrimaryKeyRelatedField(
+        source='order.issued_by', read_only=True
+    )
+    issued_date = serializers.DateTimeField(
+        source='order.issued_date', read_only=True
+    )
+
     class Meta:
         model = Invoice
         fields = [
