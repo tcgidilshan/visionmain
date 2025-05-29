@@ -63,7 +63,8 @@ from .views import (
     UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,BulkUpdateOrderProgressStatus,FactoryInvoiceExternalLenseSearchView,BulkOrderWhatsAppLogView,
     DoctorClaimInvoiceListCreateView,DoctorClaimInvoiceRetrieveUpdateDestroyView,
     DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView,
-    SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView
+    SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
+    GlassSenderReportView
 )
 # from .views import CustomAuthToken
 
@@ -245,6 +246,8 @@ urlpatterns = [
     path('soldering/orders/<int:pk>/edit/', SolderingOrderEditView.as_view(), name='soldering-order-edit'),
     path('invoices/search-by-number/', InvoiceNumberSearchView.as_view(), name='invoice-number-mini-search'),
     path('orders/mark-delivered/', OrderDeliveryMarkView.as_view(), name='order-mark-delivered'),
+    #user order report 
+    path('report/glass-sender-report/', GlassSenderReportView.as_view(), name='glass-sender-report'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

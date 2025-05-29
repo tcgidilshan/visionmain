@@ -723,7 +723,12 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
     issued_date = serializers.DateTimeField(
         source='order.issued_date', read_only=True
     )
-
+    fitting_status_updated_date = serializers.DateTimeField(
+        source='order.fitting_status_updated_date', read_only=True
+    )
+    fitting_status = serializers.CharField(
+        source='order.fitting_status', read_only=True
+    )
     class Meta:
         model = Invoice
         fields = [
@@ -744,7 +749,9 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
             'issued_by_user_code',
             'issued_date',
             'progress_status',
-            'urgent'
+            'urgent',
+            'fitting_status',
+            'fitting_status_updated_date'
         ]
     def get_payments(self, obj):
             # Get the order related to this invoice
@@ -1064,3 +1071,28 @@ class SolderingRepaymentInputSerializer(serializers.Serializer):
         ('online_transfer', 'Online Transfer'),
     ])
     is_final_payment = serializers.BooleanField(default=False)
+
+class OrderLiteSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source='customer.name', read_only=True)
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
+    issued_by_username = serializers.CharField(source='issued_by.username', read_only=True)
+    invoice_number = serializers.CharField(source='invoice.invoice_number', read_only=True)
+    #TODO: Add more fields as needed
+
+    class Meta:
+        model = Order
+        fields = [
+            'id',
+            'customer_name',
+            'branch_name',
+            'order_date',
+            'status',
+            'progress_status',
+            'total_price',
+            'issued_by',
+            'issued_by_username',
+            'issued_date',
+            'urgent',
+            'invoice_number',
+            # Add any minimal fields required by your UI/report
+        ]
