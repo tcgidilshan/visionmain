@@ -1,9 +1,9 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from api.models import Invoice,Order,OrderItem
-from api.serializers import InvoiceSerializer
-
+from api.models import Invoice,Order,OrderItemWhatsAppLog
+from api.serializers import InvoiceSerializer,BulkWhatsAppLogCreateSerializer
+from django.utils import timezone
 class InvoiceProgressUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -72,22 +72,32 @@ class BulkUpdateOrderProgressStatus(APIView):
             'progress_status': new_status,
             'order_ids': order_ids
         }, status=status.HTTP_200_OK)
-class BulkUpdateOrderWhatAppMsgSent(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-    def patch(self, request):
-        order_ids = request.data.get('order_ids', [])
-        whatsapp_sent = request.data.get('whatsapp_sent')
 
-        if not order_ids or whatsapp_sent not in ['sent', 'not_sent']:
-            return Response(
-                {"error": "Invalid input. Provide 'order_ids' and a valid 'whatsapp_sent' value ('sent' or 'not_sent')."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+class BulkOrderWhatsAppLogView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = BulkWhatsAppLogCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        order_ids = serializer.validated_data['order_ids']
+        urgent_order_ids = serializer.validated_data.get('urgent_order_ids', [])
 
-        # Filter and bulk update
-        updated_count = OrderItem.objects.filter(order_id__in=order_ids).update(whatsapp_sent=whatsapp_sent)
+        logs_created = []
+        already_exists = []
+        now = timezone.now()
 
-        return Response(
-            {"message": f"Updated {updated_count} order items successfully."},
-            status=status.HTTP_200_OK
-        )
+        for oid in order_ids:
+            if not OrderItemWhatsAppLog.objects.filter(order_id=oid, created_at__date=now.date()).exists():
+                OrderItemWhatsAppLog.objects.create(order_id=oid)
+                logs_created.append(oid)
+            else:
+                already_exists.append(oid)
+
+        # Mark urgent, only for non-deleted, valid Orders
+        if urgent_order_ids:
+            #TODO Only update if order is not soft deleted
+            Order.objects.filter(id__in=urgent_order_ids, is_deleted=False).update(urgent=True)
+
+        return Response({
+            "logs_created": logs_created,
+            "already_exists_today": already_exists,
+            "marked_urgent": urgent_order_ids
+        }, status=status.HTTP_201_CREATED)

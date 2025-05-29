@@ -4,9 +4,10 @@ from rest_framework import permissions, status,generics
 from ..services.Invoice_service import InvoiceService
 from ..serializers import InvoiceSerializer,InvoiceSearchSerializer,ExternalLensOrderItemSerializer
 from rest_framework.pagination import PageNumberPagination
-from ..models import OrderItem
+from ..models import OrderItem,Invoice,OrderItemWhatsAppLog
 from ..services.pagination_service import PaginationService
-from datetime import datetime, timedelta
+from django.db.models import Exists, OuterRef
+
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 10  # Default page size
     page_size_query_param = 'page_size'  # Allow client to override
@@ -48,15 +49,16 @@ class FactoryInvoiceSearchView(APIView):
 class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
     serializer_class = ExternalLensOrderItemSerializer
     pagination_class = PaginationService
+
     def get_queryset(self):
         queryset = OrderItem.objects.filter(
             external_lens__isnull=False,
-            is_deleted=False,               # exclude soft-deleted order items
-            order__is_deleted=False         # exclude orders soft-deleted
+            is_deleted=False,
+            order__is_deleted=False
         ).select_related(
             'order__invoice', 'order__branch'
         ).filter(
-            order__invoice__is_deleted=False  # exclude invoices soft-deleted
+            order__invoice__is_deleted=False
         )
 
         invoice_number = self.request.query_params.get('invoice_number')
@@ -69,8 +71,17 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
         if invoice_number:
             queryset = queryset.filter(order__invoice__invoice_number__icontains=invoice_number)
 
+        # --- Only apply annotation/filter if param is present ---
         if whatsapp_sent in ['sent', 'not_sent']:
-            queryset = queryset.filter(whatsapp_sent=whatsapp_sent)
+            queryset = queryset.annotate(
+                has_whatsapp_log=Exists(
+                    OrderItemWhatsAppLog.objects.filter(order=OuterRef('order_id'))
+                )
+            )
+            if whatsapp_sent == 'sent':
+                queryset = queryset.filter(has_whatsapp_log=True)
+            elif whatsapp_sent == 'not_sent':
+                queryset = queryset.filter(has_whatsapp_log=False)
 
         if order_status:
             queryset = queryset.filter(order__status=order_status)
@@ -80,11 +91,40 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
 
         if start_date and end_date:
             try:
+                from datetime import datetime, timedelta
                 start = datetime.strptime(start_date, "%Y-%m-%d")
-                end = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)  # inclusive end
+                end = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
                 queryset = queryset.filter(order__order_date__gte=start, order__order_date__lt=end)
             except ValueError:
-                # Could raise a ValidationError or return empty queryset here
                 pass
 
         return queryset
+
+class InvoiceNumberSearchView(APIView):
+    """
+    Search for a single invoice by its invoice_number.
+    If not found, returns {"error": "Invoice not found"} with 404 status.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        invoice_number = request.query_params.get('invoice_number')
+        if not invoice_number:
+            return Response(
+                {"error": "invoice_number query parameter is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        invoice = Invoice.objects.filter(
+            invoice_number=invoice_number,
+            is_deleted=False
+        ).first()
+
+        if not invoice:
+            return Response(
+                {"error": "Invoice not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = InvoiceSearchSerializer(invoice)
+        return Response(serializer.data, status=status.HTTP_200_OK)
