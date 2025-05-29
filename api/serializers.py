@@ -403,7 +403,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'issued_by_user_code',
             'issued_date',
             'progress_status',
-            'fitting_status'
+            'fitting_status',
             'fitting_status_updated_date'
         ] 
 class BulkWhatsAppLogCreateSerializer(serializers.Serializer):
