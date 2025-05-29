@@ -97,6 +97,10 @@ class OrderDeliveryMarkView(APIView):
         except CustomUser.DoesNotExist:
             return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        #Prevent inactive users from marking as delivered 
+        if not user.is_active:
+            return Response({'detail': 'User account is deactivated.'}, status=status.HTTP_403_FORBIDDEN)
+
         if not user.check_password(password):
             return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -106,6 +110,10 @@ class OrderDeliveryMarkView(APIView):
             order = invoice.order
         except Invoice.DoesNotExist:
             return Response({'detail': 'Invalid invoice number.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Soft-delete check (highly recommended for medical systems)
+        if hasattr(order, 'is_deleted') and order.is_deleted:
+            return Response({'detail': 'Order has been deleted.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if order.issued_by:
             return Response({'detail': 'This order is already marked as delivered.'}, status=status.HTTP_400_BAD_REQUEST)
