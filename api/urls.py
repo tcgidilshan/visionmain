@@ -2,7 +2,7 @@ from django.urls import path
 from .views import LoginView, AdminOnlyView, SuperAdminOnlyView
 from .views import UserRegistrationView, AdminRegistrationView
 from .views import (
-    BranchListCreateAPIView,
+    BranchListCreateAPIView,OrderRefundView,
     BranchRetrieveUpdateDestroyAPIView,
     RefractionCreateAPIView,
     RefractionListAPIView,
@@ -162,6 +162,7 @@ urlpatterns = [
     # path("manual-orders/", ManualOrderCreateView.as_view(), name="manual-order-create"),
     path('orders/update-payments/', PaymentView.as_view(), name='update-payments'),
     path('orders/payments/', PaymentView.as_view(), name='order-payments'),
+    path('orders/<int:pk>/refund/', OrderRefundView.as_view(), name='order-refund'),
     
     #frame only
     path('orders/frame-only/', FrameOnlyOrderCreateView.as_view(), name='frame-only-order-create'),

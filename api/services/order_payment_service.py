@@ -1,6 +1,8 @@
-from ..models import OrderPayment,Order
+from ..models import OrderPayment,Order,Expense
 from ..serializers import OrderPaymentSerializer
 from rest_framework.exceptions import ValidationError
+from django.utils import timezone
+from ..serializers import ExpenseSerializer
 
 class OrderPaymentService:
     """
@@ -105,4 +107,36 @@ class OrderPaymentService:
             return {"error": "Order not found."}
         except Exception as e:
             return {"error": f"An error occurred: {str(e)}"}
+        
+    @staticmethod
+    def refund_order(order_id, expense_data):
+        try:
+            order = Order.all_objects.get(id=order_id)
+        except Order.DoesNotExist:
+            raise ValidationError("Order not found.")
+
+        if order.is_refund:
+            raise ValidationError("This order has already been refunded.")
+
+        # Mark order as refunded
+        order.is_refund = True
+        order.refunded_at = timezone.now()
+        order.refund_note = f"Refund processed on {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        order.save()
+
+        # Prepare expense data
+        expense_data['amount'] = str(order.total_price)
+        expense_data['paid_source'] = 'cash'
+        expense_data['note'] = f"Refund for order #{order.id}"
+
+        # Create expense
+        serializer = ExpenseSerializer(data=expense_data)
+        serializer.is_valid(raise_exception=True)
+        expense = serializer.save()
+
+        return {
+            "message": "Order refund processed successfully.",
+            "order_id": order.id,
+            "refund_expense_id": expense.id
+        }
 

@@ -356,6 +356,9 @@ class OrderSerializer(serializers.ModelSerializer):
     issued_by = serializers.PrimaryKeyRelatedField(
         queryset=CustomUser.objects.all(), allow_null=True, required=False
     )
+    is_refund = serializers.BooleanField(read_only=True)
+    deleted_at = serializers.DateTimeField(read_only=True)
+    refunded_at = serializers.DateTimeField(read_only=True)
     issued_by_user_name = serializers.CharField(source='issued_by.username', read_only=True)
     issued_by_user_code = serializers.CharField(source='issued_by.user_code', read_only=True)
     issued_date = serializers.DateTimeField(read_only=True)
@@ -404,7 +407,10 @@ class OrderSerializer(serializers.ModelSerializer):
             'issued_date',
             'progress_status',
             'fitting_status',
-            'fitting_status_updated_date'
+            'fitting_status_updated_date',
+            'is_refund',
+            'deleted_at',
+            'refunded_at'
         ] 
 class BulkWhatsAppLogCreateSerializer(serializers.Serializer):
     order_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)

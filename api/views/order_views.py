@@ -13,6 +13,8 @@ from ..services.refraction_details_service import RefractionDetailsService
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from ..services.soft_delete_service import OrderSoftDeleteService
+from ..services.order_payment_service import refund_order  # adjust as needed
+from rest_framework.exceptions import ValidationError
 
 class OrderCreateView(APIView):
     @transaction.atomic
@@ -114,3 +116,17 @@ class OrderSoftDeleteView(APIView):
         OrderSoftDeleteService.soft_delete_order(order_id=order.id, deleted_by=deleted_by, reason=reason)
 
         return Response({"detail": "Order soft-deleted successfully."}, status=status.HTTP_200_OK)
+    
+class OrderRefundView(APIView):
+    def post(self, request, pk):
+        expense_data = request.data
+
+        try:
+            result = OrderPaymentService.refund_order(order_id=pk, expense_data=expense_data)
+            return Response(result, status=status.HTTP_201_CREATED)
+
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": f"Refund failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
