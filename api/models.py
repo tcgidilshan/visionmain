@@ -405,6 +405,9 @@ class Order(models.Model):
         blank=True,
         related_name='orders'
     )
+    is_refund = models.BooleanField(default=False)
+    refunded_at = models.DateTimeField(null=True, blank=True)
+    refund_note = models.TextField(blank=True, null=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
@@ -721,7 +724,6 @@ class Appointment(models.Model):
 
     def get_remaining_amount(self):
         return float(self.total_fee) - self.get_total_paid()
-
 
 class ChannelPayment(models.Model):
     PAYMENT_METHOD_CHOICES = [
