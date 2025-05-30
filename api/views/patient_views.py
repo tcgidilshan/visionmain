@@ -6,25 +6,19 @@ from rest_framework.filters import SearchFilter
 from ..models import Patient
 from ..serializers import PatientSerializer
 from django_filters.rest_framework import DjangoFilterBackend
-class PatientPagination(PageNumberPagination):
-    """
-    Custom Pagination for Patients
-    """
-    page_size = 10  # Number of records per page
-    page_size_query_param = 'page_size'
-    max_page_size = 100
+from ..services.pagination_service import PaginationService
 
 class PatientListView(ListAPIView):
     """
     API View to List All Patients with Pagination and Search by Name or Phone
     """
-    queryset = Patient.objects.all()
+    queryset = Patient.objects.all().order_by('id')
     serializer_class = PatientSerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = PatientPagination
+    pagination_class = PaginationService
     filter_backends = [SearchFilter]
     filter_backends = [SearchFilter, DjangoFilterBackend] 
-    search_fields = ['name', 'phone_number','nic']  # Searchable fields
+    search_fields = ['name']  # Searchable fields
     filterset_fields = ['name', 'phone_number','nic']
 
 class PatientUpdateView(RetrieveUpdateAPIView):

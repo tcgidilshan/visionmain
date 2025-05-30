@@ -60,10 +60,11 @@ from .views import (
     ExpenseSubCategoryListCreateView, ExpenseSubCategoryRetrieveUpdateDestroyView,ExpenseRetrieveView,
     UserCodeCheckView,ChannelTransferView,DoctorAbsenceRescheduleView,ExpenseReportView,FrameOnlyOrderUpdateView,
     AdminCodeCheckView,ChannelReportView,DoctorScheduleCreateView,DoctorUpcomingScheduleView,DoctorScheduleTransferView,AllRoleCheckView,
-    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,BulkUpdateOrderProgressStatus,FactoryInvoiceExternalLenseSearchView,BulkUpdateOrderWhatAppMsgSent,
+    UpdateUserView,GetAllUsersView,GetSingleUserView,FactoryInvoiceSearchView,InvoiceProgressUpdateView,InvoiceReportView,BulkUpdateOrderProgressStatus,FactoryInvoiceExternalLenseSearchView,BulkOrderWhatsAppLogView,
     DoctorClaimInvoiceListCreateView,DoctorClaimInvoiceRetrieveUpdateDestroyView,
     DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView,
-    SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView
+    SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
+    GlassSenderReportView
 )
 # from .views import CustomAuthToken
 
@@ -153,6 +154,11 @@ urlpatterns = [
     path('other-items/<int:pk>/', OtherItemRetrieveUpdateDeleteView.as_view(), name='other-item-detail'),
     path('orders/', OrderCreateView.as_view(), name='order-create'),
     path('orders/<int:pk>/', OrderUpdateView.as_view(), name='order-update'),
+    #feature fitting on collection
+    path('orders/<int:pk>/update-fit-status/', OrderUpdateFitStatusView.as_view(), name='order-update-fit-status'),
+    path('reports/fitting-status/', FittingStatusReportView.as_view(), name='fitting-status-report'),
+
+
     # path("manual-orders/", ManualOrderCreateView.as_view(), name="manual-order-create"),
     path('orders/update-payments/', PaymentView.as_view(), name='update-payments'),
     path('orders/payments/', PaymentView.as_view(), name='order-payments'),
@@ -167,7 +173,7 @@ urlpatterns = [
     path('factory-invoice/external-lense/search/', FactoryInvoiceExternalLenseSearchView.as_view(), name='factory-invoice-external-lense-search'),
     path('factory-invoices/bulk-update-status/', BulkUpdateOrderProgressStatus.as_view(), 
      name='factory-invoice-bulk-status-update'),
-    path('factory-invoices/bulk-update-whatsapp-sent/', BulkUpdateOrderWhatAppMsgSent.as_view(), 
+    path('factory-invoices/bulk-update-whatsapp-sent/', BulkOrderWhatsAppLogView.as_view(), 
      name='factory-invoice-bulk-whatsapp-sent'),
     #invoice
     path('invoices/<int:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'), #invoice
@@ -237,8 +243,11 @@ urlpatterns = [
     path('soldering/orders/create/', CreateSolderingOrderView.as_view(), name='create-soldering-order'),
     path('soldering/orders/<int:pk>/update-progress/', SolderingOrderProgressUpdateView.as_view(), name='soldering-order-progress-update'),
     path('soldering/invoices/search/', SolderingInvoiceSearchView.as_view(), name='soldering-invoice-search'),
-     path('soldering/orders/<int:pk>/edit/', SolderingOrderEditView.as_view(), name='soldering-order-edit'),
-
+    path('soldering/orders/<int:pk>/edit/', SolderingOrderEditView.as_view(), name='soldering-order-edit'),
+    path('invoices/search-by-number/', InvoiceNumberSearchView.as_view(), name='invoice-number-mini-search'),
+    path('orders/mark-delivered/', OrderDeliveryMarkView.as_view(), name='order-mark-delivered'),
+    #user order report 
+    path('report/glass-sender-report/', GlassSenderReportView.as_view(), name='glass-sender-report'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

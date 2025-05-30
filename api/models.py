@@ -370,7 +370,14 @@ class Order(models.Model):
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
     ]
-
+    FITTING_CHOICES = [
+        ('pending', 'Pending'),
+        ('fitting_ok', 'Fitting Ok'),
+        ('not_fitting', 'Not Fitting'),
+        ('damage', 'Damage'),
+    
+    ]
+    urgent=models.BooleanField(default=False)
     customer = models.ForeignKey(Patient, related_name='orders', on_delete=models.CASCADE)
     refraction = models.ForeignKey(Refraction, null=True, blank=True, on_delete=models.SET_NULL)
     branch = models.ForeignKey(
@@ -408,9 +415,19 @@ class Order(models.Model):
     is_refund = models.BooleanField(default=False)
     refunded_at = models.DateTimeField(null=True, blank=True)
     refund_note = models.TextField(blank=True, null=True)
+    issued_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='issued_orders'
+    )
+    issued_date = models.DateTimeField(null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
+    fitting_status = models.CharField(max_length=20, choices=FITTING_CHOICES, default='Pending')
+    fitting_status_updated_date = models.DateTimeField(null=True, blank=True)
     objects = SoftDeleteManager()      # Only active records
     all_objects = models.Manager() 
 
@@ -421,6 +438,25 @@ class Order(models.Model):
         self.is_deleted = True
         self.deleted_at = timezone.now()
         self.save()
+    def save(self, *args, **kwargs):
+        if self.pk:
+            # Fetch the original from the database
+            orig = Order.all_objects.filter(pk=self.pk).first()
+            # Only update the timestamp if status actually changed
+            if orig and orig.fitting_status != self.fitting_status:
+                self.fitting_status_updated_date = timezone.now()
+               # If issued_by was previously None and is now set, or issued_by changes
+            if orig and orig.issued_by != self.issued_by and self.issued_by is not None:
+                self.issued_date = timezone.now()
+        else:
+            # On create, set timestamp if not already set
+            if not self.fitting_status_updated_date:
+                self.fitting_status_updated_date = timezone.now()
+
+            # On create, set issued_date only if issued_by is set at creation
+            if self.issued_by is not None:
+                self.issued_date = timezone.now()   
+        super().save(*args, **kwargs)
     
 class ExternalLens(models.Model):
     BRAND_CHOICES = (
@@ -556,14 +592,6 @@ class OrderItem(models.Model):
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     is_non_stock = models.BooleanField(default=False)  # ✅ Mark Non-Stock Items
     note = models.TextField(blank=True, null=True)
-    whatsapp_sent = models.CharField(max_length=20,
-    choices=[
-        ('sent', 'Sent'),
-        ('not_sent', 'Not Sent'),
-    ],
-    null=True,
-    blank=True
-    )
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
@@ -582,7 +610,18 @@ class OrderItem(models.Model):
         self.is_deleted = True
         self.deleted_at = timezone.now()
         self.save()
-    
+class OrderItemWhatsAppLog(models.Model):
+    # Only log when a WhatsApp message is actually sent
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name='whatsapp_logs'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)  # When sent
+
+    def __str__(self):
+        return f"Order {self.order.id} WhatsApp sent at {self.created_at}"
+
 class OrderPayment(models.Model):
     PAYMENT_METHOD_CHOICES = [
         ('credit_card', 'Credit Card'),

@@ -353,7 +353,12 @@ class OrderSerializer(serializers.ModelSerializer):
         queryset=BusSystemSetting.objects.all(), required=False, allow_null=True
     )
     bus_title_name = serializers.PrimaryKeyRelatedField(source='bus_title.title', read_only=True)
-
+    issued_by = serializers.PrimaryKeyRelatedField(
+        queryset=CustomUser.objects.all(), allow_null=True, required=False
+    )
+    issued_by_user_name = serializers.CharField(source='issued_by.username', read_only=True)
+    issued_by_user_code = serializers.CharField(source='issued_by.user_code', read_only=True)
+    issued_date = serializers.DateTimeField(read_only=True)
     def to_representation(self, instance):
         if instance.is_deleted:
             raise serializers.ValidationError("This order has been deleted.")
@@ -393,8 +398,25 @@ class OrderSerializer(serializers.ModelSerializer):
             'user_date',
             'bus_title',
             'bus_title_name',
+            'issued_by',
+            'issued_by_user_name',
+            'issued_by_user_code',
+            'issued_date',
             'progress_status',
+            'fitting_status',
+            'fitting_status_updated_date'
         ] 
+class BulkWhatsAppLogCreateSerializer(serializers.Serializer):
+    order_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
+    urgent_order_ids = serializers.ListField(child=serializers.IntegerField(), required=False, default=list)
+
+    def validate(self, data):
+        order_ids = set(data['order_ids'])
+        urgent_order_ids = set(data.get('urgent_order_ids', []))
+        if not urgent_order_ids.issubset(order_ids):
+            raise serializers.ValidationError("urgent_order_ids must be a subset of order_ids.")
+        return data
+
 
 class ExternalLensSerializer(serializers.ModelSerializer):
     lens_type_name     = serializers.CharField(source='lens_type.name', read_only=True)
@@ -463,7 +485,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     customer_details = PatientSerializer(source='order.customer', read_only=True)  #  Full customer details
     order_details = OrderSerializer(source='order', read_only=True)  #  Full order details
     refraction_details = serializers.SerializerMethodField()
-
+    
     class Meta:
         model = Invoice
         fields = [
@@ -685,6 +707,28 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
     on_hold = serializers.BooleanField(
         source='order.on_hold', read_only=True
     )
+    urgent = serializers.BooleanField(
+        source='order.urgent', read_only=True
+    )
+    #TODO: Access issued_by via the related Order object.
+    issued_by_user_name = serializers.CharField(
+        source='order.issued_by.username', read_only=True
+    )
+    issued_by_user_code = serializers.CharField(
+        source='order.issued_by.user_code', read_only=True
+    )
+    issued_by = serializers.PrimaryKeyRelatedField(
+        source='order.issued_by', read_only=True
+    )
+    issued_date = serializers.DateTimeField(
+        source='order.issued_date', read_only=True
+    )
+    fitting_status_updated_date = serializers.DateTimeField(
+        source='order.fitting_status_updated_date', read_only=True
+    )
+    fitting_status = serializers.CharField(
+        source='order.fitting_status', read_only=True
+    )
     class Meta:
         model = Invoice
         fields = [
@@ -700,7 +744,14 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
             'fitting_on_collection',
             'on_hold',
             'payments',
-            'progress_status'
+            'issued_by',
+            'issued_by_user_name',
+            'issued_by_user_code',
+            'issued_date',
+            'progress_status',
+            'urgent',
+            'fitting_status',
+            'fitting_status_updated_date'
         ]
     def get_payments(self, obj):
             # Get the order related to this invoice
@@ -937,6 +988,7 @@ class DoctorClaimChannelSerializer(serializers.ModelSerializer):
 
 class ExternalLensOrderItemSerializer(serializers.ModelSerializer):
     order_id = serializers.IntegerField(source='order.id', read_only=True)
+    urgent = serializers.BooleanField(source='order.urgent', read_only=True)
     invoice_number = serializers.CharField(source='order.invoice.invoice_number', read_only=True)
     invoice_date = serializers.DateTimeField(source='order.invoice.invoice_date', read_only=True)
     branch_name = serializers.CharField(source='order.branch.branch_name', read_only=True)
@@ -958,9 +1010,8 @@ class ExternalLensOrderItemSerializer(serializers.ModelSerializer):
         model = OrderItem
         fields = [
             'id', 'external_lens', 'quantity', 'price_per_unit', 'subtotal',
-            'whatsapp_sent',
             'order_id', 'invoice_number', 'invoice_date', 'branch_name','customer_name',
-            'progress_status', 'total_price', 'fitting_on_collection', 'on_hold', 'payments'
+            'progress_status', 'total_price', 'fitting_on_collection', 'on_hold', 'payments','urgent',
         ]
     def get_payments(self, obj):
             # Get the order related to this invoice
@@ -1020,3 +1071,28 @@ class SolderingRepaymentInputSerializer(serializers.Serializer):
         ('online_transfer', 'Online Transfer'),
     ])
     is_final_payment = serializers.BooleanField(default=False)
+
+class OrderLiteSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source='customer.name', read_only=True)
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
+    issued_by_username = serializers.CharField(source='issued_by.username', read_only=True)
+    invoice_number = serializers.CharField(source='invoice.invoice_number', read_only=True)
+    #TODO: Add more fields as needed
+
+    class Meta:
+        model = Order
+        fields = [
+            'id',
+            'customer_name',
+            'branch_name',
+            'order_date',
+            'status',
+            'progress_status',
+            'total_price',
+            'issued_by',
+            'issued_by_username',
+            'issued_date',
+            'urgent',
+            'invoice_number',
+            # Add any minimal fields required by your UI/report
+        ]
