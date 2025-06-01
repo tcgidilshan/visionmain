@@ -3,6 +3,7 @@ from ..serializers import OrderPaymentSerializer
 from rest_framework.exceptions import ValidationError
 from django.utils import timezone
 from ..serializers import ExpenseSerializer
+from django.db import transaction
 
 class OrderPaymentService:
     """
@@ -139,4 +140,100 @@ class OrderPaymentService:
             "order_id": order.id,
             "refund_expense_id": expense.id
         }
+    @staticmethod
+    @transaction.atomic
+    def append_on_change_payments_for_order(order, payments_data):
+        """
+        Medical-compliant payment update with append-on-change logic.
+        1. For each payment in input:
+            - If id provided, check if data changed.
+                - If changed: soft-delete old, create new (copying date).
+                - If not changed: skip.
+            - If no id: create new.
+        2. Soft-delete any DB payments not referenced in input.
+        """
+        # 1. Index all current, non-deleted payments by id for lookup
+        db_payments = {p.id: p for p in order.orderpayment_set.filter(is_deleted=False)}
+        seen_payment_ids = set()
+        total_paid = 0
+        payment_records = []
 
+        for i, payment in enumerate(payments_data):
+            payment_id = payment.get("id")
+            amount = float(payment.get('amount', 0))
+            method = payment.get('payment_method')
+            txn_status = payment.get('transaction_status', 'success')
+            # --- Validation
+            if amount <= 0:
+                raise ValidationError(f"Payment #{i+1}: Amount must be greater than 0.")
+            if not method:
+                raise ValidationError(f"Payment #{i+1}: payment_method is required.")
+
+            if payment_id:
+                old_payment = db_payments.get(payment_id)
+                if old_payment:
+                    seen_payment_ids.add(payment_id)
+                    # Compare each tracked field. You can expand this as needed.
+                    changed = (
+                        float(old_payment.amount) != amount or
+                        old_payment.payment_method != method or
+                        old_payment.transaction_status != txn_status
+                    )
+                    if changed:
+                        # Soft-delete old, create new (keep date)
+                        old_payment.delete()
+                        payment_data = {
+                            "order": order.id,
+                            "amount": amount,
+                            "payment_method": method,
+                            "transaction_status": txn_status,
+                            "payment_date": old_payment.payment_date,  # Carry forward
+                            "is_partial": False,
+                            "is_final_payment": False,
+                        }
+                        payment_serializer = OrderPaymentSerializer(data=payment_data)
+                        payment_serializer.is_valid(raise_exception=True)
+                        new_payment = payment_serializer.save()
+                        payment_records.append(new_payment)
+                        total_paid += amount
+                    else:
+                        # No change, keep the original (skip creating)
+                        payment_records.append(old_payment)
+                        total_paid += float(old_payment.amount)
+                else:
+                    # Edge case: id provided but not found (invalid/old)
+                    raise ValidationError(f"Payment id {payment_id} not found for this order.")
+            else:
+                # No ID: Always create new payment (fresh entry)
+                payment_data = {
+                    "order": order.id,
+                    "amount": amount,
+                    "payment_method": method,
+                    "transaction_status": txn_status,
+                    "is_partial": False,
+                    "is_final_payment": False,
+                }
+                payment_serializer = OrderPaymentSerializer(data=payment_data)
+                payment_serializer.is_valid(raise_exception=True)
+                new_payment = payment_serializer.save()
+                payment_records.append(new_payment)
+                total_paid += amount
+
+        # 2. Soft-delete payments that are in DB but not referenced in the new list (user "removed" them)
+        for db_id, db_pmt in db_payments.items():
+            if db_id not in seen_payment_ids:
+                db_pmt.delete()
+
+        # 3. Set is_partial and is_final_payment
+        running_total = 0
+        for p in payment_records:
+            running_total += float(p.amount)
+            p.is_final_payment = (round(running_total, 2) == round(float(order.total_price), 2))
+            p.is_partial = (running_total < float(order.total_price))
+            p.save()
+
+        # 4. Overpayment check
+        if round(total_paid, 2) > round(float(order.total_price), 2):
+            raise ValidationError("Total payments exceed the order total price. No payments saved.")
+
+        return total_paid

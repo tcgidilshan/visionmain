@@ -64,7 +64,7 @@ from .views import (
     DoctorClaimInvoiceListCreateView,DoctorClaimInvoiceRetrieveUpdateDestroyView,
     DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView,
     SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
-    GlassSenderReportView
+    GlassSenderReportView,OrderDeleteRefundListView
 )
 # from .views import CustomAuthToken
 
@@ -157,19 +157,16 @@ urlpatterns = [
     #feature fitting on collection
     path('orders/<int:pk>/update-fit-status/', OrderUpdateFitStatusView.as_view(), name='order-update-fit-status'),
     path('reports/fitting-status/', FittingStatusReportView.as_view(), name='fitting-status-report'),
-
-
     # path("manual-orders/", ManualOrderCreateView.as_view(), name="manual-order-create"),
     path('orders/update-payments/', PaymentView.as_view(), name='update-payments'),
     path('orders/payments/', PaymentView.as_view(), name='order-payments'),
     path('orders/<int:pk>/refund/', OrderRefundView.as_view(), name='order-refund'),
-    
     #frame only
     path('orders/frame-only/', FrameOnlyOrderCreateView.as_view(), name='frame-only-order-create'),
     path('orders/frame-only/<int:pk>/update/', FrameOnlyOrderUpdateView.as_view(), name='frame-only-update'),
-
     path('orders/<int:order_id>/delete/', OrderSoftDeleteView.as_view(), name='order-soft-delete'),
-    
+    #Order audit 
+    path("orders/status-report/", OrderDeleteRefundListView.as_view(), name="order-status-report"),
     #whatapp msg sent
     path('factory-invoice/external-lense/search/', FactoryInvoiceExternalLenseSearchView.as_view(), name='factory-invoice-external-lense-search'),
     path('factory-invoices/bulk-update-status/', BulkUpdateOrderProgressStatus.as_view(), 

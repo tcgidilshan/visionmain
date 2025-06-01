@@ -292,7 +292,7 @@ class OrderService:
                 StockValidationService.adjust_stocks(lens_stock_updates)
 
             # 🔹 Process Payments
-            total_payment = OrderPaymentService.update_process_payments(order, payments_data)
+            total_payment = OrderPaymentService.append_on_change_payments_for_order(order, payments_data)
             if total_payment > order.total_price:
                 raise ValueError("Total payments exceed the order total price.")
 
