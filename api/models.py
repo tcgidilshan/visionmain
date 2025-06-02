@@ -525,7 +525,7 @@ class Invoice(models.Model):
         self.save()
 
     def save(self, *args, **kwargs):
-        # Always ensure invoice_date is set
+        # Ensure invoice_date is set
         if not self.invoice_date:
             self.invoice_date = timezone.now()
 
@@ -534,40 +534,42 @@ class Invoice(models.Model):
                 raise ValueError("Invoice must be linked to an order with a valid branch.")
 
             branch_code = self.order.branch.branch_name[:3].upper()
-            invoice_day = self.invoice_date.strftime('%d')  # Get day as 2-digit string
-            sequence_number = 1  # Default start
+            day_str = self.invoice_date.strftime('%d')  # 2-digit day
 
             with transaction.atomic():
-                prefix = ""
-                number = 1  # default starting number
-
+                number = 1
                 if self.invoice_type == 'factory':
-                    prefix = f"{branch_code}{invoice_day}"
-
+                    # Just get the last invoice (ignore prefix), factory invoices are globally incrementing
                     last_invoice = Invoice.objects.select_for_update().filter(
-                        invoice_type='factory',
-                        invoice_number__startswith=prefix
+                        invoice_type='factory'
                     ).order_by('-id').first()
 
+                    if last_invoice and last_invoice.invoice_number:
+                        try:
+                            # Extract number by slicing out day digits (last 2 digits)
+                            last_number_part = last_invoice.invoice_number[-7:-2]  # 5 digits before day
+                            number = int(last_number_part) + 1
+                        except Exception:
+                            number = 1  # fallback
+
+                    padded = str(number).zfill(5)  # 5-digit padded number
+                    self.invoice_number = f"{branch_code}{padded}{day_str}"
+
                 elif self.invoice_type == 'normal':
+                    # Normal: MATN1, MATN2...
                     prefix = f"{branch_code}N"
                     last_invoice = Invoice.objects.select_for_update().filter(
                         invoice_type='normal',
                         invoice_number__startswith=prefix
                     ).order_by('-id').first()
 
-                if last_invoice and last_invoice.invoice_number:
-                    try:
-                        # Use replace only once, to avoid errors in edge cases
-                        last_number = int(last_invoice.invoice_number.replace(prefix, '', 1))
-                        number = last_number + 1
-                    except ValueError:
-                        number = 1  # fallback in case of bad data
+                    if last_invoice and last_invoice.invoice_number:
+                        try:
+                            last_number = int(last_invoice.invoice_number.replace(prefix, '', 1))
+                            number = last_number + 1
+                        except ValueError:
+                            number = 1
 
-                # Format invoice number
-                if self.invoice_type == 'factory':
-                    self.invoice_number = f"{prefix}{str(number).zfill(5)}"
-                elif self.invoice_type == 'normal':
                     self.invoice_number = f"{prefix}{number}"
 
         super().save(*args, **kwargs)
