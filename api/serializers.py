@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.db.models import Sum
+from django.db import models
 from rest_framework.exceptions import ValidationError
 from .models import (
     Branch,Refraction,RefractionDetails,
@@ -336,7 +337,7 @@ class OrderPaymentSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     order_items = OrderItemSerializer(many=True, read_only=True)
-    order_payments = OrderPaymentSerializer(many=True, read_only=True, source='orderpayment_set')
+    order_payments = serializers.SerializerMethodField()
     refraction = serializers.PrimaryKeyRelatedField(queryset=Refraction.objects.all(), allow_null=True, required=False) 
     sales_staff_code = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all(), allow_null=True, required=False)
     branch_id = serializers.PrimaryKeyRelatedField(
@@ -370,6 +371,10 @@ class OrderSerializer(serializers.ModelSerializer):
     def get_order_items(self, obj):
         items = obj.order_items.filter(is_deleted=False)
         return OrderItemSerializer(items, many=True).data
+    
+    def get_order_payments(self, obj):
+        payments = obj.orderpayment_set.filter(is_deleted=False)
+        return OrderPaymentSerializer(payments, many=True).data
     class Meta:
         model = Order
         fields = [
@@ -410,7 +415,8 @@ class OrderSerializer(serializers.ModelSerializer):
             'fitting_status_updated_date',
             'is_refund',
             'deleted_at',
-            'refunded_at'
+            'refunded_at',
+            'urgent'
         ] 
 class BulkWhatsAppLogCreateSerializer(serializers.Serializer):
     order_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
@@ -1084,6 +1090,7 @@ class OrderLiteSerializer(serializers.ModelSerializer):
     issued_by_username = serializers.CharField(source='issued_by.username', read_only=True)
     invoice_number = serializers.CharField(source='invoice.invoice_number', read_only=True)
     #TODO: Add more fields as needed
+    total_payment = serializers.SerializerMethodField(read_only=True)  # //TODO: Add total_payment field
 
     class Meta:
         model = Order
@@ -1100,5 +1107,17 @@ class OrderLiteSerializer(serializers.ModelSerializer):
             'issued_date',
             'urgent',
             'invoice_number',
-            # Add any minimal fields required by your UI/report
+            'is_deleted',      # add this for "deactivated"
+            'deleted_at',      # add this for "deactivation date"
+            'is_refund',       # add this for refund status
+            'refunded_at',     # add this for refund date
+            'refund_note',     # add if you want the reason/note
+            'total_payment'
+           
         ]
+    def get_total_payment(self, obj):
+        # //TODO: Only sum payments that are not deleted and are successful
+        return (
+            obj.orderpayment_set.filter(is_deleted=False)
+            .aggregate(total=models.Sum('amount'))['total'] or 0
+        )
