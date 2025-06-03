@@ -3,11 +3,12 @@ from django.db.models import Sum
 from datetime import timedelta
 from datetime import date
 from ..models import OrderPayment,ChannelPayment,OtherIncome,Expense,BankDeposit,SafeTransaction
+from decimal import Decimal
 
 class DailyFinanceSummaryService:
     @staticmethod
     def _sum(queryset, field='amount'):
-        return queryset.aggregate(total=Sum(field)).get('total') or 0
+        return queryset.aggregate(total=Sum(field)).get('total') or Decimal("0.00")
 
     @staticmethod
     def get_summary(branch_id, date=None):
@@ -16,73 +17,50 @@ class DailyFinanceSummaryService:
 
         yesterday = date - timedelta(days=1)
 
-        # ========= YESTERDAY (General)
-        yesterday_order_payments = DailyFinanceSummaryService._sum(OrderPayment.objects.filter(
-            order__branch_id=branch_id,
-            payment_date__date=yesterday,
-            transaction_status='success'
-        ))
+        # ========== YESTERDAY
+        yesterday_order_payments = DailyFinanceSummaryService._sum(
+            OrderPayment.objects.filter(order__branch_id=branch_id, payment_date__date=yesterday, payment_method="cash")
+        )
+        yesterday_channel_payments = DailyFinanceSummaryService._sum(
+            ChannelPayment.objects.filter(appointment__branch_id=branch_id, payment_date__date=yesterday, payment_method="cash")
+        )
+        yesterday_other_income = DailyFinanceSummaryService._sum(
+            OtherIncome.objects.filter(branch_id=branch_id, date=yesterday, payment_method="cash")
+        )
+        yesterday_expenses = DailyFinanceSummaryService._sum(
+            Expense.objects.filter(branch_id=branch_id, created_at__date=yesterday, paid_source="cash")
+        )
 
-        yesterday_channel_payments = DailyFinanceSummaryService._sum(ChannelPayment.objects.filter(
-            appointment__branch_id=branch_id,
-            payment_date__date=yesterday
-        ))
-
-        yesterday_other_income = DailyFinanceSummaryService._sum(OtherIncome.objects.filter(
-            branch_id=branch_id,
-            date=yesterday
-        ))
-
-        yesterday_expenses = DailyFinanceSummaryService._sum(Expense.objects.filter(
-            branch_id=branch_id,
-            created_at__date=yesterday,
-            paid_source ='cash'
-        ))
-
-        yesterday_safe = DailyFinanceSummaryService._sum(SafeTransaction.objects.filter(
-            branch_id=branch_id,
-            date=yesterday,
-            transaction_type='income' 
-        ))
-
-        # ✅ DO NOT subtract safe income — it's already part of income
+        # ❗️ Don't subtract safe – it's not an expense
         before_balance = (
             yesterday_order_payments +
             yesterday_channel_payments +
             yesterday_other_income
-        ) - (yesterday_expenses + yesterday_safe)
+        ) - yesterday_expenses
 
-        # ========= TODAY (General)
-        today_order_payments = DailyFinanceSummaryService._sum(OrderPayment.objects.filter(
-            order__branch_id=branch_id,
-            payment_date__date=date,
-            transaction_status='success'
-        ))
-
-        today_channel_payments = DailyFinanceSummaryService._sum(ChannelPayment.objects.filter(
-            appointment__branch_id=branch_id,
-            payment_date__date=date
-        ))
-
-        today_other_income = DailyFinanceSummaryService._sum(OtherIncome.objects.filter(
-            branch_id=branch_id,
-            date=date
-        ))
-
-        today_expenses = DailyFinanceSummaryService._sum(Expense.objects.filter(
-            branch_id=branch_id,
-            created_at__date=date,
-            paid_source = 'cash'
-        ))
-
-        today_safe_qs = SafeTransaction.objects.filter(
-            branch_id=branch_id,
-            date=date,
-            transaction_type='income'
+        # ========== TODAY
+        today_order_payments = DailyFinanceSummaryService._sum(
+            OrderPayment.objects.filter(order__branch_id=branch_id, payment_date__date=date, payment_method="cash")
         )
-        today_safe_total = DailyFinanceSummaryService._sum(today_safe_qs)
+        today_channel_payments = DailyFinanceSummaryService._sum(
+            ChannelPayment.objects.filter(appointment__branch_id=branch_id, payment_date__date=date, payment_method="cash")
+        )
+        today_other_income = DailyFinanceSummaryService._sum(
+            OtherIncome.objects.filter(branch_id=branch_id, date=date, payment_method="cash")
+        )
+        today_expenses = DailyFinanceSummaryService._sum(
+            Expense.objects.filter(branch_id=branch_id, created_at__date=date, paid_source="cash")
+        )
 
-        # ✅ Correct banking section
+        today_balance = (
+            today_order_payments +
+            today_channel_payments +
+            today_other_income
+        ) - today_expenses
+
+        cash_in_hand = before_balance + today_balance
+
+        # 🔹 Banking details (optional)
         today_banking_qs = BankDeposit.objects.select_related('bank_account').filter(
             branch_id=branch_id,
             date=date
@@ -98,23 +76,25 @@ class DailyFinanceSummaryService:
             for deposit in today_banking_qs
         ]
 
-        today_income = today_order_payments + today_channel_payments + today_other_income
-        today_balance = today_income - (today_expenses + today_safe_total)
-        cash_in_hold = before_balance + today_balance
-
         return {
             "branch": branch_id,
             "date": str(date),
 
-            # -- General --
-            "before_balance": before_balance,
+            # Income Sources
             "today_order_payments": today_order_payments,
             "today_channel_payments": today_channel_payments,
             "today_other_income": today_other_income,
+
+            # Expenses
             "today_expenses": today_expenses,
-            "today_banking": today_banking_list,
+
+            # Summary
+            "before_balance": before_balance,
             "today_balance": today_balance,
-            "cash_in_hold": cash_in_hold,
-            "available_for_deposit": cash_in_hold,
-            "today_banking_total":today_banking_total
+            "cash_in_hand": cash_in_hand,
+            "available_for_deposit": cash_in_hand,
+
+            # Bank
+            "today_banking_total": today_banking_total,
+            "today_banking": today_banking_list,
         }
