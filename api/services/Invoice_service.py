@@ -4,7 +4,7 @@ from ..models import Invoice, RefractionDetails
 from rest_framework.exceptions import NotFound
 from ..serializers import InvoiceSerializer,RefractionDetailsSerializer
 from rest_framework.exceptions import ValidationError
-
+from django.db.models import OuterRef, Subquery
 class InvoiceService:
     """
     Service class to handle invoice creation based on new invoice type logic.
@@ -99,11 +99,20 @@ class InvoiceService:
 
         if nic:
             qs = qs.filter(order__customer__nic=nic)
-
         if progress_status:
-            qs = qs.filter(order__progress_status=progress_status)
+            status_list = [s.strip() for s in progress_status.split(",") if s.strip()]
+            from api.models import OrderProgress
+            latest_progress = OrderProgress.objects.filter(
+                order=OuterRef('order_id')
+            ).order_by('-changed_at')
+            qs = qs.annotate(
+                latest_progress_status=Subquery(latest_progress.values('progress_status')[:1])
+            ).filter(latest_progress_status__in=status_list)
+        
+        qs = qs.select_related('order', 'order__customer').prefetch_related('order__order_progress_status').order_by('-invoice_date')
+        return qs
 
-        return qs.select_related('order', 'order__customer').order_by('-invoice_date')
+
 
     
     @staticmethod

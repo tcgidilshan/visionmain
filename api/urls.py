@@ -64,7 +64,7 @@ from .views import (
     DoctorClaimInvoiceListCreateView,DoctorClaimInvoiceRetrieveUpdateDestroyView,
     DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView,
     SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
-    GlassSenderReportView,OrderDeleteRefundListView
+    GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView
 )
 # from .views import CustomAuthToken
 
@@ -171,12 +171,14 @@ urlpatterns = [
     path('factory-invoice/external-lense/search/', FactoryInvoiceExternalLenseSearchView.as_view(), name='factory-invoice-external-lense-search'),
     path('factory-invoices/bulk-update-status/', BulkUpdateOrderProgressStatus.as_view(), 
      name='factory-invoice-bulk-status-update'),
+    path('progress-status/list/', OrderProgressStatusListView.as_view(), 
+     name='order-progress-status-list'),
     path('factory-invoices/bulk-update-whatsapp-sent/', BulkOrderWhatsAppLogView.as_view(), 
      name='factory-invoice-bulk-whatsapp-sent'),
     #invoice
     path('invoices/<int:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'), #invoice
     path('invoices/', InvoiceDetailView.as_view(), name='invoice-by-order'),  # ✅ Filter by order_id
-    path('factory-invoices/<int:pk>/update-status/', InvoiceProgressUpdateView.as_view(), name='factory-invoice-status-update'),
+    # path('factory-invoices/<int:pk>/update-status/', InvoiceProgressUpdateView.as_view(), name='factory-invoice-status-update'), (removed)
    
     path("factory-invoices/search/", FactoryInvoiceSearchView.as_view(), name="factory-invoice-search"),
     path('reports/invoices/', InvoiceReportView.as_view(), name='invoice-report'),
