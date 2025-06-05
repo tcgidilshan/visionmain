@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 from django.db import transaction
-from ..models import Order, OrderItem, Invoice, Patient, FrameStock
+from ..models import Order, OrderItem, Invoice, Patient, FrameStock,OrderProgress
 from datetime import date
 from django.db.models import Q
 from ..services.patient_service import PatientService
@@ -18,13 +18,14 @@ class FrameOnlyOrderService:
         price_per_unit = data["price_per_unit"]
         branch_id = data["branch_id"]
         sales_staff_code = data.get("sales_staff_code", None)
-        progress_status = data.get("progress_status", None)
+        
+        
 
         # 🧠 Step 1: Get or create patient
         customer = None
         if patient_data:
             customer = PatientService.create_or_update_patient(patient_data)
-
+        
         # Step 2: Prepare order item
         order_items_data = [{
             "frame": frame.id,
@@ -51,10 +52,24 @@ class FrameOnlyOrderService:
             total_price=total_price,
             discount=discount,
             status=data.get("status", "pending"),
-            progress_status=data.get("progress_status"),
             user_date=date.today()
         )
+        
 
+        # 1. Update the progress_status field (capture previous if needed)
+        incoming_status = data.get('progress_status', None)
+        last_progress = order.order_progress_status.order_by('-changed_at').first()
+        # Always log if this is the first status, or if it's different from the last logged status
+        print(data)
+    
+        if incoming_status and (
+            last_progress is None or last_progress.progress_status != incoming_status
+        ):
+            OrderProgress.objects.create(
+                order=order,
+                progress_status=incoming_status,
+            )
+            
         # Step 6: Create order item
         OrderItem.objects.create(
             order=order,

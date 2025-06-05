@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-from ..models import Order,Invoice  # Assuming Order model exists
+from ..models import Order,Invoice,OrderProgress  # Assuming Order model exists
 from ..serializers import OrderPaymentSerializer
 from ..services.order_payment_service import OrderPaymentService  # Assuming service function is in OrderService
 
@@ -17,6 +17,8 @@ class PaymentView(APIView):
         progress_status = request.data.get("progress_status") 
         invoice_id = request.data.get("invoice_id")  # Invoice ID (if used)
         payments_data = request.data.get("payments", [])  # List of payments
+        admin_id = request.data.get("admin_id")
+        user_id = request.data.get("user_id")
 
         if not order_id and not invoice_id:
             return Response({"error": "Order ID or Invoice ID is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -29,17 +31,24 @@ class PaymentView(APIView):
             elif invoice_id:
                 order = Order.objects.get(invoice_id=invoice_id)
 
-            # Update progress_status on Invoice if provided
-            progress_status = request.data.get("progress_status")
-            if progress_status:
-                order.progress_status = progress_status
-                order.save(update_fields=["progress_status"])
+            # 1. Update the progress_status field (capture previous if needed)
+            incoming_status = request.data.get('progress_status', None)
+            last_progress = order.order_progress_status.order_by('-changed_at').first()
+            # Always log if this is the first status, or if it's different from the last logged status
+            if incoming_status and (
+                last_progress is None or last_progress.progress_status != incoming_status
+            ):
+                OrderProgress.objects.create(
+                    order=order,
+                    progress_status=incoming_status,
+                )
+            
 
             if not payments_data:
                 return Response({"error": "Payments data is required."}, status=status.HTTP_400_BAD_REQUEST)
 
             # ✅ Process payments using the service function
-            total_payment = OrderPaymentService.update_process_payments(order, payments_data)
+            total_payment = OrderPaymentService.update_process_payments(order, payments_data,admin_id,user_id)
 
             # ✅ Return updated order payment details
             updated_payments = order.orderpayment_set.all()
