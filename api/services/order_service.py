@@ -1,4 +1,4 @@
-from ..models import Order, OrderItem, LensStock, LensCleanerStock, FrameStock,Lens,LensCleaner,Frame,ExternalLens,OtherItemStock,BusSystemSetting
+from ..models import Order,Frame,OrderProgress, OtherItem,OrderItem, LensStock, LensCleanerStock, FrameStock,Lens,LensCleaner,Frame,ExternalLens,OtherItemStock,BusSystemSetting
 from ..serializers import OrderSerializer, OrderItemSerializer, ExternalLensSerializer
 from django.db import transaction
 from ..services.order_payment_service import OrderPaymentService
@@ -6,7 +6,8 @@ from ..services.external_lens_service import ExternalLensService
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from ..services.stock_validation_service import StockValidationService
-
+from django.utils import timezone
+from decimal import Decimal, InvalidOperation
 class OrderService:
     """
     Handles order and order item creation.
@@ -60,12 +61,112 @@ class OrderService:
         if not on_hold:
             StockValidationService.adjust_stocks(lens_stock_updates)
 
+       # Always create a new progress status with 'received_from_customer' as the initial status
+        OrderProgress.objects.create(
+            order=order,
+            progress_status='received_from_customer',
+        )
         # Step 6: Return the created order
         return order
-    
+
     @staticmethod
     @transaction.atomic
-    def update_order(order, order_data, order_items_data, payments_data):
+    def on_change_append(existing_item: OrderItem, new_data: dict, admin_id: int, user_id: int):
+        """
+        If any tracked field is changed (with robust type-safe checks), 
+        mark the old item as deleted and create a new one.
+        Handles string/number input for prices/quantity.
+        All ForeignKeys handled as IDs or instances.
+        """
+        TRACKED_FIELDS = [
+            "price_per_unit", "subtotal", "external_lens", "lens", "frame",
+            "lens_cleaner", "other_item", "note", "quantity"
+        ]
+        FK_FIELDS = {
+            'frame': Frame,
+            'lens': Lens,
+            'external_lens': ExternalLens,
+            'lens_cleaner': LensCleaner,
+            'other_item': OtherItem,
+        }
+
+        changed = False
+
+        # Always recalculate subtotal using Decimal (ignore frontend subtotal)
+        if 'quantity' in new_data and 'price_per_unit' in new_data:
+            try:
+                q = Decimal(str(new_data['quantity']))
+                p = Decimal(str(new_data['price_per_unit']))
+                new_data['subtotal'] = q * p
+            except Exception:
+                new_data['subtotal'] = Decimal('0.00')
+
+        for field in TRACKED_FIELDS:
+            old = getattr(existing_item, field)
+            new = new_data.get(field, old)
+            if field in FK_FIELDS:
+                old_id = getattr(old, 'id', old) if old else None
+                new_id = new if isinstance(new, int) else getattr(new, 'id', new) if new else None
+                if old_id != new_id:
+                    changed = True
+                    break
+            elif field in ["price_per_unit", "subtotal"]:
+                try:
+                    old_val = Decimal(str(old)) if old is not None else None
+                    new_val = Decimal(str(new)) if new is not None else None
+                    if old_val != new_val:
+                        changed = True
+                        break
+                except (InvalidOperation, TypeError):
+                    if old != new:
+                        changed = True
+                        break
+            elif field == "quantity":
+                try:
+                    if int(old) != int(new):
+                        changed = True
+                        break
+                except Exception:
+                    if old != new:
+                        changed = True
+                        break
+            else:
+                if old != new:
+                    changed = True
+                    break
+
+        if changed:
+            # //TODO: Soft-delete the old item for compliance
+            existing_item.is_deleted = True
+            existing_item.deleted_at = timezone.now()
+            existing_item.save()
+
+            # //TODO: Prepare new item data with proper FK resolution
+            new_item_data = {
+                **new_data,
+                "order": existing_item.order,
+                "admin_id": admin_id,
+                "user_id": user_id,
+            }
+            new_item_data.pop("id", None)  # Ensure id not reused
+
+            # Resolve FK IDs to instances
+            for field, model in FK_FIELDS.items():
+                value = new_item_data.get(field)
+                if value and not isinstance(value, model):
+                    new_item_data[field] = model.objects.get(pk=value)
+                elif not value:
+                    new_item_data[field] = None
+
+            return OrderItem.objects.create(**new_item_data)
+        else:
+            # No changes: keep as is, don't update or touch
+            return existing_item
+
+
+    @staticmethod
+    @transaction.atomic
+    def update_order(order, order_data, order_items_data, payments_data,admin_id,user_id):
         if order.is_deleted:
             raise ValidationError("This order has been deleted and cannot be modified.")
 
@@ -109,13 +210,26 @@ class OrderService:
             order.discount = order_data.get('discount', order.discount)
             order.total_price = order_data.get('total_price', order.total_price)
             order.status = order_data.get('status', order.status)
-            order.progress_status = order_data.get('progress_status', order.progress_status)
             order.sales_staff_code_id = order_data.get('sales_staff_code', order.sales_staff_code_id)
             order.order_remark = order_data.get('order_remark', order.order_remark)
             order.user_date = order_data.get('user_date', order.user_date)
             order.on_hold = will_be_on_hold  # ✅ Update hold status
             order.fitting_on_collection = order_data.get('fitting_on_collection', order.fitting_on_collection)  # ✅ Update hold status
             bus_title_id = order_data.get('bus_title')
+
+            #Update Progress Status
+          # 1. Update the progress_status field (capture previous if needed)
+            incoming_status = order_data.get('progress_status', None)
+            last_progress = order.order_progress_status.order_by('-changed_at').first()
+            # Always log if this is the first status, or if it's different from the last logged status
+            if incoming_status and (
+                last_progress is None or last_progress.progress_status != incoming_status
+            ):
+                OrderProgress.objects.create(
+                    order=order,
+                    progress_status=incoming_status,
+                )
+            
             if bus_title_id is not None:
                 order.bus_title = BusSystemSetting.objects.get(pk=bus_title_id)
             
@@ -142,17 +256,8 @@ class OrderService:
                     # Just save the item
                     if item_id and item_id in existing_items:
                         # Update existing item
-                        existing_item = existing_items.pop(item_id)
-                        existing_item.quantity = quantity
-                        existing_item.price_per_unit = item_data['price_per_unit']
-                        existing_item.subtotal = item_data['subtotal']
-                        existing_item.external_lens_id = external_lens_id or existing_item.external_lens_id
-                        existing_item.lens_id = item_data.get("lens", existing_item.lens_id)
-                        existing_item.frame_id = item_data.get("frame", existing_item.frame_id)
-                        existing_item.lens_cleaner_id = item_data.get("lens_cleaner", existing_item.lens_cleaner_id)
-                        existing_item.other_item_id = item_data.get("other_item", existing_item.other_item_id)
-                        existing_item.note = item_data.get("note", existing_item.note)
-                        existing_item.save()
+                        OrderService.on_change_append(existing_items.pop(item_id), item_data, admin_id, user_id)
+                        
                     else:
                         # Create new item
                         OrderItem.objects.create(
@@ -166,7 +271,9 @@ class OrderService:
                             lens_cleaner_id=item_data.get("lens_cleaner"),
                             other_item_id=item_data.get("other_item"),
                             is_non_stock=is_non_stock,
-                            note=item_data.get("note")
+                            note=item_data.get("note"),
+                            admin_id=admin_id,
+                            user_id=user_id
                         )
                     continue
 
@@ -217,17 +324,7 @@ class OrderService:
 
                 # Save order item
                 if item_id and item_id in existing_items:
-                    existing_item = existing_items.pop(item_id)
-                    existing_item.quantity = quantity
-                    existing_item.price_per_unit = item_data['price_per_unit']
-                    existing_item.subtotal = item_data['subtotal']
-                    existing_item.external_lens_id = external_lens_id or existing_item.external_lens_id
-                    existing_item.lens_id = item_data.get("lens", existing_item.lens_id)
-                    existing_item.frame_id = item_data.get("frame", existing_item.frame_id)
-                    existing_item.lens_cleaner_id = item_data.get("lens_cleaner", existing_item.lens_cleaner_id)
-                    existing_item.other_item_id = item_data.get("other_item", existing_item.other_item_id)
-                    existing_item.note = item_data.get("note", existing_item.note)
-                    existing_item.save()
+                    OrderService.on_change_append(existing_items.pop(item_id), item_data, admin_id, user_id)
                 else:
                     OrderItem.objects.create(
                         order=order,
@@ -240,7 +337,9 @@ class OrderService:
                         lens_cleaner_id=item_data.get("lens_cleaner"),
                         other_item_id=item_data.get("other_item"),
                         is_non_stock=is_non_stock,
-                        note=item_data.get("note")
+                        note=item_data.get("note"),
+                        admin_id=admin_id,
+                        user_id=user_id
                     )
 
             # 🔹 Handle deleted items and restock
@@ -292,7 +391,7 @@ class OrderService:
                 StockValidationService.adjust_stocks(lens_stock_updates)
 
             # 🔹 Process Payments
-            total_payment = OrderPaymentService.append_on_change_payments_for_order(order, payments_data)
+            total_payment = OrderPaymentService.append_on_change_payments_for_order(order, payments_data,admin_id,user_id)
             if total_payment > order.total_price:
                 raise ValueError("Total payments exceed the order total price.")
 

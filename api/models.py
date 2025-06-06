@@ -351,19 +351,6 @@ class LensCleanerStock(models.Model):
         return f"{self.lens_cleaner.name} - Qty: {self.qty} - Branch: {self.branch.branch_name if self.branch else 'N/A'}"
     
 class Order(models.Model):
-    progress_status = models.CharField(
-        max_length=30,
-        choices=[
-            ('received_from_customer', 'Received from Customer'),
-            ('issue_to_factory', 'Issued to Factory'),
-            ('received_from_factory', 'Received from Factory'),
-            ('issue_to_customer', 'Issued to Customer'),
-        ],
-        default='received_from_customer',
-        null=True,
-        blank=True
-    )
-
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('processing', 'Processing'),
@@ -457,6 +444,80 @@ class Order(models.Model):
             if self.issued_by is not None:
                 self.issued_date = timezone.now()   
         super().save(*args, **kwargs)
+class OrderProgress(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_progress_status')
+    progress_status = models.CharField(
+        max_length=30,
+        choices=[
+            ('received_from_customer', 'Received from Customer'),
+            ('issue_to_factory', 'Issued to Factory'),
+            ('received_from_factory', 'Received from Factory'),
+            ('issue_to_customer', 'Issued to Customer'),
+        ]
+    )
+    changed_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ['changed_at']
+    
+    def __str__(self):
+        return f"Order {self.order.id} - {self.progress_status} at {self.changed_at}"
+
+class MntOrder(models.Model):
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, related_name='mnt_orders'
+    )  # Links to the original factory order
+    mnt_number = models.CharField(
+        max_length=20
+    )  # E.g. "MNT0001", unique per order
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='mnt_orders_user'
+    )
+    admin = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='mnt_orders_admin'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.CASCADE,
+        related_name='mnt_orders_branch',
+        null=False,
+        blank=False 
+    )
+
+    class Meta:
+        unique_together = ('order', 'mnt_number','branch')
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"MNT {self.mnt_number} for Order {self.order.id} ({self.user})"
+
+    def save(self, *args, **kwargs):
+        # TODO: Only set on create, not update!
+        if not self.mnt_number:
+            # Assume branch_code is first 3 letters (customize as needed)
+            branch_code = self.branch.branch_name[:3].upper()
+            # Count how many MNTs exist for this branch
+            last_mnt = MntOrder.objects.filter(branch=self.branch).order_by('-id').first()
+            if last_mnt and last_mnt.mnt_number:
+                # Extract last numeric part; fallback to 1 if parsing fails
+                try:
+                    last_num = int(''.join(filter(str.isdigit, last_mnt.mnt_number)))
+                    next_num = last_num + 1
+                except Exception:
+                    next_num = 1
+            else:
+                next_num = 1
+            self.mnt_number = f"MNT{branch_code}{str(next_num).zfill(3)}"
+        super().save(*args, **kwargs)
+
     
 class ExternalLens(models.Model):
     BRAND_CHOICES = (
@@ -518,12 +579,13 @@ class Invoice(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["invoice_number"], name="unique_invoice_number")
         ]
-        
+    
+    
     def delete(self, using=None, keep_parents=False):
         self.is_deleted = True
         self.deleted_at = timezone.now()
         self.save()
-
+   
     def save(self, *args, **kwargs):
         # Ensure invoice_date is set
         if not self.invoice_date:
@@ -596,6 +658,13 @@ class OrderItem(models.Model):
     note = models.TextField(blank=True, null=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
+    # In OrderItem model:
+    user = models.ForeignKey(
+        CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='user_order_items'
+    )
+    admin = models.ForeignKey(
+        CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_order_items'
+    )
 
     objects = SoftDeleteManager()
     all_objects = models.Manager()
@@ -646,6 +715,8 @@ class OrderPayment(models.Model):
     is_partial = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
+    user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='user_order_payments')
+    admin = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_order_payments')
 
     def __str__(self):
         return f"Payment for Order {self.order.id} - Amount: {self.amount}"

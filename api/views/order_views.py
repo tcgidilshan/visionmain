@@ -2,8 +2,8 @@ from django.db import transaction
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from ..models import Order, OrderItem, OrderPayment, LensStock, LensCleanerStock, FrameStock,RefractionDetails,Refraction
-from ..serializers import OrderSerializer, OrderItemSerializer, OrderPaymentSerializer
+from ..models import Order, OrderItem, OrderPayment, LensStock, LensCleanerStock, FrameStock, OrderProgress,RefractionDetails,Refraction
+from ..serializers import OrderSerializer, OrderItemSerializer, OrderPaymentSerializer,OrderProgressSerializer
 from ..services.order_payment_service import OrderPaymentService
 from ..services.stock_validation_service import StockValidationService
 from ..services.order_service import OrderService
@@ -130,3 +130,12 @@ class OrderRefundView(APIView):
         except Exception as e:
             return Response({"error": f"Refund failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+class OrderProgressStatusListView(APIView):
+    def get(self, request):
+        order_id = request.query_params.get('order_id')
+        qs = OrderProgress.objects.all()
+        if order_id:
+            qs = qs.filter(order_id=order_id)
+        # Always order by changed_at for timeline clarity
+        qs = qs.order_by('-changed_at')
+        return Response(OrderProgressSerializer(qs, many=True).data)

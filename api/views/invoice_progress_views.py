@@ -4,6 +4,8 @@ from rest_framework import status, permissions
 from api.models import Invoice,Order,OrderItemWhatsAppLog
 from api.serializers import InvoiceSerializer,BulkWhatsAppLogCreateSerializer
 from django.utils import timezone
+from django.db import transaction
+from api.models import OrderProgress
 class InvoiceProgressUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -53,26 +55,38 @@ class InvoiceProgressUpdateView(APIView):
 class BulkUpdateOrderProgressStatus(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def patch(self, request, *args, **kwargs):
-        order_ids = request.data.get('order_ids')
-        new_status = request.data.get('progress_status')
+    def post(self, request, *args, **kwargs):
+        order_ids = request.data.get("order_ids", [])
+        progress_status = request.data.get("progress_status", None)
 
-        if not order_ids or not isinstance(order_ids, list):
-            return Response({'error': 'Invalid or missing "order_ids". Must be a list of IDs.'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        valid_statuses = dict(Order._meta.get_field('progress_status').choices).keys()
-        if new_status not in valid_statuses:
-            return Response({'error': f'Invalid progress_status. Valid options: {list(valid_statuses)}'}, status=status.HTTP_400_BAD_REQUEST)
+        if not order_ids or not progress_status:
+            return Response({"detail": "order_ids and progress_status required."}, status=400)
 
-        # Update orders
-        updated_count = Order.objects.filter(id__in=order_ids).update(progress_status=new_status)
+        results = []
+        with transaction.atomic():
+            # Lock the orders to prevent concurrent issues
+            orders = Order.objects.select_for_update().filter(id__in=order_ids, is_deleted=False)
+            for order in orders:
+                # Fetch the latest OrderProgress record for this order
+                last_progress = (
+                    OrderProgress.objects
+                    .filter(order=order)
+                    .order_by('-changed_at')
+                    .first()
+                )
+                if last_progress and last_progress.progress_status == progress_status:
+                    results.append({"order_id": order.id, "status": "already_set"})
+                    continue
 
-        return Response({
-            'message': f'{updated_count} order(s) updated successfully.',
-            'progress_status': new_status,
-            'order_ids': order_ids
-        }, status=status.HTTP_200_OK)
+                # Create a new progress record
+                OrderProgress.objects.create(
+                    order=order,
+                    progress_status=progress_status,
+                    changed_at=timezone.now()
+                )
+                results.append({"order_id": order.id, "status": "created"})
 
+        return Response({"results": results}, status=200)
 class BulkOrderWhatsAppLogView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = BulkWhatsAppLogCreateSerializer(data=request.data)
