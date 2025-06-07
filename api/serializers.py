@@ -3,7 +3,7 @@ from django.db.models import Sum
 from django.db import models
 from rest_framework.exceptions import ValidationError
 from .models import (
-    Branch,Refraction,RefractionDetails,
+    Branch,Refraction,RefractionDetails,RefractionDetailsAuditLog,
     Brand,Color,Code,Frame,
     FrameStock,
     LenseType,
@@ -92,6 +92,29 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'username', 
             'blepharitis'
         ]
+        def update(self, instance, validated_data):
+            request = self.context.get('request', None)
+            user = request.user if request and request.user.is_authenticated else None
+
+            # Loop over all fields in validated_data
+            for field, new_value in validated_data.items():
+                old_value = getattr(instance, field)
+
+                if old_value != new_value:
+                    # Create audit log
+                    RefractionDetailsAuditLog.objects.create(
+                        refraction_details=instance,
+                        field_name=field,
+                        old_value=str(old_value) if old_value is not None else '',
+                        new_value=str(new_value) if new_value is not None else '',
+                        modified_by=user,
+                    )
+
+                    # Update the field on instance
+                    setattr(instance, field, new_value)
+
+            instance.save()
+            return instance
   
 class BrandSerializer(serializers.ModelSerializer):
     class Meta:

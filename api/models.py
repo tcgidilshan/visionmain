@@ -9,6 +9,7 @@ from django.db import transaction
 from django.db.models import Max,Sum,Q
 from .managers import SoftDeleteManager
 from django.db import IntegrityError
+from django.utils.timezone import now
 
 class Item(models.Model):
     name = models.CharField(max_length=100)
@@ -184,6 +185,32 @@ class RefractionDetails(models.Model):
             return f"Details for {self.refraction.customer_full_name}"
         
         return f"Details for Refraction {self.refraction.id if self.refraction else 'N/A'}"
+    
+
+class RefractionDetailsAuditLog(models.Model):
+    refraction_details = models.ForeignKey(
+        RefractionDetails,
+        on_delete=models.CASCADE,
+        related_name='audit_logs'
+    )
+    field_name = models.CharField(max_length=100)
+    old_value = models.TextField(null=True, blank=True)
+    new_value = models.TextField(null=True, blank=True)
+    
+    modified_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='refraction_audit_logs'
+    )
+    modified_at = models.DateTimeField(default=now)
+
+    class Meta:
+        ordering = ['-modified_at']
+
+    def __str__(self):
+        return f"{self.field_name} changed by {self.modified_by} on {self.modified_at}"
 
 #brands
 class Brand(models.Model):
