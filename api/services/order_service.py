@@ -23,6 +23,7 @@ class OrderService:
         # Step 1: Extract necessary fields
         on_hold = order_data.get("on_hold", False)
         branch_id = order_data.get("branch_id")
+        invoice_type = order_data.get("invoice_type")
 
         if not branch_id:
             raise ValidationError({"branch_id": "Branch ID is required for stock validation."})
@@ -62,10 +63,11 @@ class OrderService:
             StockValidationService.adjust_stocks(lens_stock_updates)
 
        # Always create a new progress status with 'received_from_customer' as the initial status
-        OrderProgress.objects.create(
-            order=order,
-            progress_status='received_from_customer',
-        )
+        if invoice_type == "factory":
+            OrderProgress.objects.create(
+                order=order,
+                progress_status='received_from_customer',
+            )
         # Step 6: Return the created order
         return order
 
@@ -185,7 +187,6 @@ class OrderService:
             # 🔹 Track on_hold flag changes
             was_on_hold = order.on_hold
             will_be_on_hold = order_data.get("on_hold", was_on_hold)
-            
             # Detect transition from on-hold to active
             transitioning_off_hold = was_on_hold and not will_be_on_hold
             
@@ -244,6 +245,7 @@ class OrderService:
                 item_id = item_data.get('id')
                 is_non_stock = item_data.get('is_non_stock', False)
                 quantity = item_data['quantity']
+                new_quantity = int(item_data['quantity'])
                 external_lens_id = item_data.get('external_lens')
 
                 # Validate external lens
@@ -306,20 +308,20 @@ class OrderService:
                 if should_adjust_stock:
                     if item_id and item_id in existing_items:
                         # Update existing item
-                        old_qty = existing_items[item_id].quantity
-                        if quantity > old_qty:
-                            diff = quantity - old_qty
-                            if stock.qty < diff:
-                                raise ValueError(f"Insufficient {stock_type} stock for increase.")
-                            stock.qty -= diff
-                        elif quantity < old_qty:
-                            stock.qty += old_qty - quantity
+                        old_item = existing_items.pop(item_id)
+                        old_qty = int(old_item.quantity)
+                        
+                        if stock.qty < new_quantity:
+                            raise ValueError(f"Insufficient {stock_type} stock.")
+                        stock.qty -= new_quantity
                         stock.save()
                     else:
                         # Create new item
+
                         if stock.qty < quantity:
+                            
                             raise ValueError(f"Insufficient {stock_type} stock.")
-                        stock.qty -= quantity
+                        stock.qty -= new_quantity
                         stock.save()
 
                 # Save order item
