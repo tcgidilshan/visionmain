@@ -35,7 +35,7 @@ class OrderPaymentService:
         return total_payment
     
     @staticmethod
-    def update_process_payments(order, payments_data):
+    def update_process_payments(order, payments_data,admin_id,user_id):
         """
         Updates existing payments, creates new ones if needed, and removes old ones.
         """
@@ -142,7 +142,7 @@ class OrderPaymentService:
         }
     @staticmethod
     @transaction.atomic
-    def append_on_change_payments_for_order(order, payments_data):
+    def append_on_change_payments_for_order(order, payments_data,admin_id,user_id):
         """
         Medical-compliant payment update with append-on-change logic.
         1. For each payment in input:
@@ -152,6 +152,8 @@ class OrderPaymentService:
             - If no id: create new.
         2. Soft-delete any DB payments not referenced in input.
         """
+        print(admin_id)
+        print(user_id)
         # 1. Index all current, non-deleted payments by id for lookup
         db_payments = {p.id: p for p in order.orderpayment_set.filter(is_deleted=False)}
         seen_payment_ids = set()
@@ -190,6 +192,9 @@ class OrderPaymentService:
                             "payment_date": old_payment.payment_date,  # Carry forward
                             "is_partial": False,
                             "is_final_payment": False,
+                            "user": user_id,
+                            "admin": admin_id,
+                            
                         }
                         payment_serializer = OrderPaymentSerializer(data=payment_data)
                         payment_serializer.is_valid(raise_exception=True)
@@ -212,6 +217,8 @@ class OrderPaymentService:
                     "transaction_status": txn_status,
                     "is_partial": False,
                     "is_final_payment": False,
+                    "admin": admin_id,
+                    "user": user_id,
                 }
                 payment_serializer = OrderPaymentSerializer(data=payment_data)
                 payment_serializer.is_valid(raise_exception=True)

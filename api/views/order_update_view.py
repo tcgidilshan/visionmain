@@ -9,6 +9,7 @@ from ..services.patient_service import PatientService
 from ..services.external_lens_service import ExternalLensService
 from rest_framework.exceptions import ValidationError
 from django.utils import timezone
+from ..services.mnt_order_service import MntOrderService
 
 class OrderUpdateView(APIView):
     """
@@ -19,16 +20,22 @@ class OrderUpdateView(APIView):
     def put(self, request, pk, *args, **kwargs):
         try:
             order = Order.objects.get(pk=pk)
-
+            admin_id = request.data.get("admin_id")
+            user_id = request.data.get("user_id")
+            if not admin_id:
+               return Response({"error": "Admin ID is required to perform an MNT operation."}, status=status.HTTP_400_BAD_REQUEST)
             # ✅ Step 1: Update Patient Details (if provided)
+
             patient_data = request.data.get("patient")
             if patient_data:
                 PatientService.create_or_update_patient(patient_data)
+
 
             # ✅ Step 2: Extract Order Data (check if on_hold status is changing)
             order_data = request.data.get("order", {})
             order_items_data = request.data.get("order_items", [])
             payments_data = request.data.get("order_payments", [])
+            
 
             # ✅ Check if we're changing on_hold status
             current_on_hold = order.on_hold
@@ -40,7 +47,31 @@ class OrderUpdateView(APIView):
 
             # ✅ Step 3: Update Order 
             # The updated update_order method now handles different stock behavior based on on_hold status
-            updated_order = OrderService.update_order(order, order_data, order_items_data, payments_data)
+            updated_order = OrderService.update_order(order, order_data, order_items_data, payments_data,admin_id,user_id)
+
+              # --- MNT logic (if requested) ---
+            if request.data.get("mnt", False):
+                admin_id = request.data.get("admin_id")
+                admin = CustomUser.objects.get(pk=admin_id) if admin_id else None
+
+                # Business/medical validation: Only allow MNT for eligible orders (e.g., factory)
+                if not MntOrderService.is_mnt_allowed(updated_order):
+                    return Response({"error": "MNT can only be created for factory orders."}, status=400)
+
+                # Prevent duplicate MNT for same order/branch in same request/session (optional)
+                # (Could also use unique_together constraint at DB/model level)
+                existing = MntOrderService.get_latest_mnt_order_for_order(updated_order)
+                # If you want to block multiple MNT in rapid succession, check time window or manual status
+
+                # Actually create the MNT order
+                mnt_order = MntOrderService.create_mnt_order(
+                    order=updated_order,
+                    user_id=request.data.get("user_id"),
+                    admin_id=request.data.get("admin_id"),
+                   
+                )
+                # Optionally: return mnt_order info in response or audit log
+
 
             # ✅ Step 5: Return Updated Order Response
             response_serializer = OrderSerializer(updated_order)
