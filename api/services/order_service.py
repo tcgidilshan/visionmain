@@ -102,7 +102,10 @@ class OrderService:
                         lens_items.append(item_data)
                 
                 # Validate lens stock separately
-                _, lens_stock_updates = StockValidationService.validate_stocks(lens_items, branch_id, on_hold=False)
+                _, lens_stock_updates = StockValidationService.validate_stocks(
+                    lens_items, branch_id, on_hold=False, existing_items=existing_items
+                )
+
 
             # 🔹 Update order fields
             order.sub_total = order_data.get('sub_total', order.sub_total)
