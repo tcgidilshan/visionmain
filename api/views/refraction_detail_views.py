@@ -51,7 +51,12 @@ class RefractionDetailRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPI
         """
         try:
             refraction_details = RefractionDetails.objects.get(refraction_id=refraction_id)
-            serializer = RefractionDetailsSerializer(refraction_details, data=request.data, partial=False)
+            serializer = RefractionDetailsSerializer(
+                refraction_details,
+                data=request.data,
+                partial=False,
+                context={"request": request}  # ✅ Required for audit log to have user
+            )
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)

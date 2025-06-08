@@ -5,7 +5,6 @@ class RefractionDetailsService:
     """
     Service class to handle refraction details creation and updating.
     """
-
     @staticmethod
     def create_refraction_details(refraction_details_data):
         """
