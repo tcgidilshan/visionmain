@@ -287,6 +287,26 @@ class FrameStock(models.Model):
 
     def __str__(self):
         return f"Frame: {self.frame.id} - Qty: {self.qty}"
+
+class FrameStockHistory(models.Model):
+    ADD = 'add'
+    REMOVE = 'remove'
+
+    ACTION_CHOICES = [
+        (ADD, 'Add'),
+        (REMOVE, 'Remove'),
+    ]
+
+    frame = models.ForeignKey('Frame', on_delete=models.CASCADE, related_name='stock_histories')
+    branch = models.ForeignKey('Branch', on_delete=models.CASCADE, related_name='stock_histories')
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES)
+    quantity_changed = models.PositiveIntegerField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    performed_by = models.ForeignKey(CustomUser,related_name='stock_histories',on_delete=models.CASCADE, null=True, blank=True)
+    note = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.action.upper()} {self.quantity_changed} of {self.frame} at {self.branch} by {self.performed_by}"
     
 class LenseType(models.Model):
     name = models.CharField(max_length=255)

@@ -45,7 +45,7 @@ from .views import (
     LensTypeRetrieveUpdateDeleteView,ExternalLensCoatingListCreateView,
     ExternalLensCoatingRetrieveUpdateDeleteView,SafeAll,
     LensCoatingListCreateView,ExternalLensBrandListCreateView,
-    ExternalLensBrandRetrieveUpdateDeleteView,SafeIncomeTotalView,
+    ExternalLensBrandRetrieveUpdateDeleteView,SafeIncomeTotalView,StockAdjustmentView,
     LensCoatingRetrieveUpdateDeleteView,FrameOnlyOrderCreateView,CreateSolderingOrderView,
    ChannelRepaymentView,ManualOrderCreateView,DoctorAppointmentTransferView,ChannelRepaymentView,AppointmentStatusListView,
     InvoiceDetailView,BankDepositListCreateView,BankDepositRetrieveUpdateView,BankDepositConfirmView,
@@ -125,6 +125,7 @@ urlpatterns = [
     path('frames/', FrameListCreateView.as_view(), name='frame-list-create'),
     path('frames/<int:pk>/', FrameRetrieveUpdateDeleteView.as_view(), name='frame-detail'),
     path("frames/colors/", FrameColorListView.as_view(), name="frame-colors"),
+    path("frames/stocks/adjust", StockAdjustmentView.as_view(), name="frame-stock-adjustment"),
 
     path('frames/report/', FrameReportView.as_view(), name='frames-report'), #frame reports
 
