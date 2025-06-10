@@ -1,7 +1,7 @@
 # views.py
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListAPIView
-from ..models import Order,OrderItem,OrderPayment,OrderAuditLog,Invoice
+from ..models import Order,OrderItem,OrderPayment,RefractionDetails,OrderAuditLog,Invoice,RefractionDetailsAuditLog
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -60,10 +60,23 @@ class OrderAuditHistoryView(APIView):
         order_logs = OrderAuditLog.objects.all()
         order_items = OrderItem.all_objects.filter(is_deleted=True).order_by('-deleted_at')
         order_payments = OrderPayment.all_objects.filter(is_deleted=True).order_by('-deleted_at')
+        refraction_logs = []
         if order_id:
             order_items = order_items.filter(order_id=order_id)
             order_payments = order_payments.filter(order_id=order_id)
             order_logs = order_logs.filter(order_id=order_id)
+            # Fetch refraction details audit logs if applicable
+            try:
+                order = Order.all_objects.select_related('refraction').get(id=order_id)
+                if order.refraction:
+                    ref_details = RefractionDetails.objects.filter(refraction_id=order.refraction.id).first()
+                    if ref_details:
+                        refraction_logs = RefractionDetailsAuditLog.objects.filter(
+                            refraction_details=ref_details
+                        ).order_by("-created_at")
+            except Order.DoesNotExist:
+                pass
+       
         data = {
             # "orders": OrderSerializer(orders, many=True).data,
             "order_items": OrderItemSerializer(order_items, many=True).data,
@@ -84,6 +97,17 @@ class OrderAuditHistoryView(APIView):
                     "created_at": log.created_at,
                 }
                 for log in order_logs.order_by('-created_at')
+            ],
+            "refraction_logs": [
+                {
+                    "field_name": log.field_name,
+                    "old_value": log.old_value,
+                    "new_value": log.new_value,
+                    "user_name": log.user.username if log.user else None,
+                    "admin_name": log.admin.username if log.admin else None,
+                    "created_at": log.created_at,
+                }
+                for log in refraction_logs
             ],
             "invoice_number": Invoice.all_objects.filter(order_id=order_id).values_list('invoice_number', flat=True).first() if order_id else None
         }, status=status.HTTP_200_OK)
