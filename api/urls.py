@@ -64,7 +64,7 @@ from .views import (
     DoctorClaimInvoiceListCreateView,DoctorClaimInvoiceRetrieveUpdateDestroyView,
     DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView,
     SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
-    GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView
+    GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView
 )
 # from .views import CustomAuthToken
 
@@ -248,6 +248,8 @@ urlpatterns = [
     path('orders/mark-delivered/', OrderDeliveryMarkView.as_view(), name='order-mark-delivered'),
     #user order report 
     path('report/glass-sender-report/', GlassSenderReportView.as_view(), name='glass-sender-report'),
+    # order audir hostory 
+    path('orders/audit-history/', OrderAuditHistoryView.as_view(), name='order-audit-history'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

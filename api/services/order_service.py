@@ -179,6 +179,7 @@ class OrderService:
         - Lens stock is only adjusted when the order is not on hold
         - When transitioning from on_hold=True to on_hold=False, lens stock is validated and deducted
         """
+
         try:
             branch_id = order.branch_id
             if not branch_id:
@@ -240,9 +241,8 @@ class OrderService:
             for field in ['pd', 'height', 'right_height', 'left_height', 'left_pd', 'right_pd']:
                 if field in order_data:
                     setattr(order, field, order_data.get(field))
-
             order.save()
-
+            
             # 🔹 Create/Update order items
             for item_data in order_items_data:
                 item_id = item_data.get('id')
@@ -384,7 +384,7 @@ class OrderService:
                                 f"(Item ID: {deleted_item.id})"
                             )
                         else:
-                            print(
+                            raise ValueError (
                                 f"⚠️ Warning: Item ID {deleted_item.id} marked as stock, but has no stock FK set "
                                 f"(lens, frame, other_item, or lens_cleaner). Skipping restock."
                             )
