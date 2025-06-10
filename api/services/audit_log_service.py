@@ -1,6 +1,6 @@
 from decimal import Decimal, InvalidOperation
 from django.utils.timezone import now
-from ..models import OrderAuditLog, CustomUser,RefractionDetailsAuditLog, CustomUser
+from ..models import OrderAuditLog, CustomUser,RefractionDetailsAuditLog
 
 class OrderAuditLogService:
     """
