@@ -169,3 +169,8 @@ class OrderDeliveryMarkView(APIView):
         order.save()
 
         return Response({'detail': 'Order marked as delivered.', 'order_id': order.id}, status=status.HTTP_200_OK)
+
+        for item_id, deleted_item in existing_items.items():
+            if item_id not in updated_item_ids:
+                # ...restock logic...
+                deleted_item.delete()
