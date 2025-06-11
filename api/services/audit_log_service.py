@@ -10,6 +10,8 @@ class OrderAuditLogService:
 
     TRACKED_FIELDS = {
         'urgent', 'pd', 'height', 'right_height', 'left_height',
+        'fitting_on_collection',  # ← track when store staff marks “Fit OK”
+        'on_hold', 
         'left_pd', 'right_pd', 'order_remark', 'sub_total', 'discount','total_price'
     }
 
@@ -28,8 +30,15 @@ class OrderAuditLogService:
             value = str(value).strip() if isinstance(value, str) else value
             return value if value != "" else None
         
-        if field == 'urgent':
+        if field in {'urgent', 'fitting_on_collection', 'on_hold'}:  # TODO handle new bools
+            # Accept bools, ints, or common truthy / falsy strings
+            if isinstance(value, str):
+                return value.lower() in {'true', '1', 'yes', 'y'}
             return bool(value)
+
+        # Fallback – leave untouched
+        return value
+
 
 
 
