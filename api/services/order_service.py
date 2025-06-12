@@ -24,7 +24,7 @@ class OrderService:
         on_hold = order_data.get("on_hold", False)
         branch_id = order_data.get("branch_id")
         invoice_type = order_data.get("invoice_type")
-
+        
         if not branch_id:
             raise ValidationError({"branch_id": "Branch ID is required for stock validation."})
 
