@@ -21,11 +21,12 @@ class DailyFinanceSummaryService:
         yesterday_order_payments = DailyFinanceSummaryService._sum(
             OrderPayment.objects.filter(order__branch_id=branch_id, payment_date__date=yesterday, payment_method="cash")
         )
+        
         yesterday_channel_payments = DailyFinanceSummaryService._sum(
             ChannelPayment.objects.filter(appointment__branch_id=branch_id, payment_date__date=yesterday, payment_method="cash")
         )
         yesterday_other_income = DailyFinanceSummaryService._sum(
-            OtherIncome.objects.filter(branch_id=branch_id, date=yesterday, payment_method="cash")
+            OtherIncome.objects.filter(branch_id=branch_id, date=yesterday, )
         )
         yesterday_expenses = DailyFinanceSummaryService._sum(
             Expense.objects.filter(branch_id=branch_id, created_at__date=yesterday, paid_source="cash")
@@ -46,7 +47,7 @@ class DailyFinanceSummaryService:
             ChannelPayment.objects.filter(appointment__branch_id=branch_id, payment_date__date=date, payment_method="cash")
         )
         today_other_income = DailyFinanceSummaryService._sum(
-            OtherIncome.objects.filter(branch_id=branch_id, date=date, payment_method="cash")
+            OtherIncome.objects.filter(branch_id=branch_id, date=date, )
         )
         today_expenses = DailyFinanceSummaryService._sum(
             Expense.objects.filter(branch_id=branch_id, created_at__date=date, paid_source="cash")
