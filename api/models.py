@@ -542,6 +542,7 @@ class MntOrder(models.Model):
         blank=True,
         related_name='mnt_orders_admin'
     )
+    mnt_price= models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Price for MNT order
     created_at = models.DateTimeField(auto_now_add=True)
     branch = models.ForeignKey(
         Branch,

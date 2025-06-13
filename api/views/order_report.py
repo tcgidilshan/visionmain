@@ -3,8 +3,12 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from datetime import datetime
 from ..models import Order, Invoice
-from ..serializers import InvoiceSearchSerializer
+from ..serializers import InvoiceSearchSerializer,MntOrderSerializer
 from ..services.pagination_service import PaginationService
+from ..models import MntOrder  
+from django.db.models import Count, Sum
+from decimal import Decimal
+from rest_framework import status
 
 class FittingStatusReportView(APIView):
     permission_classes = [IsAuthenticated]
@@ -74,3 +78,66 @@ class FittingStatusReportView(APIView):
             "orders": serialized_invoices,  # paginated
         }
         return paginator.get_paginated_response(result)
+
+class MntOrderReportView(APIView):
+    """
+    Returns a per-branch snapshot of MNT orders, optionally filtered by date
+    (uses created_at date; NOT time-zone aware for performance - adjust if needed).
+
+    Query params
+    ------------
+    branch_id   (int, required)
+    date        (YYYY-MM-DD, optional) → filters by `created_at` date portion
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        branch_id = request.query_params.get("branch_id")
+        if not branch_id:
+            return Response(
+                {"error": "branch_id parameter is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        date_str = request.query_params.get("date")
+
+        # ✧✧ Base queryset — eager-load FKs to avoid N+1 hits ✧✧
+        qs = (
+            MntOrder.objects
+            .select_related("order", "branch", "user", "admin")
+            .filter(branch_id=branch_id)
+        )
+
+        # --- Optional date filter -------------------------------------------
+        if date_str:
+            try:
+                target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                return Response(
+                    {"error": "Invalid date format, use YYYY-MM-DD"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            qs = qs.filter(created_at__date=target_date)
+
+        # ========== Metrics ==================================================
+        # DB-side aggregation keeps it transactional-safe & fast
+        aggregates = qs.aggregate(
+            total_mnt_orders=Count("id"),
+            total_mnt_price=Sum("mnt_price"),
+        )
+        total_mnt_orders   = aggregates["total_mnt_orders"]
+        total_mnt_price    = aggregates["total_mnt_price"] or Decimal("0.00")
+
+        # ------- Pagination / serialization ---------------------------------
+        paginator = PaginationService()
+        paginated_qs = paginator.paginate_queryset(qs.order_by("-created_at"), request)
+        serialized   = MntOrderSerializer(paginated_qs, many=True).data
+
+        payload = {
+            "branch_id":               int(branch_id),
+            "date":                    date_str,
+            "total_mnt_orders":        total_mnt_orders,
+            "total_mnt_price":         total_mnt_price,
+            "orders":                  serialized,   # paginated slice
+        }
+        return paginator.get_paginated_response(payload)

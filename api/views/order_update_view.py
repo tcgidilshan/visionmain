@@ -80,9 +80,9 @@ class OrderUpdateView(APIView):
                 # Actually create the MNT order
                 mnt_order = MntOrderService.create_mnt_order(
                     order=updated_order,
+                    mnt_price=request.data.get("mnt_price"),
                     user_id=request.data.get("user_id"),
                     admin_id=request.data.get("admin_id"),
-                   
                 )
                 # Optionally: return mnt_order info in response or audit log
 

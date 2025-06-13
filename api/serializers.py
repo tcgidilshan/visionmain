@@ -1202,12 +1202,12 @@ class MntOrderSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source='user.username', read_only=True)
     admin_id = serializers.PrimaryKeyRelatedField(source='admin', queryset=CustomUser.objects.all(), allow_null=True)
     admin_username = serializers.CharField(source='admin.username', read_only=True)
-
     class Meta:
         model = MntOrder
         fields = [
             'id',
             'mnt_number',
+            'mnt_price',
             'order_id',
             'branch_id',
             'branch_name',
