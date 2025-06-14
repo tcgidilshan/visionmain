@@ -24,7 +24,7 @@ class OrderService:
         on_hold = order_data.get("on_hold", False)
         branch_id = order_data.get("branch_id")
         invoice_type = order_data.get("invoice_type")
-
+        
         if not branch_id:
             raise ValidationError({"branch_id": "Branch ID is required for stock validation."})
 
@@ -70,15 +70,13 @@ class OrderService:
             )
         # Step 6: Return the created order
         return order
-
     @staticmethod
     @transaction.atomic
     def on_change_append(existing_item: OrderItem, new_data: dict, admin_id: int, user_id: int):
         """
-        If any tracked field is changed (with robust type-safe checks), 
-        mark the old item as deleted and create a new one.
-        Handles string/number input for prices/quantity.
-        All ForeignKeys handled as IDs or instances.
+        Medical-compliant item update with append-on-change logic.
+        1. If any tracked field changes: soft-delete old, create new (copying original order ref, user/admin).
+        2. If not changed: just return original (do nothing).
         """
         TRACKED_FIELDS = [
             "price_per_unit", "subtotal", "external_lens", "lens", "frame",
@@ -92,8 +90,6 @@ class OrderService:
             'other_item': OtherItem,
         }
 
-        changed = False
-
         # Always recalculate subtotal using Decimal (ignore frontend subtotal)
         if 'quantity' in new_data and 'price_per_unit' in new_data:
             try:
@@ -103,6 +99,9 @@ class OrderService:
             except Exception:
                 new_data['subtotal'] = Decimal('0.00')
 
+        changed = False
+
+        # Detect field changes robustly
         for field in TRACKED_FIELDS:
             old = getattr(existing_item, field)
             new = new_data.get(field, old)
@@ -141,6 +140,8 @@ class OrderService:
             # //TODO: Soft-delete the old item for compliance
             existing_item.is_deleted = True
             existing_item.deleted_at = timezone.now()
+            existing_item.admin_id = admin_id  
+            existing_item.user_id = user_id
             existing_item.save()
 
             # //TODO: Prepare new item data with proper FK resolution
@@ -160,11 +161,12 @@ class OrderService:
                 elif not value:
                     new_item_data[field] = None
 
-            return OrderItem.objects.create(**new_item_data)
+            # //TODO: Audit log creation could be inserted here for regulatory trace
+            new_item = OrderItem.objects.create(**new_item_data)
+            return new_item
         else:
             # No changes: keep as is, don't update or touch
             return existing_item
-
 
     @staticmethod
     @transaction.atomic
@@ -179,6 +181,7 @@ class OrderService:
         - Lens stock is only adjusted when the order is not on hold
         - When transitioning from on_hold=True to on_hold=False, lens stock is validated and deducted
         """
+
         try:
             branch_id = order.branch_id
             if not branch_id:
@@ -240,9 +243,8 @@ class OrderService:
             for field in ['pd', 'height', 'right_height', 'left_height', 'left_pd', 'right_pd']:
                 if field in order_data:
                     setattr(order, field, order_data.get(field))
-
             order.save()
-
+            updated_item_ids = set()
             # 🔹 Create/Update order items
             for item_data in order_items_data:
                 item_id = item_data.get('id')
@@ -261,7 +263,10 @@ class OrderService:
                     # Just save the item
                     if item_id and item_id in existing_items:
                         # Update existing item
-                        OrderService.on_change_append(existing_items.pop(item_id), item_data, admin_id, user_id)
+                        old_item = existing_items[item_id]
+                        result_item = OrderService.on_change_append(old_item, item_data, admin_id, user_id)
+                        updated_item_ids.add(result_item.id)
+                        
                         
                     else:
                         # Create new item
@@ -277,8 +282,8 @@ class OrderService:
                             other_item_id=item_data.get("other_item"),
                             is_non_stock=is_non_stock,
                             note=item_data.get("note"),
-                            admin_id=admin_id,
-                            user_id=user_id
+                            admin_id=None,
+                            user_id=None
                         )
                     continue
 
@@ -311,13 +316,12 @@ class OrderService:
                 if should_adjust_stock:
                     if item_id and item_id in existing_items:
                         # Update existing item
-                        old_item = existing_items.pop(item_id)
-                        old_qty = int(old_item.quantity)
-                        
-                        if stock.qty < new_quantity:
+                       old_item = existing_items[item_id]
+                       if int(old_item.quantity) != new_quantity:
+                          if stock.qty < new_quantity:
                             raise ValueError(f"Insufficient {stock_type} stock.")
-                        stock.qty -= new_quantity
-                        stock.save()
+                          stock.qty -= new_quantity
+                          stock.save()
                     else:
                         # Create new item
 
@@ -329,7 +333,9 @@ class OrderService:
 
                 # Save order item
                 if item_id and item_id in existing_items:
-                    OrderService.on_change_append(existing_items.pop(item_id), item_data, admin_id, user_id)
+                    old_item = existing_items[item_id]
+                    result_item = OrderService.on_change_append(old_item, item_data, admin_id, user_id)
+                    updated_item_ids.add(result_item.id)
                 else:
                     OrderItem.objects.create(
                         order=order,
@@ -343,53 +349,53 @@ class OrderService:
                         other_item_id=item_data.get("other_item"),
                         is_non_stock=is_non_stock,
                         note=item_data.get("note"),
-                        admin_id=admin_id,
-                        user_id=user_id
+                        admin_id=None,
+                        user_id=None
                     )
 
             # 🔹 Handle deleted items and restock
-            for deleted_item in existing_items.values():
-                if not deleted_item.is_non_stock:
-                    stock = None
-                    stock_model = None
-                    stock_filter = {}
-                    is_frame = False
+            # //TODO: CLEANUP DELETED ORDER ITEMS (soft delete and restock if needed)
+            for item_id, deleted_item in existing_items.items():
+                if item_id not in updated_item_ids:
+                    if not deleted_item.is_non_stock:
+                        stock = None
+                        stock_model = None
+                        stock_filter = {}
+                        is_frame = False
 
-                    if deleted_item.lens_id:
-                        stock_model = LensStock
-                        stock_filter = {"lens_id": deleted_item.lens_id, "branch_id": branch_id}
-                    elif deleted_item.frame_id:
-                        stock_model = FrameStock
-                        stock_filter = {"frame_id": deleted_item.frame_id, "branch_id": branch_id}
-                        is_frame = True
-                    elif deleted_item.lens_cleaner_id:
-                        stock_model = LensCleanerStock
-                        stock_filter = {"lens_cleaner_id": deleted_item.lens_cleaner_id, "branch_id": branch_id}
-                    elif deleted_item.other_item_id:
-                        stock_model = OtherItemStock
-                        stock_filter = {"other_item_id": deleted_item.other_item_id, "branch_id": branch_id}
+                        if deleted_item.lens_id:
+                            stock_model = LensStock
+                            stock_filter = {"lens_id": deleted_item.lens_id, "branch_id": branch_id}
+                        elif deleted_item.frame_id:
+                            stock_model = FrameStock
+                            stock_filter = {"frame_id": deleted_item.frame_id, "branch_id": branch_id}
+                            is_frame = True
+                        elif deleted_item.lens_cleaner_id:
+                            stock_model = LensCleanerStock
+                            stock_filter = {"lens_cleaner_id": deleted_item.lens_cleaner_id, "branch_id": branch_id}
+                        elif deleted_item.other_item_id:
+                            stock_model = OtherItemStock
+                            stock_filter = {"other_item_id": deleted_item.other_item_id, "branch_id": branch_id}
 
-                    # Only restock if it's a frame or if the order is not on hold
-                    should_restock = is_frame or not will_be_on_hold
+                        should_restock = is_frame or not will_be_on_hold
 
-                    if should_restock and stock_model and stock_filter:
-                        stock = stock_model.objects.select_for_update().filter(**stock_filter).first()
+                        if should_restock and stock_model and stock_filter:
+                            stock = stock_model.objects.select_for_update().filter(**stock_filter).first()
+                            if stock:
+                                stock.qty += deleted_item.quantity
+                                stock.save()
+                            elif stock_model:
+                                raise ValueError(
+                                    f"Stock record not found for deleted item [{stock_model.__name__}] in branch {branch_id} "
+                                    f"(Item ID: {deleted_item.id})"
+                                )
+                            else:
+                                raise ValueError(
+                                    f"⚠️ Warning: Item ID {deleted_item.id} marked as stock, but has no stock FK set "
+                                    f"(lens, frame, other_item, or lens_cleaner). Skipping restock."
+                                )
+                    deleted_item.delete()
 
-                        if stock:
-                            stock.qty += deleted_item.quantity
-                            stock.save()
-                        elif stock_model:
-                            raise ValueError(
-                                f"Stock record not found for deleted item [{stock_model.__name__}] in branch {branch_id} "
-                                f"(Item ID: {deleted_item.id})"
-                            )
-                        else:
-                            print(
-                                f"⚠️ Warning: Item ID {deleted_item.id} marked as stock, but has no stock FK set "
-                                f"(lens, frame, other_item, or lens_cleaner). Skipping restock."
-                            )
-
-                deleted_item.delete()
 
             # 🔹 Final: Deduct lens stock if on_hold → False
             if transitioning_off_hold:

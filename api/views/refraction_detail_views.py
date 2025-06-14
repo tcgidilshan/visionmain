@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from ..models import RefractionDetails
 from ..serializers import RefractionDetailsSerializer
 from ..services.refraction_details_service import RefractionDetailsService
-
-
+from ..services.audit_log_service import RefractionDetailsAuditLogService
+from django.forms.models import model_to_dict
 class RefractionDetailCreateAPIView(generics.CreateAPIView):
     """
     API View to create RefractionDetails.
@@ -51,6 +51,8 @@ class RefractionDetailRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPI
         """
         try:
             refraction_details = RefractionDetails.objects.get(refraction_id=refraction_id)
+            # Take a snapshot before update
+            original_data = model_to_dict(refraction_details)
             serializer = RefractionDetailsSerializer(
                 refraction_details,
                 data=request.data,
@@ -59,6 +61,12 @@ class RefractionDetailRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPI
             )
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            RefractionDetailsAuditLogService.log_changes(
+                instance=refraction_details,
+                updated_data=serializer.validated_data,
+                original_data=original_data,
+                raw_data=request.data  # should contain user_id/admin_id in your frontend
+            )
             return Response(serializer.data, status=status.HTTP_200_OK)
         except RefractionDetails.DoesNotExist:
             return Response({"error": "Refraction details not found."}, status=status.HTTP_404_NOT_FOUND)

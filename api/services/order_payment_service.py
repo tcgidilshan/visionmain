@@ -152,8 +152,6 @@ class OrderPaymentService:
             - If no id: create new.
         2. Soft-delete any DB payments not referenced in input.
         """
-        print(admin_id)
-        print(user_id)
         # 1. Index all current, non-deleted payments by id for lookup
         db_payments = {p.id: p for p in order.orderpayment_set.filter(is_deleted=False)}
         seen_payment_ids = set()
@@ -183,6 +181,9 @@ class OrderPaymentService:
                     )
                     if changed:
                         # Soft-delete old, create new (keep date)
+                        old_payment.user_id = user_id
+                        old_payment.admin_id = admin_id
+                        old_payment.save(update_fields=['user', 'admin'])
                         old_payment.delete()
                         payment_data = {
                             "order": order.id,
@@ -192,8 +193,8 @@ class OrderPaymentService:
                             "payment_date": old_payment.payment_date,  # Carry forward
                             "is_partial": False,
                             "is_final_payment": False,
-                            "user": user_id,
-                            "admin": admin_id,
+                            "user": None,
+                            "admin": None,
                             
                         }
                         payment_serializer = OrderPaymentSerializer(data=payment_data)
@@ -217,8 +218,8 @@ class OrderPaymentService:
                     "transaction_status": txn_status,
                     "is_partial": False,
                     "is_final_payment": False,
-                    "admin": admin_id,
-                    "user": user_id,
+                    "admin": None,
+                    "user": None,
                 }
                 payment_serializer = OrderPaymentSerializer(data=payment_data)
                 payment_serializer.is_valid(raise_exception=True)
@@ -229,6 +230,9 @@ class OrderPaymentService:
         # 2. Soft-delete payments that are in DB but not referenced in the new list (user "removed" them)
         for db_id, db_pmt in db_payments.items():
             if db_id not in seen_payment_ids:
+                db_pmt.user_id = user_id
+                db_pmt.admin_id = admin_id
+                db_pmt.save(update_fields=['user', 'admin'])
                 db_pmt.delete()
 
         # 3. Set is_partial and is_final_payment

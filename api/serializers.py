@@ -20,7 +20,7 @@ from .models import (
     OtherItem,BankAccount,BankDeposit,
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
     UserBranch,ExpenseMainCategory, ExpenseSubCategory,
-    DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress
+    DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -92,29 +92,6 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'username', 
             'blepharitis'
         ]
-        def update(self, instance, validated_data):
-            request = self.context.get('request', None)
-            user = request.user if request and request.user.is_authenticated else None
-
-            # Loop over all fields in validated_data
-            for field, new_value in validated_data.items():
-                old_value = getattr(instance, field)
-
-                if old_value != new_value:
-                    # Create audit log
-                    RefractionDetailsAuditLog.objects.create(
-                        refraction_details=instance,
-                        field_name=field,
-                        old_value=str(old_value) if old_value is not None else '',
-                        new_value=str(new_value) if new_value is not None else '',
-                        modified_by=user,
-                    )
-
-                    # Update the field on instance
-                    setattr(instance, field, new_value)
-
-            instance.save()
-            return instance
   
 class BrandSerializer(serializers.ModelSerializer):
     class Meta:
@@ -289,6 +266,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
     coating_name   = serializers.CharField(source="external_lens.coating.name", read_only=True)
     brand_id       = serializers.IntegerField(source="external_lens.brand.id", read_only=True)
     brand_name     = serializers.CharField(source="external_lens.brand.name", read_only=True)
+    ex_branded_type= serializers.CharField(source="external_lens.branded", read_only=True)
 
     # Detail serializers (readonly)
     lens_detail        = LensSerializer(source="lens", read_only=True)
@@ -299,10 +277,11 @@ class OrderItemSerializer(serializers.ModelSerializer):
     lens_powers   = serializers.SerializerMethodField()  # Optional/custom field
     is_non_stock  = serializers.BooleanField(default=False)
     external_lens = serializers.PrimaryKeyRelatedField(queryset=ExternalLens.objects.all(), required=False)
+    
     note = serializers.CharField(allow_blank=True, allow_null=True, required=False)
     user_username = serializers.CharField(source='user.username', read_only=True)
     admin_username = serializers.CharField(source='admin.username', read_only=True)
-    
+    deleted_at = serializers.DateTimeField(read_only=True)
     class Meta:
         model = OrderItem
         fields = [
@@ -331,7 +310,9 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'user_username',
             'admin_username',
             'user',
-            'admin'
+            'admin',
+            'deleted_at',
+            'ex_branded_type'
         ]
 
 
@@ -353,6 +334,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 class OrderPaymentSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source='user.username', read_only=True)
     admin_username = serializers.CharField(source='admin.username', read_only=True)
+    deleted_at = serializers.DateTimeField(read_only=True)
     class Meta:
         model = OrderPayment
         fields = [
@@ -367,7 +349,8 @@ class OrderPaymentSerializer(serializers.ModelSerializer):
             'user',
             'admin',
             'user_username',
-            'admin_username'
+            'admin_username',
+            'deleted_at'
         ]
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -475,7 +458,23 @@ class OrderSerializer(serializers.ModelSerializer):
             'urgent',
             'mnt_order'
         ] 
-
+class OrderAuditLogSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.username', read_only=True)
+    admin_name = serializers.CharField(source='admin.username', read_only=True)
+    
+    class Meta:
+        model = OrderAuditLog
+        fields = [
+            'id',
+            'order',
+            'field_name',
+            'old_value',
+            'user',
+            'admin', 
+            'created_at',  
+            'user_name' ,
+            'admin_name',
+        ]
 
 class BulkWhatsAppLogCreateSerializer(serializers.Serializer):
     order_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
@@ -1203,12 +1202,12 @@ class MntOrderSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source='user.username', read_only=True)
     admin_id = serializers.PrimaryKeyRelatedField(source='admin', queryset=CustomUser.objects.all(), allow_null=True)
     admin_username = serializers.CharField(source='admin.username', read_only=True)
-
     class Meta:
         model = MntOrder
         fields = [
             'id',
             'mnt_number',
+            'mnt_price',
             'order_id',
             'branch_id',
             'branch_name',

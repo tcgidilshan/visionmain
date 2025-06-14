@@ -5,6 +5,7 @@ from django.db import transaction
 from ..models import Order,ExternalLens,Invoice, CustomUser
 from ..serializers import OrderSerializer,ExternalLensSerializer
 from ..services.order_service import OrderService
+from ..services.audit_log_service import OrderAuditLogService
 from ..services.patient_service import PatientService
 from ..services.external_lens_service import ExternalLensService
 from rest_framework.exceptions import ValidationError
@@ -40,15 +41,28 @@ class OrderUpdateView(APIView):
             # ✅ Check if we're changing on_hold status
             current_on_hold = order.on_hold
             new_on_hold = order_data.get("on_hold", current_on_hold)
-            
+            original_order_data = {
+            field: getattr(order, field)
+            for field in OrderAuditLogService.TRACKED_FIELDS
+            }
             # Log the on-hold transition if it's happening (can be helpful for debugging)
             if current_on_hold != new_on_hold:
                 print(f"Order {order.id} on_hold status changing: {current_on_hold} → {new_on_hold}")
-
+            
             # ✅ Step 3: Update Order 
             # The updated update_order method now handles different stock behavior based on on_hold status
             updated_order = OrderService.update_order(order, order_data, order_items_data, payments_data,admin_id,user_id)
-
+            
+            # ✅ Now log only if update succeeded
+            OrderAuditLogService.log_order_changes(
+            order_instance=updated_order,
+            updated_data=order_data,
+            original_data=original_order_data,
+            raw_data={
+                "admin_id": admin_id,
+                "user_id": user_id
+            }
+            )
               # --- MNT logic (if requested) ---
             if request.data.get("mnt", False):
                 admin_id = request.data.get("admin_id")
@@ -66,9 +80,9 @@ class OrderUpdateView(APIView):
                 # Actually create the MNT order
                 mnt_order = MntOrderService.create_mnt_order(
                     order=updated_order,
+                    mnt_price=request.data.get("mnt_price"),
                     user_id=request.data.get("user_id"),
                     admin_id=request.data.get("admin_id"),
-                   
                 )
                 # Optionally: return mnt_order info in response or audit log
 
@@ -155,3 +169,8 @@ class OrderDeliveryMarkView(APIView):
         order.save()
 
         return Response({'detail': 'Order marked as delivered.', 'order_id': order.id}, status=status.HTTP_200_OK)
+
+        for item_id, deleted_item in existing_items.items():
+            if item_id not in updated_item_ids:
+                # ...restock logic...
+                deleted_item.delete()

@@ -5,7 +5,7 @@ from api.models import MntOrder, Order, CustomUser, Branch
 class MntOrderService:
     @staticmethod
     @transaction.atomic
-    def create_mnt_order(order, user_id=None, admin_id=None):
+    def create_mnt_order(order,mnt_price, user_id=None, admin_id=None):
         """
         Creates a new MntOrder for the given order.
         Ensures branch-wise MNT numbering, full audit, and medical compliance.
@@ -27,6 +27,7 @@ class MntOrderService:
         # Create and return the MNT order (number is auto-generated in model.save)
         mnt_order = MntOrder.objects.create(
             order=order,
+            mnt_price=mnt_price or 0,
             branch=order.branch,
             user=user,  # Pass the user object, not the ID
             admin=admin,  # Pass the admin object, not the ID
