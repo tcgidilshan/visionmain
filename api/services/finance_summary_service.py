@@ -2,7 +2,7 @@ from django.utils import timezone
 from django.db.models import Sum
 from datetime import timedelta
 from datetime import date
-from ..models import OrderPayment,ChannelPayment,OtherIncome,Expense,BankDeposit,SafeTransaction
+from ..models import OrderPayment,ChannelPayment,OtherIncome,Expense,BankDeposit,SafeTransaction,SolderingPayment
 from decimal import Decimal
 
 class DailyFinanceSummaryService:
@@ -28,15 +28,22 @@ class DailyFinanceSummaryService:
         yesterday_other_income = DailyFinanceSummaryService._sum(
             OtherIncome.objects.filter(branch_id=branch_id, date=yesterday, )
         )
+        yesterday_soldering_income = DailyFinanceSummaryService._sum(
+           SolderingPayment.objects.filter(
+           order__branch_id=branch_id,
+           payment_date__date=yesterday,
+           payment_method="cash"  # ✅ Optional: if you're filtering by method
+        )
+        )
         yesterday_expenses = DailyFinanceSummaryService._sum(
             Expense.objects.filter(branch_id=branch_id, created_at__date=yesterday, paid_source="cash")
         )
 
-        # ❗️ Don't subtract safe – it's not an expense
         before_balance = (
             yesterday_order_payments +
             yesterday_channel_payments +
-            yesterday_other_income
+            yesterday_other_income +
+            yesterday_soldering_income
         ) - yesterday_expenses
 
         # ========== TODAY
@@ -49,6 +56,13 @@ class DailyFinanceSummaryService:
         today_other_income = DailyFinanceSummaryService._sum(
             OtherIncome.objects.filter(branch_id=branch_id, date=date, )
         )
+        today_soldering_income = DailyFinanceSummaryService._sum(
+           SolderingPayment.objects.filter(
+           order__branch_id=branch_id,
+           payment_date__date=date,
+           payment_method="cash"  # ✅ Optional: if you're filtering by method
+        )
+        )
         today_expenses = DailyFinanceSummaryService._sum(
             Expense.objects.filter(branch_id=branch_id, created_at__date=date, paid_source="cash")
         )
@@ -56,7 +70,8 @@ class DailyFinanceSummaryService:
         today_balance = (
             today_order_payments +
             today_channel_payments +
-            today_other_income
+            today_other_income +
+            today_soldering_income
         ) - today_expenses
 
         cash_in_hand = before_balance + today_balance
