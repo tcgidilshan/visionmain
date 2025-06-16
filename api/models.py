@@ -1164,6 +1164,16 @@ class SolderingPayment(models.Model):
 
     def __str__(self):
         return f"Payment #{self.id} - Order #{self.order.id}"
+    
+class DailyCashInHandRecord(models.Model):
+    branch_id = models.IntegerField()
+    date = models.DateField()
+    cash_in_hand = models.DecimalField(max_digits=10, decimal_places=2)
+    before_balance = models.DecimalField(max_digits=10, decimal_places=2)
+    today_balance = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"Branch {self.branch_id} - {self.date}: {self.cash_in_hand}"
 
 
 
