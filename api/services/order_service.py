@@ -223,6 +223,8 @@ class OrderService:
             order.on_hold = will_be_on_hold  # ✅ Update hold status
             order.fitting_on_collection = order_data.get('fitting_on_collection', order.fitting_on_collection)  # ✅ Update hold status
             bus_title_id = order_data.get('bus_title')
+            #urgent
+            order.urgent = order_data.get('urgent', order.urgent)
 
             #Update Progress Status
           # 1. Update the progress_status field (capture previous if needed)

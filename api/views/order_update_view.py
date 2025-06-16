@@ -79,10 +79,7 @@ class OrderUpdateView(APIView):
 
                 # Actually create the MNT order
                 #progress stage
-                OrderProgress.objects.create(
-                    order=updated_order,
-                    progress_status='received_from_customer',
-                )
+                
                 mnt_order = MntOrderService.create_mnt_order(
                     order=updated_order,
                     mnt_price=request.data.get("mnt_price"),
