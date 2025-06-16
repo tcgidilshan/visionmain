@@ -66,7 +66,7 @@ class OrderService:
         if invoice_type == "factory":
             OrderProgress.objects.create(
                 order=order,
-                progress_status='received_from_customer',
+                progress_status=order_data.get("progress_status"),
             )
         # Step 6: Return the created order
         return order
