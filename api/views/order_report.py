@@ -87,7 +87,8 @@ class MntOrderReportView(APIView):
     Query params
     ------------
     branch_id   (int, required)
-    date        (YYYY-MM-DD, optional) → filters by `created_at` date portion
+    start_date  (YYYY-MM-DD, optional) → filters by `created_at` date portion
+    end_date    (YYYY-MM-DD, optional) → filters by `created_at` date portion
     """
     permission_classes = [IsAuthenticated]
 
@@ -99,7 +100,8 @@ class MntOrderReportView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        date_str = request.query_params.get("date")
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
 
         # ✧✧ Base queryset — eager-load FKs to avoid N+1 hits ✧✧
         qs = (
@@ -108,16 +110,25 @@ class MntOrderReportView(APIView):
             .filter(branch_id=branch_id)
         )
 
-        # --- Optional date filter -------------------------------------------
-        if date_str:
+        # --- Optional date range filter -------------------------------------
+        if start_date or end_date:
             try:
-                target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                if start_date:
+                    start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+                if end_date:
+                    end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+                
+                if start_date and end_date:
+                    qs = qs.filter(created_at__date__range=(start_date, end_date))
+                elif start_date:
+                    qs = qs.filter(created_at__date__gte=start_date)
+                elif end_date:
+                    qs = qs.filter(created_at__date__lte=end_date)
             except ValueError:
                 return Response(
                     {"error": "Invalid date format, use YYYY-MM-DD"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            qs = qs.filter(created_at__date=target_date)
 
         # ========== Metrics ==================================================
         # DB-side aggregation keeps it transactional-safe & fast
@@ -135,7 +146,8 @@ class MntOrderReportView(APIView):
 
         payload = {
             "branch_id":               int(branch_id),
-            "date":                    date_str,
+            "start_date":                  start_date,
+            "end_date":                  end_date,
             "total_mnt_orders":        total_mnt_orders,
             "total_mnt_price":         total_mnt_price,
             "orders":                  serialized,   # paginated slice

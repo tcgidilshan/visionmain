@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-from ..models import Order,ExternalLens,Invoice, CustomUser
+from ..models import Order,ExternalLens,Invoice, CustomUser,OrderProgress
 from ..serializers import OrderSerializer,ExternalLensSerializer
 from ..services.order_service import OrderService
 from ..services.audit_log_service import OrderAuditLogService
@@ -78,6 +78,8 @@ class OrderUpdateView(APIView):
                 # If you want to block multiple MNT in rapid succession, check time window or manual status
 
                 # Actually create the MNT order
+                #progress stage
+                
                 mnt_order = MntOrderService.create_mnt_order(
                     order=updated_order,
                     mnt_price=request.data.get("mnt_price"),

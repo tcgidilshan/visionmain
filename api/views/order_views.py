@@ -87,8 +87,7 @@ class OrderCreateView(APIView):
                 # 🔹 Step 8: Validate payment amount
                 if total_payment > order.total_price:
                     raise ValueError("Total payments exceed the order total price.")
-
-                # 🔹 Step 9: Return Success
+                
                 response_serializer = OrderSerializer(order)
                 return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
