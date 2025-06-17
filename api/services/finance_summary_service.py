@@ -2,7 +2,7 @@ from django.utils import timezone
 from django.db.models import Sum
 from datetime import timedelta
 from datetime import date
-from ..models import OrderPayment,ChannelPayment,OtherIncome,Expense,BankDeposit,SafeTransaction,SolderingPayment,DailyCashInHandRecord
+from ..models import OrderPayment,ChannelPayment,OtherIncome,Expense,BankDeposit,SafeBalance,SolderingPayment,DailyCashInHandRecord
 from decimal import Decimal
 
 class DailyFinanceSummaryService:
@@ -19,11 +19,18 @@ class DailyFinanceSummaryService:
             return Decimal("0.00")
 
     @staticmethod
+    def get_safe_balance(branch_id):
+        try:
+            return SafeBalance.objects.get(branch_id=branch_id).balance
+        except SafeBalance.DoesNotExist:
+            return Decimal("0.00")  # Default to 0 if no safe balance is set
+
+    @staticmethod
     def get_summary(branch_id, date=None):
         if date is None:
             date = timezone.localdate()
 
-        # Calculate and store the cash_in_hand for today and yesterday, but only save if needed
+        # Calculate and store the cash_in_hand for today and yesterday
         DailyFinanceSummaryService.calculate_for_day(branch_id, date)
 
         # Fetch all records excluding today and yesterday
@@ -44,6 +51,9 @@ class DailyFinanceSummaryService:
 
         # Get previous day's balance (if any)
         previous_balance = DailyFinanceSummaryService.get_previous_day_balance(branch_id, yesterday)
+
+        # Get today's safe balance from the SafeBalance model
+        safe_balance = DailyFinanceSummaryService.get_safe_balance(branch_id)
 
         # ========== YESTERDAY
         yesterday_order_payments = DailyFinanceSummaryService._sum(
@@ -94,14 +104,15 @@ class DailyFinanceSummaryService:
             Expense.objects.filter(branch_id=branch_id, created_at__date=date, paid_source="cash")
         )
 
+        # Today balance calculation with safe balance included
         today_balance = (
             today_order_payments +
             today_channel_payments +
             today_other_income +
             today_soldering_income
-        ) - today_expenses
+        ) - (today_expenses + safe_balance)
 
-        cash_in_hand = previous_balance + before_balance + today_balance
+        cash_in_hand = previous_balance + today_balance
 
         # Fetch banking details for today
         today_banking_qs = BankDeposit.objects.select_related('bank_account').filter(
@@ -125,7 +136,7 @@ class DailyFinanceSummaryService:
             date=date,
             defaults={
                 'cash_in_hand': cash_in_hand,
-                'before_balance': before_balance,
+                'before_balance': previous_balance,
                 'today_balance': today_balance,
             }
         )
@@ -143,7 +154,7 @@ class DailyFinanceSummaryService:
             "today_expenses": today_expenses,
 
             # Summary
-            "before_balance": before_balance,
+            "before_balance": previous_balance,
             "today_balance": today_balance,
             "cash_in_hand": cash_in_hand,
             "available_for_deposit": cash_in_hand,
