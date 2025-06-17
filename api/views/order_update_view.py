@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-from ..models import Order,ExternalLens,Invoice, CustomUser,OrderProgress
+from ..models import Order,ExternalLens,Invoice, CustomUser,OrderItemWhatsAppLog,OrderProgress,ArrivalStatus
 from ..serializers import OrderSerializer,ExternalLensSerializer
 from ..services.order_service import OrderService
 from ..services.audit_log_service import OrderAuditLogService
@@ -86,6 +86,24 @@ class OrderUpdateView(APIView):
                     user_id=request.data.get("user_id"),
                     admin_id=request.data.get("admin_id"),
                 )
+                OrderItemWhatsAppLog.objects.create(
+                    order=updated_order,
+                    status="Mnt Marked",
+                    created_at=timezone.now()
+                )
+                ArrivalStatus.objects.create(
+                    order=updated_order,
+                    arrival_status="Mnt Marked",
+                    created_at=timezone.now()
+                )
+                #check relavent order id alast progress status of it not received_from_customer
+                last_progress = OrderProgress.objects.filter(order=updated_order).order_by('-id').first()
+                if last_progress and last_progress.progress_status != "received_from_customer":
+                    OrderProgress.objects.create(
+                        order=updated_order,
+                        progress_status="received_from_customer",
+                        created_at=timezone.now()
+                    )
                 # Optionally: return mnt_order info in response or audit log
 
 

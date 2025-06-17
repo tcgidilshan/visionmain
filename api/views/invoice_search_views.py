@@ -4,9 +4,9 @@ from rest_framework import permissions, status,generics
 from ..services.Invoice_service import InvoiceService
 from ..serializers import InvoiceSerializer,InvoiceSearchSerializer,ExternalLensOrderItemSerializer
 from rest_framework.pagination import PageNumberPagination
-from ..models import OrderItem,Invoice,OrderItemWhatsAppLog
+from ..models import OrderItem,Invoice,OrderItemWhatsAppLog,ArrivalStatus,MntOrder
 from ..services.pagination_service import PaginationService
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, OuterRef,Q,Subquery,CharField
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 10  # Default page size
@@ -59,7 +59,7 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
             'order__invoice', 'order__branch'
         ).filter(
             order__invoice__is_deleted=False
-        )
+        ).order_by('-order__invoice__invoice_date')
 
         invoice_number = self.request.query_params.get('invoice_number')
         whatsapp_sent = self.request.query_params.get('whatsapp_sent')
@@ -67,21 +67,52 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
         branch_id = self.request.query_params.get('branch_id')
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
+        #arrival status 
+        arrival_status = self.request.query_params.get('arrival_status')
 
         if invoice_number:
             queryset = queryset.filter(order__invoice__invoice_number__icontains=invoice_number)
 
         # --- Only apply annotation/filter if param is present ---
         if whatsapp_sent in ['sent', 'not_sent']:
+            # Subquery that fetches the **latest** WhatsAppLog.status for this order
+            latest_log_status_sq = OrderItemWhatsAppLog.objects.filter(
+                order=OuterRef('order_id')
+            ).order_by('-created_at').values('status')[:1]
             queryset = queryset.annotate(
-                has_whatsapp_log=Exists(
-                    OrderItemWhatsAppLog.objects.filter(order=OuterRef('order_id'))
-                )
+                latest_wp_status=Subquery(latest_log_status_sq, output_field=CharField())
             )
             if whatsapp_sent == 'sent':
-                queryset = queryset.filter(has_whatsapp_log=True)
-            elif whatsapp_sent == 'not_sent':
-                queryset = queryset.filter(has_whatsapp_log=False)
+                # filter last record status what is sent
+                queryset = queryset.filter(latest_wp_status='sent')
+            else:
+                # filter orders where last record is either mnt_marked or doesn't exist
+                queryset = queryset.filter(
+                    Q(latest_wp_status='mnt_marked') | 
+                    Q(latest_wp_status__isnull=True)
+                )
+        if arrival_status in ['received', 'not_received']:
+            # 1️⃣ Subquery: grab the *latest* arrival_status for this order
+            latest_as_subq = (
+                ArrivalStatus.objects
+                .filter(order=OuterRef('order_id'))
+                .order_by('-created_at')            # newest first
+                .values('arrival_status')[:1]       # returns 'recived' or 'mnt_marked'
+            )
+
+            queryset = queryset.annotate(
+                latest_arrival_status=Subquery(latest_as_subq, output_field=CharField())
+            )
+
+            if arrival_status == 'received':
+                # ✅ Returned rows: last status == 'recived'
+                queryset = queryset.filter(latest_arrival_status='recived')
+            else:  # arrival_status == 'not_received'
+                # ✅ Returned rows: last status == 'mnt_marked'
+                queryset = queryset.filter(
+                    Q(latest_arrival_status='mnt_marked') | 
+                    Q(latest_arrival_status__isnull=True)
+                )
 
         if order_status:
             queryset = queryset.filter(order__status=order_status)

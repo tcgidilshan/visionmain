@@ -47,7 +47,7 @@ class OrderPaymentService:
             payment_id = payment_data.get("id")  # Check if payment exists
 
             if payment_id and payment_id in existing_payments:
-                # ✅ Update existing payment
+                # Update existing payment
                 existing_payment = existing_payments.pop(payment_id)
                 existing_payment.amount = payment_data.get("amount", existing_payment.amount)
                 existing_payment.payment_method = payment_data.get("payment_method", existing_payment.payment_method)
@@ -58,7 +58,7 @@ class OrderPaymentService:
                 total_payment += existing_payment.amount
 
             else:
-                # ✅ Create a new payment
+                # Create a new payment
                 payment_data['order'] = order.id
                 payment_data['is_partial'] = total_payment + payment_data['amount'] < order.total_price
 
@@ -69,11 +69,11 @@ class OrderPaymentService:
                 new_payment_ids.add(payment_instance.id)
                 total_payment += payment_data['amount']
 
-        # ✅ Remove payments that were not in the update request
+        # Remove payments that were not in the update request
         for old_payment in existing_payments.values():
             old_payment.delete()
 
-        # ✅ Ensure total payments do not exceed the order total
+        # Ensure total payments do not exceed the order total
         if total_payment > order.total_price:
             raise ValueError("Total payments exceed the order total price.")
 
@@ -85,7 +85,7 @@ class OrderPaymentService:
         Fetch payments for a given order ID or invoice ID.
         """
         try:
-            # ✅ Fetch order using order_id or invoice_id
+            # Fetch order using order_id or invoice_id
             if order_id:
                 order = Order.objects.get(id=order_id)
             elif invoice_id:
@@ -93,10 +93,10 @@ class OrderPaymentService:
             else:
                 return {"error": "Order ID or Invoice ID is required."}
 
-            # ✅ Get payments related to the order
+            # Get payments related to the order
             payments = order.orderpayment_set.all()
 
-            # ✅ Serialize payment data
+            # Serialize payment data
             payment_serializer = OrderPaymentSerializer(payments, many=True)
 
             return {
@@ -125,10 +125,18 @@ class OrderPaymentService:
         order.refund_note = f"Refund processed on {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}"
         order.save()
 
+        # Get invoice number if exists
+        try:
+            invoice_number = order.invoice.invoice_number
+            note = f"Refund Invoice {invoice_number}"
+        except Invoice.DoesNotExist:
+            note = f"Refund for No invoice Number"
+            
         # Prepare expense data
         expense_data['amount'] = str(order.total_price)
         expense_data['paid_source'] = 'cash'
-        expense_data['note'] = f"Refund for order #{order.id}"
+        expense_data['paid_from_safe'] = False
+        expense_data['note'] = note
 
         # Create expense
         serializer = ExpenseSerializer(data=expense_data)

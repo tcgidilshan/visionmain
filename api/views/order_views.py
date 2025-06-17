@@ -1,9 +1,9 @@
 from django.db import transaction
-from rest_framework import status
+from rest_framework import status,permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from ..models import Order, OrderItem, OrderPayment, LensStock, LensCleanerStock, FrameStock, OrderProgress,RefractionDetails,Refraction
-from ..serializers import OrderSerializer, OrderItemSerializer, OrderPaymentSerializer,OrderProgressSerializer
+from ..models import Order, ArrivalStatus, OrderProgress,RefractionDetails,Refraction
+from ..serializers import OrderSerializer,ArrivalStatusBulkCreateSerializer,OrderProgressSerializer
 from ..services.order_payment_service import OrderPaymentService
 from ..services.stock_validation_service import StockValidationService
 from ..services.order_service import OrderService
@@ -139,3 +139,70 @@ class OrderProgressStatusListView(APIView):
         qs = qs.order_by('-changed_at')
         return Response(OrderProgressSerializer(qs, many=True).data)
 
+
+
+class ArrivalStatusBulkCreateView(APIView):
+    """
+    Bulk-mark orders as 'recived' (arrival confirmed).
+
+    Payload:
+        {"order_ids": [12, 15, 18]}
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        ser = ArrivalStatusBulkCreateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        order_ids = ser.validated_data["order_ids"]
+        now = timezone.now()
+
+        # --- 1. Fetch & sanity-check orders -------------------------------
+        orders_qs = (
+            Order.objects
+            .filter(id__in=order_ids, is_deleted=False)
+            .only("id")                           # small query
+        )
+        found_ids = set(orders_qs.values_list("id", flat=True))
+        missing   = set(order_ids) - found_ids
+        if missing:
+            return Response(
+                {"error": f"Order(s) not found or deleted: {sorted(missing)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # --- 2. Skip orders already marked as received --------------------
+        # Get latest status for each order
+        latest_statuses = {}
+        for oid in order_ids:
+            latest_status = (
+                ArrivalStatus.objects
+                .filter(order_id=oid)
+                .order_by('-created_at')
+                .first()
+            )
+            latest_statuses[oid] = latest_status
+
+        # Create new arrival statuses only for orders that don't have 'recived' status
+        to_create = []
+        already_received = []
+        
+        for oid in order_ids:
+            latest_status = latest_statuses[oid]
+            if latest_status and latest_status.arrival_status == 'recived':
+                already_received.append(oid)
+            else:
+                to_create.append(ArrivalStatus(
+                    order_id=oid,
+                    arrival_status='recived',
+                    created_at=now,
+                ))
+
+        # Create all new arrival statuses in one bulk operation
+        if to_create:
+            ArrivalStatus.objects.bulk_create(to_create)
+
+        return Response({
+            "created": len(to_create),
+            "already_received": already_received,
+            "timestamp": now.isoformat()
+        })
