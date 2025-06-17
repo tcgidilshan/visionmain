@@ -2,7 +2,7 @@ from django.utils import timezone
 from django.db.models import Sum
 from datetime import timedelta
 from datetime import date
-from ..models import OrderPayment,ChannelPayment,OtherIncome,Expense,BankDeposit,SafeBalance,SolderingPayment,DailyCashInHandRecord
+from ..models import OrderPayment,ChannelPayment,OtherIncome,Expense,BankDeposit,SafeTransaction,SolderingPayment,DailyCashInHandRecord
 from decimal import Decimal
 
 class DailyFinanceSummaryService:
@@ -19,11 +19,14 @@ class DailyFinanceSummaryService:
             return Decimal("0.00")
 
     @staticmethod
-    def get_safe_balance(branch_id):
-        try:
-            return SafeBalance.objects.get(branch_id=branch_id).balance
-        except SafeBalance.DoesNotExist:
-            return Decimal("0.00")  # Default to 0 if no safe balance is set
+    def get_safe_balance(branch_id, date):
+        result = SafeTransaction.objects.filter(
+            branch_id=branch_id,
+            transaction_type="income",
+            date=date
+        ).aggregate(total_amount=Sum('amount'))
+
+        return result["total_amount"] or Decimal("0.00")  # Default to 0 if no safe balance is set
 
     @staticmethod
     def get_summary(branch_id, date=None):
@@ -51,9 +54,6 @@ class DailyFinanceSummaryService:
 
         # Get previous day's balance (if any)
         previous_balance = DailyFinanceSummaryService.get_previous_day_balance(branch_id, yesterday)
-
-        # Get today's safe balance from the SafeBalance model
-        safe_balance = DailyFinanceSummaryService.get_safe_balance(branch_id)
 
         # ========== YESTERDAY
         yesterday_order_payments = DailyFinanceSummaryService._sum(
@@ -104,13 +104,16 @@ class DailyFinanceSummaryService:
             Expense.objects.filter(branch_id=branch_id, created_at__date=date, paid_source="cash")
         )
 
+        # Get today's safe balance from the SafeBalance model
+        today_safe_balance = DailyFinanceSummaryService.get_safe_balance(branch_id, yesterday)
+
         # Today balance calculation with safe balance included
         today_balance = (
             today_order_payments +
             today_channel_payments +
             today_other_income +
             today_soldering_income
-        ) - (today_expenses + safe_balance)
+        ) - (today_expenses + today_safe_balance)
 
         cash_in_hand = previous_balance + today_balance
 
