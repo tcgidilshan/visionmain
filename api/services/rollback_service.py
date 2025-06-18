@@ -41,20 +41,20 @@ class StockRollbackService:
     @staticmethod
     def increment_lens_stock(lens_id, quantity, branch_id):
         stock = LensStock.objects.select_for_update().get(lens_id=lens_id, branch_id=branch_id)
-        stock.quantity += quantity
+        stock.qty += quantity
         stock.last_updated = timezone.now()
         stock.save()
 
     @staticmethod
     def increment_other_item_stock(item_id, quantity, branch_id):
         stock = OtherItemStock.objects.select_for_update().get(other_item_id=item_id, branch_id=branch_id)
-        stock.quantity += quantity
+        stock.qty += quantity
         stock.last_updated = timezone.now()
         stock.save()
 
     @staticmethod
     def increment_lens_cleaner_stock(item_id, quantity, branch_id):
         stock = LensCleanerStock.objects.select_for_update().get(lens_cleaner_id=item_id, branch_id=branch_id)
-        stock.quantity += quantity
+        stock.qty += quantity
         stock.last_updated = timezone.now()
         stock.save()
