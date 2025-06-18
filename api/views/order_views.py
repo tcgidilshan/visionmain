@@ -154,6 +154,7 @@ class ArrivalStatusBulkCreateView(APIView):
         ser = ArrivalStatusBulkCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         order_ids = ser.validated_data["order_ids"]
+        now = timezone.now()
 
         # --- 1. Fetch & sanity-check orders -------------------------------
         orders_qs = (
@@ -170,36 +171,38 @@ class ArrivalStatusBulkCreateView(APIView):
             )
 
         # --- 2. Skip orders already marked as received --------------------
-        existing_ids = set(
-            ArrivalStatus.objects
-            .filter(order_id__in=order_ids)
-            .values_list("order_id", flat=True)
-        )
-
-        to_insert = [
-            ArrivalStatus(
-                order_id      = oid,
-                arrival_status= "recived",   # legacy spelling kept
-                created_at    = timezone.now(),
+        # Get latest status for each order
+        latest_statuses = {}
+        for oid in order_ids:
+            latest_status = (
+                ArrivalStatus.objects
+                .filter(order_id=oid)
+                .order_by('-created_at')
+                .first()
             )
-            for oid in found_ids - existing_ids
-        ]
+            latest_statuses[oid] = latest_status
 
-        if not to_insert:
-            return Response(
-                {"detail": "No new records inserted", "skipped": len(existing_ids)},
-                status=status.HTTP_200_OK,
-            )
+        # Create new arrival statuses only for orders that don't have 'recived' status
+        to_create = []
+        already_received = []
+        
+        for oid in order_ids:
+            latest_status = latest_statuses[oid]
+            if latest_status and latest_status.arrival_status == 'recived':
+                already_received.append(oid)
+            else:
+                to_create.append(ArrivalStatus(
+                    order_id=oid,
+                    arrival_status='recived',
+                    created_at=now,
+                ))
 
-        # --- 3. Bulk insert atomically -----------------------------------
-        with transaction.atomic():
-            ArrivalStatus.objects.bulk_create(to_insert, ignore_conflicts=True)
+        # Create all new arrival statuses in one bulk operation
+        if to_create:
+            ArrivalStatus.objects.bulk_create(to_create)
 
-        return Response(
-            {
-                "created": len(to_insert),
-                "skipped": len(existing_ids),
-                "timestamp": timezone.now().isoformat(),
-            },
-            status=status.HTTP_201_CREATED,
-        )
+        return Response({
+            "created": len(to_create),
+            "already_received": already_received,
+            "timestamp": now.isoformat()
+        })

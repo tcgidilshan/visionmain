@@ -59,7 +59,7 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
             'order__invoice', 'order__branch'
         ).filter(
             order__invoice__is_deleted=False
-        )
+        ).order_by('-order__invoice__invoice_date')
 
         invoice_number = self.request.query_params.get('invoice_number')
         whatsapp_sent = self.request.query_params.get('whatsapp_sent')
@@ -83,12 +83,14 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
                 latest_wp_status=Subquery(latest_log_status_sq, output_field=CharField())
             )
             if whatsapp_sent == 'sent':
-                # filter last record status what is sennt
+                # filter last record status what is sent
                 queryset = queryset.filter(latest_wp_status='sent')
-                
             else:
-                #status mnt_marked or not exist
-                queryset = queryset.filter(Q(latest_wp_status__isnull=True) | Q(latest_wp_status='mnt_marked'))
+                # filter orders where last record is either mnt_marked or doesn't exist
+                queryset = queryset.filter(
+                    Q(latest_wp_status='mnt_marked') | 
+                    Q(latest_wp_status__isnull=True)
+                )
         if arrival_status in ['received', 'not_received']:
             # 1️⃣ Subquery: grab the *latest* arrival_status for this order
             latest_as_subq = (

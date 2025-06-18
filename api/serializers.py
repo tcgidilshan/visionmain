@@ -811,7 +811,13 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
         source='order.fitting_status', read_only=True
     )
     progress_status = serializers.SerializerMethodField()
-
+    whatsapp_sent = serializers.SerializerMethodField()
+    arrival_status = serializers.SerializerMethodField()
+    #get mni invoice number 
+    mnt_number = serializers.SerializerMethodField()
+    
+    
+    
     class Meta:
         model = Invoice
         fields = [
@@ -823,7 +829,8 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
             'invoice_number',
             'invoice_date',
             'total_price',
-            'lens_arrival_status',
+            'whatsapp_sent',
+            'arrival_status',
             'fitting_on_collection',
             'on_hold',
             'payments',
@@ -834,8 +841,15 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
             'progress_status',
             'urgent',
             'fitting_status',
-            'fitting_status_updated_date'
+            'fitting_status_updated_date',
+            'mnt_number'
         ]
+  
+    def get_mnt_number(self, obj):
+        mnt_order = obj.order.mnt_orders.first()  # Get the first MNT order if exists
+        if mnt_order:
+            return mnt_order.mnt_number
+        return None
     def get_progress_status(self, obj):
         order = getattr(obj, "order", None)
         if not order:
@@ -858,6 +872,30 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
                 from .serializers import OrderPaymentSerializer  # Avoid circular import if needed
                 return OrderPaymentSerializer(payments, many=True).data
             return []
+    def get_whatsapp_sent(self, obj):
+        # Get the order related to this order item
+        order = getattr(obj, "order", None)
+        if not order:
+            return None
+                
+        # Get the latest WhatsApp status log
+        last_whatsapp_log = order.whatsapp_logs.order_by('-created_at').first()
+        if last_whatsapp_log:
+            return WhatsAppLogSerializer(last_whatsapp_log).data
+        return None
+    def get_arrival_status(self, obj):
+        order = getattr(obj, "order", None)
+        if not order:
+            return None
+        
+        # Get the latest arrival status for this order
+        last_arrival_status = ArrivalStatus.objects.filter(
+            order=order,                      
+        ).order_by('-created_at').first()
+        
+        if last_arrival_status:
+            return ArrivalStatusSerializer(last_arrival_status).data
+        return None
 class ExpenseMainCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ExpenseMainCategory

@@ -6,6 +6,7 @@ from api.serializers import InvoiceSerializer,BulkWhatsAppLogCreateSerializer
 from django.utils import timezone
 from django.db import transaction
 from api.models import OrderProgress
+
 class InvoiceProgressUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -37,7 +38,7 @@ class InvoiceProgressUpdateView(APIView):
 
             # Update Order
             if order_data:
-                from api.serializers import OrderSerializer  # 🔁 Import as needed
+                from api.serializers import OrderSerializer  # Import as needed
                 order_serializer = OrderSerializer(order, data=order_data, partial=True)
                 order_serializer.is_valid(raise_exception=True)
                 order_serializer.save()
@@ -87,6 +88,7 @@ class BulkUpdateOrderProgressStatus(APIView):
                 results.append({"order_id": order.id, "status": "created"})
 
         return Response({"results": results}, status=200)
+
 class BulkOrderWhatsAppLogView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = BulkWhatsAppLogCreateSerializer(data=request.data)
@@ -99,11 +101,23 @@ class BulkOrderWhatsAppLogView(APIView):
         now = timezone.now()
 
         for oid in order_ids:
-            if not OrderItemWhatsAppLog.objects.filter(order_id=oid, created_at__date=now.date()).exists():
-                OrderItemWhatsAppLog.objects.create(order_id=oid)
-                logs_created.append(oid)
-            else:
+            # Get the latest WhatsApp log for this order
+            latest_log = OrderItemWhatsAppLog.objects.filter(
+                order_id=oid
+            ).order_by('-created_at').first()
+            
+            # Only prevent update if latest status is 'sent'
+            if latest_log and latest_log.status == 'sent':
                 already_exists.append(oid)
+                continue
+
+            # Create new log with 'sent' status
+            OrderItemWhatsAppLog.objects.create(
+                order_id=oid,
+                status='sent',
+                created_at=now
+            )
+            logs_created.append(oid)
 
         # Mark urgent, only for non-deleted, valid Orders
         if urgent_order_ids:
