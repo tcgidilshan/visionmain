@@ -89,27 +89,25 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
             else:
                 #status mnt_marked or not exist
                 queryset = queryset.filter(Q(latest_wp_status__isnull=True) | Q(latest_wp_status='mnt_marked'))
-                    
-        #filter order that have ArrivalStatus record
-
         if arrival_status in ['received', 'not_received']:
-            # One annotation pass – cheaper than re-annotating in each branch
+            # 1️⃣ Subquery: grab the *latest* arrival_status for this order
+            latest_as_subq = (
+                ArrivalStatus.objects
+                .filter(order=OuterRef('order_id'))
+                .order_by('-created_at')            # newest first
+                .values('arrival_status')[:1]       # returns 'recived' or 'mnt_marked'
+            )
+
             queryset = queryset.annotate(
-                has_arrival_status=Exists(
-                    ArrivalStatus.objects.filter(order=OuterRef('order_id'))
-                ),
-                has_mnt_order=Exists(
-                    MntOrder.objects.filter(order=OuterRef('order_id'))
-                ),
+                latest_arrival_status=Subquery(latest_as_subq, output_field=CharField())
             )
 
             if arrival_status == 'received':
-                # ✅ Arrived but NOT yet turned into an MNT order
-                queryset = queryset.filter(has_arrival_status=True, has_mnt_order=False)
-
-            else:  # 'not_received'
-                # ✅ Either never arrived OR already turned into an MNT order
-                queryset = queryset.filter(Q(has_arrival_status=False) | Q(has_mnt_order=True))
+                # ✅ Returned rows: last status == 'recived'
+                queryset = queryset.filter(latest_arrival_status='recived')
+            else:  # arrival_status == 'not_received'
+                # ✅ Returned rows: last status == 'mnt_marked'
+                queryset = queryset.filter(latest_arrival_status='mnt_marked')
 
         if order_status:
             queryset = queryset.filter(order__status=order_status)
