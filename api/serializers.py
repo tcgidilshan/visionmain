@@ -20,7 +20,7 @@ from .models import (
     OtherItem,BankAccount,BankDeposit,
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
     UserBranch,ExpenseMainCategory, ExpenseSubCategory,
-    DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog
+    DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -487,6 +487,16 @@ class BulkWhatsAppLogCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("urgent_order_ids must be a subset of order_ids.")
         return data
 
+class ArrivalStatusBulkCreateSerializer(serializers.Serializer):
+    order_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        allow_empty=False
+    )
+
+    def validate_order_ids(self, value):
+        if len(set(value)) != len(value):
+            raise serializers.ValidationError("Duplicate order_ids detected.")
+        return value
 
 class ExternalLensSerializer(serializers.ModelSerializer):
     lens_type_name     = serializers.CharField(source='lens_type.name', read_only=True)
@@ -1070,7 +1080,14 @@ class DoctorClaimChannelSerializer(serializers.ModelSerializer):
         read_only_fields = ["created_at"]
 
 # serializers.py
-
+class WhatsAppLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderItemWhatsAppLog
+        fields = ['id', 'status', 'created_at']
+class ArrivalStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ArrivalStatus
+        fields = ['id', 'arrival_status', 'created_at']
 class ExternalLensOrderItemSerializer(serializers.ModelSerializer):
     order_id = serializers.IntegerField(source='order.id', read_only=True)
     urgent = serializers.BooleanField(source='order.urgent', read_only=True)
@@ -1078,6 +1095,7 @@ class ExternalLensOrderItemSerializer(serializers.ModelSerializer):
     invoice_date = serializers.DateTimeField(source='order.invoice.invoice_date', read_only=True)
     branch_name = serializers.CharField(source='order.branch.branch_name', read_only=True)
     customer_name = serializers.CharField(source='order.customer.name', read_only=True)
+    progress_status = serializers.SerializerMethodField()
     # progress_status = serializers.CharField(
     #     source='order.progress_status', read_only=True
     # )
@@ -1091,12 +1109,15 @@ class ExternalLensOrderItemSerializer(serializers.ModelSerializer):
         source='order.on_hold', read_only=True
     )
     payments = serializers.SerializerMethodField()
+    whatsapp_sent = serializers.SerializerMethodField()
+    arrival_status = serializers.SerializerMethodField()
     class Meta:
         model = OrderItem
         fields = [
             'id', 'external_lens', 'quantity', 'price_per_unit', 'subtotal',
             'order_id', 'invoice_number', 'invoice_date', 'branch_name','customer_name',
             'total_price', 'fitting_on_collection', 'on_hold', 'payments','urgent',
+            'progress_status','whatsapp_sent','arrival_status'
         ]
     def get_payments(self, obj):
             # Get the order related to this invoice
@@ -1108,7 +1129,42 @@ class ExternalLensOrderItemSerializer(serializers.ModelSerializer):
                 from .serializers import OrderPaymentSerializer  # Avoid circular import if needed
                 return OrderPaymentSerializer(payments, many=True).data
             return []
+    def get_progress_status(self, obj):
+        order = getattr(obj, "order", None)
+        if not order:
+            return None  # return None if order not present
+
+        # Get the latest (last) progress status by changed_at DESCENDING
+        last_status = order.order_progress_status.order_by('-changed_at').first()
+        if last_status:
+            return OrderProgressSerializer(last_status).data
+        return None  # return None if there is no status
     
+    def get_whatsapp_sent(self, obj):
+        # Get the order related to this order item
+        order = getattr(obj, "order", None)
+        if not order:
+            return None
+                
+        # Get the latest WhatsApp status log
+        last_whatsapp_log = order.whatsapp_logs.order_by('-created_at').first()
+        if last_whatsapp_log:
+            return WhatsAppLogSerializer(last_whatsapp_log).data
+        return None
+    def get_arrival_status(self, obj):
+        order = getattr(obj, "order", None)
+        if not order:
+            return None
+        
+        # Get the latest arrival status for this order
+        last_arrival_status = ArrivalStatus.objects.filter(
+            order=order,
+            order__order_items__external_lens=obj.external_lens
+        ).order_by('-created_at').first()
+        
+        if last_arrival_status:
+            return ArrivalStatusSerializer(last_arrival_status).data
+        return None
 class SolderingOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = SolderingOrder

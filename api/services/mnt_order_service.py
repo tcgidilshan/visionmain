@@ -58,3 +58,4 @@ class MntOrderService:
         if hasattr(order, 'invoice') and order.invoice.invoice_type != 'factory':
             return False
         return True
+

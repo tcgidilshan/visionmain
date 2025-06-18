@@ -4,9 +4,9 @@ from rest_framework import permissions, status,generics
 from ..services.Invoice_service import InvoiceService
 from ..serializers import InvoiceSerializer,InvoiceSearchSerializer,ExternalLensOrderItemSerializer
 from rest_framework.pagination import PageNumberPagination
-from ..models import OrderItem,Invoice,OrderItemWhatsAppLog
+from ..models import OrderItem,Invoice,OrderItemWhatsAppLog,ArrivalStatus,MntOrder
 from ..services.pagination_service import PaginationService
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, OuterRef,Q,Subquery,CharField
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 10  # Default page size
@@ -67,21 +67,49 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
         branch_id = self.request.query_params.get('branch_id')
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
+        #arrival status 
+        arrival_status = self.request.query_params.get('arrival_status')
 
         if invoice_number:
             queryset = queryset.filter(order__invoice__invoice_number__icontains=invoice_number)
 
         # --- Only apply annotation/filter if param is present ---
         if whatsapp_sent in ['sent', 'not_sent']:
+            # Subquery that fetches the **latest** WhatsAppLog.status for this order
+            latest_log_status_sq = OrderItemWhatsAppLog.objects.filter(
+                order=OuterRef('order_id')
+            ).order_by('-created_at').values('status')[:1]
             queryset = queryset.annotate(
-                has_whatsapp_log=Exists(
-                    OrderItemWhatsAppLog.objects.filter(order=OuterRef('order_id'))
-                )
+                latest_wp_status=Subquery(latest_log_status_sq, output_field=CharField())
             )
             if whatsapp_sent == 'sent':
-                queryset = queryset.filter(has_whatsapp_log=True)
-            elif whatsapp_sent == 'not_sent':
-                queryset = queryset.filter(has_whatsapp_log=False)
+                # filter last record status what is sennt
+                queryset = queryset.filter(latest_wp_status='sent')
+                
+            else:
+                #status mnt_marked or not exist
+                queryset = queryset.filter(Q(latest_wp_status__isnull=True) | Q(latest_wp_status='mnt_marked'))
+                    
+        #filter order that have ArrivalStatus record
+
+        if arrival_status in ['received', 'not_received']:
+            # One annotation pass – cheaper than re-annotating in each branch
+            queryset = queryset.annotate(
+                has_arrival_status=Exists(
+                    ArrivalStatus.objects.filter(order=OuterRef('order_id'))
+                ),
+                has_mnt_order=Exists(
+                    MntOrder.objects.filter(order=OuterRef('order_id'))
+                ),
+            )
+
+            if arrival_status == 'received':
+                # ✅ Arrived but NOT yet turned into an MNT order
+                queryset = queryset.filter(has_arrival_status=True, has_mnt_order=False)
+
+            else:  # 'not_received'
+                # ✅ Either never arrived OR already turned into an MNT order
+                queryset = queryset.filter(Q(has_arrival_status=False) | Q(has_mnt_order=True))
 
         if order_status:
             queryset = queryset.filter(order__status=order_status)

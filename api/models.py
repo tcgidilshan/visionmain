@@ -541,6 +541,23 @@ class OrderProgress(models.Model):
     def __str__(self):
         return f"Order {self.order.id} - {self.progress_status} at {self.changed_at}"
 
+class ArrivalStatus(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='arrival_status')
+    arrival_status = models.CharField(
+        max_length=30,
+        choices=[
+            ('mnt_marked', 'MNT Marked'),
+            ('recived', 'Recived'),
+        ],
+        default='recived'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ['created_at']
+    
+    def __str__(self):
+        return f"Order {self.order.id} - {self.arrival_status} at {self.created_at}"
+
 class MntOrder(models.Model):
     order = models.ForeignKey(
         Order, on_delete=models.CASCADE, related_name='mnt_orders'
@@ -682,7 +699,7 @@ class Invoice(models.Model):
                 number = 1
                 if self.invoice_type == 'factory':
                     # Just get the last invoice (ignore prefix), factory invoices are globally incrementing
-                    last_invoice = Invoice.objects.select_for_update().filter(
+                    last_invoice = Invoice.all_objects.select_for_update().filter(
                         invoice_type='factory'
                     ).order_by('-id').first()
 
@@ -700,7 +717,7 @@ class Invoice(models.Model):
                 elif self.invoice_type == 'normal':
                     # Normal: MATN1, MATN2...
                     prefix = f"{branch_code}N"
-                    last_invoice = Invoice.objects.select_for_update().filter(
+                    last_invoice = Invoice.all_objects.select_for_update().filter(
                         invoice_type='normal',
                         invoice_number__startswith=prefix
                     ).order_by('-id').first()
@@ -770,6 +787,7 @@ class OrderItemWhatsAppLog(models.Model):
         on_delete=models.CASCADE,
         related_name='whatsapp_logs'
     )
+    status = models.CharField(max_length=20, choices=[('sent', 'Sent'), ('mnt_marked', 'Mnt Marked')], default='sent')
     created_at = models.DateTimeField(auto_now_add=True)  # When sent
 
     def __str__(self):

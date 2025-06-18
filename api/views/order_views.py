@@ -1,9 +1,9 @@
 from django.db import transaction
-from rest_framework import status
+from rest_framework import status,permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from ..models import Order, OrderItem, OrderPayment, LensStock, LensCleanerStock, FrameStock, OrderProgress,RefractionDetails,Refraction
-from ..serializers import OrderSerializer, OrderItemSerializer, OrderPaymentSerializer,OrderProgressSerializer
+from ..models import Order, ArrivalStatus, OrderProgress,RefractionDetails,Refraction
+from ..serializers import OrderSerializer,ArrivalStatusBulkCreateSerializer,OrderProgressSerializer
 from ..services.order_payment_service import OrderPaymentService
 from ..services.stock_validation_service import StockValidationService
 from ..services.order_service import OrderService
@@ -139,3 +139,67 @@ class OrderProgressStatusListView(APIView):
         qs = qs.order_by('-changed_at')
         return Response(OrderProgressSerializer(qs, many=True).data)
 
+
+
+class ArrivalStatusBulkCreateView(APIView):
+    """
+    Bulk-mark orders as 'recived' (arrival confirmed).
+
+    Payload:
+        {"order_ids": [12, 15, 18]}
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        ser = ArrivalStatusBulkCreateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        order_ids = ser.validated_data["order_ids"]
+
+        # --- 1. Fetch & sanity-check orders -------------------------------
+        orders_qs = (
+            Order.objects
+            .filter(id__in=order_ids, is_deleted=False)
+            .only("id")                           # small query
+        )
+        found_ids = set(orders_qs.values_list("id", flat=True))
+        missing   = set(order_ids) - found_ids
+        if missing:
+            return Response(
+                {"error": f"Order(s) not found or deleted: {sorted(missing)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # --- 2. Skip orders already marked as received --------------------
+        existing_ids = set(
+            ArrivalStatus.objects
+            .filter(order_id__in=order_ids)
+            .values_list("order_id", flat=True)
+        )
+
+        to_insert = [
+            ArrivalStatus(
+                order_id      = oid,
+                arrival_status= "recived",   # legacy spelling kept
+                created_at    = timezone.now(),
+            )
+            for oid in found_ids - existing_ids
+        ]
+
+        if not to_insert:
+            return Response(
+                {"detail": "No new records inserted", "skipped": len(existing_ids)},
+                status=status.HTTP_200_OK,
+            )
+
+        # --- 3. Bulk insert atomically -----------------------------------
+        with transaction.atomic():
+            ArrivalStatus.objects.bulk_create(to_insert, ignore_conflicts=True)
+
+        return Response(
+            {
+                "created": len(to_insert),
+                "skipped": len(existing_ids),
+                "timestamp": timezone.now().isoformat(),
+            },
+            status=status.HTTP_201_CREATED,
+        )
