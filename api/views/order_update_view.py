@@ -88,12 +88,12 @@ class OrderUpdateView(APIView):
                 )
                 OrderItemWhatsAppLog.objects.create(
                     order=updated_order,
-                    status="mnt_marked",
+                    status="Mnt Marked",
                     created_at=timezone.now()
                 )
                 ArrivalStatus.objects.create(
                     order=updated_order,
-                    arrival_status="mnt_marked",
+                    arrival_status="Mnt Marked",
                     created_at=timezone.now()
                 )
                 #check relavent order id alast progress status of it not received_from_customer

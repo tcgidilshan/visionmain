@@ -546,7 +546,7 @@ class ArrivalStatus(models.Model):
     arrival_status = models.CharField(
         max_length=30,
         choices=[
-            ('mnt_marked', 'MNT Marked'),
+            ('mnt_marked', 'Mnt Marked'),
             ('recived', 'Recived'),
         ],
         default='recived'
