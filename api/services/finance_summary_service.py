@@ -54,6 +54,8 @@ class DailyFinanceSummaryService:
 
         # Get previous day's balance (if any)
         previous_balance = DailyFinanceSummaryService.get_previous_day_balance(branch_id, yesterday)
+        yesterday_safe_income  = DailyFinanceSummaryService.get_safe_balance(branch_id, yesterday)
+        today_safe_balance      = DailyFinanceSummaryService.get_safe_balance(branch_id, date)
 
         # ========== YESTERDAY
         yesterday_order_payments = DailyFinanceSummaryService._sum(
@@ -81,7 +83,7 @@ class DailyFinanceSummaryService:
             yesterday_channel_payments +
             yesterday_other_income +
             yesterday_soldering_income
-        ) - yesterday_expenses
+        ) - (yesterday_expenses + yesterday_safe_income)
 
         # ========== TODAY
         today_order_payments = DailyFinanceSummaryService._sum(
@@ -105,7 +107,7 @@ class DailyFinanceSummaryService:
         )
 
         # Get today's safe balance from the SafeBalance model
-        today_safe_balance = DailyFinanceSummaryService.get_safe_balance(branch_id, yesterday)
+        
 
         # Today balance calculation with safe balance included
         today_balance = (

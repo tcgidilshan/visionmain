@@ -651,15 +651,7 @@ class Invoice(models.Model):
     INVOICE_TYPES = [
         ('factory', 'Factory Invoice'),  # Linked to an order with refraction
         ('manual', 'Manual Invoice')  # Linked to an order without refraction
-    ]
-
-    lens_arrival_status = models.CharField(
-        max_length=20,
-        choices=[('received', 'Received'), ('not_received', 'Not Received')],
-        null=True, blank=True
-    )
-
-    
+    ]   
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="invoice")
     invoice_type = models.CharField(max_length=10, choices=INVOICE_TYPES)  #  Identifies invoice type
     daily_invoice_no = models.CharField(max_length=10,null=True, blank=True)  #  Factory invoices get a daily number
@@ -667,7 +659,6 @@ class Invoice(models.Model):
     invoice_date = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
-
     objects = SoftDeleteManager()
     all_objects = models.Manager()
 

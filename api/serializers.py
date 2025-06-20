@@ -579,9 +579,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'invoice_number',
             'invoice_date',
             'order_details',  #  Full order details (optional)
-
               #  NEW fields for tracking factory invoice progress
-            'lens_arrival_status',
         ]
 
     def get_refraction_details(self, obj):
@@ -920,7 +918,8 @@ class ExpenseSerializer(serializers.ModelSerializer):
 class ExpenseReportSerializer(serializers.ModelSerializer):
     main_category_name = serializers.CharField(source='main_category.name', read_only=True)
     sub_category_name = serializers.CharField(source='sub_category.name', read_only=True)
-
+    main_category_id = serializers.IntegerField(source='main_category.id', read_only=True)
+    sub_category_id = serializers.IntegerField(source='sub_category.id', read_only=True)
     class Meta:
         model = Expense
         fields = [
@@ -928,6 +927,8 @@ class ExpenseReportSerializer(serializers.ModelSerializer):
             'created_at',
             'main_category_name',
             'sub_category_name',
+            'main_category_id',
+            'sub_category_id',
             'amount',
             'note',
             'paid_from_safe'
@@ -1258,7 +1259,7 @@ class OrderLiteSerializer(serializers.ModelSerializer):
     invoice_number = serializers.CharField(source='invoice.invoice_number', read_only=True)
     #TODO: Add more fields as needed
     total_payment = serializers.SerializerMethodField(read_only=True)  # //TODO: Add total_payment field
-
+    progress_status = serializers.SerializerMethodField()
     class Meta:
         model = Order
         fields = [
@@ -1288,6 +1289,11 @@ class OrderLiteSerializer(serializers.ModelSerializer):
             obj.orderpayment_set.filter(is_deleted=False)
             .aggregate(total=models.Sum('amount'))['total'] or 0
         )
+    def get_progress_status(self, obj):
+        last_status = obj.order_progress_status.order_by('-changed_at').first()
+        if last_status:
+            return OrderProgressSerializer(last_status).data
+        return None
 class MntOrderSerializer(serializers.ModelSerializer):
     order_id = serializers.PrimaryKeyRelatedField(source='order', queryset=Order.objects.all())
     branch_id = serializers.PrimaryKeyRelatedField(source='branch', queryset=Branch.objects.all())
