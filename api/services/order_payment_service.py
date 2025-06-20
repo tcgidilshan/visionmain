@@ -118,6 +118,15 @@ class OrderPaymentService:
 
         if order.is_refund:
             raise ValidationError("This order has already been refunded.")
+        
+    # Get total amount paid by customer
+        total_paid = (
+            order.orderpayment_set
+            .filter(is_deleted=False, transaction_status="success")
+            .aggregate(total=Sum("amount"))["total"] or 0
+        )
+        if total_paid == 0:
+            raise ValidationError("No successful payments found to refund.")
 
         # Mark order as refunded
         order.is_refund = True
@@ -133,7 +142,7 @@ class OrderPaymentService:
             note = f"Refund for No invoice Number"
             
         # Prepare expense data
-        expense_data['amount'] = str(order.total_price)
+        expense_data['amount'] = str(total_paid)
         expense_data['paid_source'] = 'cash'
         expense_data['paid_from_safe'] = False
         expense_data['note'] = note

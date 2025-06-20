@@ -1,6 +1,8 @@
 from django.urls import path
 from .views import LoginView, AdminOnlyView, SuperAdminOnlyView
 from .views import UserRegistrationView, AdminRegistrationView
+from django.conf import settings
+from django.conf.urls.static import static
 from .views import (
     BranchListCreateAPIView,OrderRefundView,
     BranchRetrieveUpdateDestroyAPIView,
@@ -258,5 +260,3 @@ urlpatterns = [
     path("orders/audit-report/", DailyOrderAuditReportView.as_view(), name="daily-order-audit-report"),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
-
- 

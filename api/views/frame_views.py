@@ -9,7 +9,7 @@ from ..services.branch_protection_service import BranchProtectionsService
 class FrameListCreateView(generics.ListCreateAPIView):
     queryset = Frame.objects.all()
     serializer_class = FrameSerializer
-
+    
     def list(self, request, *args, **kwargs):
         """
         List frames with optional status filter (?status=active|inactive|all).
@@ -51,12 +51,12 @@ class FrameListCreateView(generics.ListCreateAPIView):
         """
         frame_data = request.data.get("frame")
         stock_data_list = request.data.get("stock", [])  # ✅ Default to an empty list if stock is missing
-
+        
         # ✅ Create the frame
-        frame_serializer = self.get_serializer(data=frame_data)
+        frame_serializer = self.get_serializer(data=request.data)
         frame_serializer.is_valid(raise_exception=True)
         frame = frame_serializer.save()
-
+        
         stock_entries = []
 
         # ✅ If stock data is provided, process it

@@ -130,6 +130,11 @@ class FrameSerializer(serializers.ModelSerializer):
             'brand_type_display',
             'is_active',
         ]
+    def validate_image(self, value):
+    # Accept only supported types
+        if value and not value.name.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+            raise serializers.ValidationError("Only PNG, JPG, JPEG, or WEBP files are allowed.")
+        return value
         
 class FrameStockSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(
