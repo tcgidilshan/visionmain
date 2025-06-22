@@ -4,7 +4,7 @@ from .views import UserRegistrationView, AdminRegistrationView
 from .views import (
     BranchListCreateAPIView,OrderRefundView,FactoryOrderReportView,
     BranchRetrieveUpdateDestroyAPIView,NormalOrderReportView,
-    RefractionCreateAPIView,
+    RefractionCreateAPIView,ChannelOrderReportView,
     RefractionListAPIView,
     RefractionUpdateAPIView,
     RefractionDeleteAPIView,
@@ -259,7 +259,8 @@ urlpatterns = [
 
     #reports
     path('reports/factory-orders/', FactoryOrderReportView.as_view(), name='factory-order-report'),
-        path('reports/normal-orders/', NormalOrderReportView.as_view(), name='normal-order-report'),
+    path('reports/normal-orders/', NormalOrderReportView.as_view(), name='normal-order-report'),
+    path('reports/channel-orders/', ChannelOrderReportView.as_view(), name='channel-order-report'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

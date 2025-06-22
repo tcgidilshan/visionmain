@@ -116,3 +116,48 @@ class NormalOrderReportView(APIView):
                 {"error": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+            
+class ChannelOrderReportView(APIView):
+    """
+    API endpoint to generate channel order reports.
+    """
+    
+    def get(self, request, format=None):
+        # Get query parameters with defaults
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        branch_id = request.query_params.get('branch_id')
+        
+        # Validate required parameters
+        if not all([start_date, end_date, branch_id]):
+            return Response(
+                {"error": "start_date, end_date, and branch_id are required parameters"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            # Convert branch_id to integer
+            branch_id = int(branch_id)
+            
+            # Generate the report
+            report_data = InvoiceReportService.get_channel_order_report(
+                start_date_str=start_date,
+                end_date_str=end_date,
+                branch_id=branch_id
+            )
+            
+            return Response({
+                "success": True,
+                "data": report_data
+            }, status=status.HTTP_200_OK)
+            
+        except ValueError as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

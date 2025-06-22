@@ -1,6 +1,6 @@
 from datetime import datetime
 from django.db.models import Sum, Q
-from api.models import Invoice, OrderPayment
+from api.models import Invoice, OrderPayment,Appointment, ChannelPayment
 
 
 class InvoiceReportService:
@@ -327,3 +327,114 @@ class InvoiceReportService:
                 'total_balance': total_balance
             }
         }
+    
+    @staticmethod
+    def get_channel_order_report(start_date_str, end_date_str, branch_id):
+        """
+        Generate a detailed channel order report filtered by date range and branch.
+        
+        Args:
+            start_date_str (str): Start date in YYYY-MM-DD format
+            end_date_str (str): End date in YYYY-MM-DD format
+            branch_id (int): Branch ID to filter by
+            
+        Returns:
+            dict: {
+                'orders': [
+                    {
+                        'channel_id': int,
+                        'channel_number': str,
+                        'date': str (YYYY-MM-DD),
+                        'time': str (HH:MM:SS),
+                        'customer_name': str,
+                        'address': str,
+                        'mobile_number': str,
+                        'total_amount': float,
+                        'paid_amount': float,
+                        'balance': float,
+                        'bill': float  # Same as total_amount for consistency
+                    },
+                    ...
+                ],
+                'summary': {
+                    'total_invoice_count': int,
+                    'total_invoice_amount': float,
+                    'total_paid_amount': float,
+                    'total_balance': float
+                }
+            }
+        """
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            raise ValueError("Invalid date format. Use YYYY-MM-DD.")
+            
+        if start_date > end_date:
+            raise ValueError("Start date cannot be after end date.")
+            
+        # Get all appointments in the date range for the branch
+        appointments = Appointment.objects.select_related('patient').filter(
+            date__range=(start_date, end_date),
+            branch_id=branch_id,
+            is_deleted=False
+        ).order_by('date', 'time')
+        
+        # Get all payments for these appointments
+        appointment_ids = list(appointments.values_list('id', flat=True))
+        payments = ChannelPayment.objects.filter(
+            appointment_id__in=appointment_ids,
+            is_deleted=False
+        ).values('appointment_id').annotate(
+            total_paid=Sum('amount')
+        )
+        
+        # Create a dictionary of appointment_id to total_paid
+        payments_dict = {p['appointment_id']: float(p['total_paid'] or 0) for p in payments}
+        
+        # Prepare the report data
+        orders = []
+        total_invoice_amount = 0
+        total_paid_amount = 0
+        total_balance = 0
+        total_invoice_count = appointments.count()
+        
+        for appointment in appointments:
+            patient = appointment.patient
+            
+            # Calculate payment totals
+            total_amount = float(appointment.amount or 0)
+            paid_amount = payments_dict.get(appointment.id, 0)
+            balance = total_amount - paid_amount
+            
+            # Add to totals
+            total_invoice_amount += total_amount
+            total_paid_amount += paid_amount
+            total_balance += balance
+            
+            # Add appointment to results
+            orders.append({
+                'channel_id': appointment.id,
+                'channel_number': str(appointment.channel_no or ''),
+                'date': appointment.date.strftime("%Y-%m-%d") if appointment.date else '',
+                'time': appointment.time.strftime("%H:%M:%S") if appointment.time else '',
+                'customer_name': patient.name if patient else '',
+                'address': patient.address if patient and hasattr(patient, 'address') else '',
+                'mobile_number': patient.phone_number if patient and hasattr(patient, 'phone_number') else '',
+                'total_amount': total_amount,
+                'paid_amount': paid_amount,
+                'balance': balance,
+                'bill': total_amount  # Same as total_amount for consistency
+            })
+        
+        return {
+            'orders': orders,
+            'summary': {
+                'total_invoice_count': total_invoice_count,
+                'total_invoice_amount': total_invoice_amount,
+                'total_paid_amount': total_paid_amount,
+                'total_balance': total_balance
+            }
+        }
+        
+
