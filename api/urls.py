@@ -2,7 +2,7 @@ from django.urls import path
 from .views import LoginView, AdminOnlyView, SuperAdminOnlyView
 from .views import UserRegistrationView, AdminRegistrationView
 from .views import (
-    BranchListCreateAPIView,OrderRefundView,
+    BranchListCreateAPIView,OrderRefundView,FactoryOrderReportView,
     BranchRetrieveUpdateDestroyAPIView,
     RefractionCreateAPIView,
     RefractionListAPIView,
@@ -256,6 +256,9 @@ urlpatterns = [
     path("arrival-status/bulk-create/", ArrivalStatusBulkCreateView.as_view(),
          name="arrival-status-bulk"),
     path("orders/audit-report/", DailyOrderAuditReportView.as_view(), name="daily-order-audit-report"),
+
+    #reports
+    path('reports/factory-orders/', FactoryOrderReportView.as_view(), name='factory-order-report'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
 

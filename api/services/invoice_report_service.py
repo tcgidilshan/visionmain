@@ -68,3 +68,130 @@ class InvoiceReportService:
             results.append(data)
 
         return results
+
+    @staticmethod
+    def get_factory_order_report(start_date_str, end_date_str, branch_id):
+        """
+        Generate a detailed factory order report filtered by date range and branch.
+        
+        Args:
+            start_date_str (str): Start date in YYYY-MM-DD format
+            end_date_str (str): End date in YYYY-MM-DD format
+            branch_id (int): Branch ID to filter by
+            
+        Returns:
+            dict: {
+                'orders': [
+                    {
+                        'refraction_number': str,
+                        'invoice_number': str,
+                        'date': str (YYYY-MM-DD),
+                        'time': str (HH:MM:SS),
+                        'customer_name': str,
+                        'nic': str,
+                        'address': str,
+                        'mobile_number': str,
+                        'total_amount': float,
+                        'paid_amount': float,
+                        'balance': float,
+                        'bill': float  # Same as total_amount for backward compatibility
+                    },
+                    ...
+                ],
+                'summary': {
+                    'total_invoice_amount': float,
+                    'total_paid_amount': float,
+                    'total_balance': float
+                }
+            }
+        """
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            raise ValueError("Invalid date format. Use YYYY-MM-DD.")
+            
+        if start_date > end_date:
+            raise ValueError("Start date cannot be after end date.")
+            
+        # Get all factory invoices in the date range for the branch
+        invoices = Invoice.objects.select_related(
+            'order', 'order__customer', 'order__refraction'
+        ).filter(
+            invoice_type='factory',
+            invoice_date__date__range=(start_date, end_date),
+            order__branch_id=branch_id,
+            is_deleted=False,
+            order__is_deleted=False
+        ).order_by('invoice_date')
+        
+        # Get all payments for these orders
+        order_ids = invoices.values_list('order_id', flat=True)
+        payments = OrderPayment.objects.filter(
+            order_id__in=order_ids
+        ).values('order_id').annotate(
+            total_paid=Sum('amount')
+        )
+        
+        # Create a dictionary of order_id to total_paid
+        payments_dict = {p['order_id']: float(p['total_paid'] or 0) for p in payments}
+        
+        # Prepare the report data
+        orders = []
+        total_invoice_amount = 0
+        total_paid_amount = 0
+        total_balance = 0
+        
+        for invoice in invoices:
+            order = invoice.order
+            customer = order.customer
+            refraction = order.refraction
+            
+            # Get customer details from refraction if available, otherwise from patient
+            if refraction:
+                customer_name = refraction.customer_full_name
+                nic = refraction.nic or ''
+                address = ''  # Address not directly on refraction, would need to be added if needed
+                mobile_number = refraction.customer_mobile or ''
+                refraction_number = refraction.refraction_number or ''
+            else:
+                customer_name = customer.name
+                nic = customer.nic or ''
+                address = customer.address or ''
+                mobile_number = customer.phone_number or ''
+                refraction_number = ''
+            
+            # Calculate payment totals
+            total_amount = float(order.total_price)
+            paid_amount = payments_dict.get(order.id, 0)
+            balance = total_amount - paid_amount
+            
+            # Add to totals
+            total_invoice_amount += total_amount
+            total_paid_amount += paid_amount
+            total_balance += balance
+            
+            # Add order to results
+            orders.append({
+                'refraction_number': refraction_number,
+                'invoice_number': invoice.invoice_number or '',
+                'date': invoice.invoice_date.strftime("%Y-%m-%d"),
+                'time': invoice.invoice_date.strftime("%H:%M:%S"),
+                'customer_name': customer_name,
+                'nic': nic or '',
+                'address': address or '',
+                'mobile_number': mobile_number or '',
+                'total_amount': total_amount,
+                'paid_amount': paid_amount,
+                'balance': balance,
+                'bill': total_amount  # For backward compatibility
+            })
+        
+        return {
+            'orders': orders,
+            'summary': {
+                'total_invoice_amount': total_invoice_amount,
+                'total_paid_amount': total_paid_amount,
+                'total_balance': total_balance
+            }
+        }
