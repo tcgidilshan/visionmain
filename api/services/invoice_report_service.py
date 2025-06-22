@@ -141,6 +141,7 @@ class InvoiceReportService:
         total_invoice_amount = 0
         total_paid_amount = 0
         total_balance = 0
+        total_invoice_count = invoices.count() 
         
         for invoice in invoices:
             order = invoice.order
@@ -190,6 +191,7 @@ class InvoiceReportService:
         return {
             'orders': orders,
             'summary': {
+                'total_invoice_count': total_invoice_count, 
                 'total_invoice_amount': total_invoice_amount,
                 'total_paid_amount': total_paid_amount,
                 'total_balance': total_balance
