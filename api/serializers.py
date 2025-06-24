@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.db.models import Sum
 from django.db import models
 from rest_framework.exceptions import ValidationError
+import os
 from .models import (
     Branch,Refraction,RefractionDetails,RefractionDetailsAuditLog,
     Brand,Color,Code,Frame,
@@ -114,7 +115,7 @@ class FrameSerializer(serializers.ModelSerializer):
     code_name = serializers.CharField(source='code.name', read_only=True)    # Get code name
     color_name = serializers.CharField(source='color.name', read_only=True)  # Get color name
     brand_type_display = serializers.CharField(source='get_brand_type_display', read_only=True)
-
+    image_url = serializers.SerializerMethodField()
     class Meta:
         model = Frame
         fields = [
@@ -129,13 +130,47 @@ class FrameSerializer(serializers.ModelSerializer):
             'brand_type',
             'brand_type_display',
             'is_active',
+            'image_url',
+            'branch'
         ]
     def validate_image(self, value):
     # Accept only supported types
         if value and not value.name.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
             raise serializers.ValidationError("Only PNG, JPG, JPEG, or WEBP files are allowed.")
         return value
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+            
+        # Get the URL and remove any leading slashes to prevent double /media/
+        relative_url = obj.image.url.lstrip('/')
+        request = self.context.get('request')
         
+        if request is not None:
+            return request.build_absolute_uri(f'/{relative_url}')
+        
+        # Try Django sites framework
+        try:
+            from django.contrib.sites.shortcuts import get_current_site
+            from django.conf import settings
+            
+            site = get_current_site(None)
+            scheme = 'https' if getattr(settings, 'SECURE_SSL_REDIRECT', False) else 'http'
+            base_url = f"{scheme}://{site.domain}"
+            return f"{base_url}/{relative_url}"
+            
+        except Exception as e:
+            # Fallback to environment variable or default
+            from dotenv import load_dotenv
+            import os
+            
+            # Load environment variables from .env file
+            load_dotenv()
+            
+            # Get SITE_URL from environment variables or use default
+            base_url = os.getenv('SITE_URL', 'http://127.0.0.1:8000')
+            return f"{base_url.rstrip('/')}/{relative_url}"
+            
 class FrameStockSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(),  # Ensures valid branch selection
@@ -163,13 +198,13 @@ class CoatingSerializer(serializers.ModelSerializer):
         
 class LensSerializer(serializers.ModelSerializer):
     brand = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all())
-    brand_name = serializers.CharField(source='brand.name', read_only=True)  # ✅ Get brand name  
-    type_name = serializers.CharField(source='type.name', read_only=True)  # ✅ Get brand name 
-    coating_name = serializers.CharField(source='coating.name', read_only=True)  # ✅ Get brand name 
+    brand_name = serializers.CharField(source='brand.name', read_only=True)  # Get brand name  
+    type_name = serializers.CharField(source='type.name', read_only=True)  # Get brand name 
+    coating_name = serializers.CharField(source='coating.name', read_only=True)  # Get brand name 
 
     class Meta:
         model = Lens
-        fields = ['id', 'type', 'coating', 'price','brand', 'brand_name','type_name','coating_name','is_active']
+        fields = ['id', 'type', 'coating', 'price','brand','branch', 'brand_name','type_name','coating_name','is_active']
 
     def validate(self, data):
         if 'brand' not in data:
@@ -775,7 +810,7 @@ class OrderProgressSerializer(serializers.ModelSerializer):
         fields = ['id', 'progress_status', 'changed_at']
 
 class InvoiceSearchSerializer(serializers.ModelSerializer):
-    customer = serializers.PrimaryKeyRelatedField(source='order.customer.name', read_only=True)  # ✅ Fetch customer ID
+    customer = serializers.PrimaryKeyRelatedField(source='order.customer.name', read_only=True)  # Fetch customer ID
     # customer_details = PatientSerializer(source='order.customer', read_only=True)  #  Full customer details
     # refraction_details = RefractionSerializer(source='order.refraction', read_only=True)  # Refraction details (if exists)
     payments = serializers.SerializerMethodField()
@@ -972,8 +1007,8 @@ class BankDepositSerializer(serializers.ModelSerializer):
             'id',
             'branch',
             'bank_account',
-            'bank_name',         # 🔁 from FK (read-only)
-            'account_number',    # 🔁 from FK (read-only)
+            'bank_name',         # from FK (read-only)
+            'account_number',    # from FK (read-only)
             'amount',
             'date',
             'is_confirmed',

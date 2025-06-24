@@ -54,3 +54,4 @@ from .soldering_order_views import CreateSolderingOrderView,SolderingOrderProgre
 from .order_report import FittingStatusReportView,MntOrderReportView
 from .user_order_report_view import GlassSenderReportView
 from .order_audit_view import OrderDeleteRefundListView,OrderAuditHistoryView,DailyOrderAuditReportView
+from .inventory_transfer import FrameTransferView

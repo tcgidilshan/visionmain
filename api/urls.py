@@ -67,7 +67,7 @@ from .views import (
     DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView,
     SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
     GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView,MntOrderReportView,
-    ArrivalStatusBulkCreateView,DailyOrderAuditReportView
+    ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView
 )
 # from .views import CustomAuthToken
 
@@ -126,6 +126,7 @@ urlpatterns = [
     path('frame-stocks/', FrameStockListCreateView.as_view(), name='frame-stock-list-create'),
     path('frame-stocks/<int:pk>/', FrameStockRetrieveUpdateDeleteView.as_view(), name='frame-stock-detail'),
     path('frames/', FrameListCreateView.as_view(), name='frame-list-create'),
+    path('frames/transfer/', FrameTransferView.as_view(), name='frame-transfer'),
     path('frames/<int:pk>/', FrameRetrieveUpdateDeleteView.as_view(), name='frame-detail'),
     path("frames/colors/", FrameColorListView.as_view(), name="frame-colors"),
     path("frames/stocks/adjust", StockAdjustmentView.as_view(), name="frame-stock-adjustment"),

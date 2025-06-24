@@ -1,44 +1,74 @@
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from ..models import Frame, FrameStock
+from ..models import Frame, FrameStock, Branch, FrameStockHistory
 from ..serializers import FrameSerializer, FrameStockSerializer
 from django.db import transaction
 from ..services.branch_protection_service import BranchProtectionsService
+import json
+import os
+
 # List and Create Frames (with stock)
 class FrameListCreateView(generics.ListCreateAPIView):
     queryset = Frame.objects.all()
     serializer_class = FrameSerializer
     
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        init_branch_id = self.request.query_params.get('init_branch_id')
+        if init_branch_id:
+            queryset = queryset.filter(branch_id=init_branch_id)
+        return queryset
+    
     def list(self, request, *args, **kwargs):
         """
-        List frames with optional status filter (?status=active|inactive|all).
-        Includes stock information for the branch.
+        List frames with optional filters:
+        - status: active|inactive|all
+        - init_branch_id: filter by initial branch
+        - branch_id: filter stock by branch
         """
-        branch = BranchProtectionsService.validate_branch_id(request)
         status_filter = request.query_params.get("status", "active").lower()
+        branch_id = request.query_params.get("branch_id")
+        
+        if not branch_id:
+            return Response(
+                {"error": "branch_id parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            branch = Branch.objects.get(id=branch_id)
+        except Branch.DoesNotExist:
+            return Response(
+                {"error": "Branch not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         frames = self.get_queryset()
-
+        
+        # Apply status filter if provided
         if status_filter == "active":
             frames = frames.filter(is_active=True)
         elif status_filter == "inactive":
             frames = frames.filter(is_active=False)
-        elif status_filter == "all":
-            pass  # no filter
-        else:
+        elif status_filter != "all":
             return Response(
                 {"error": "Invalid status filter. Use 'active', 'inactive', or 'all'."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        data = []
 
+        data = []
         for frame in frames:
-            stocks = frame.stocks.filter(branch_id=branch.id)  # ✅ Get all stock entries for this frame
-            stock_data = FrameStockSerializer(stocks, many=True).data  # ✅ Ensure many=True
+            stocks = frame.stocks.filter(branch_id=branch.id)  # Get all stock entries for this frame
+            stock_data = FrameStockSerializer(stocks, many=True).data  # Ensure many=True
 
             frame_data = FrameSerializer(frame).data
-            frame_data["stock"] = stock_data  # ✅ Store all stock records as a list
+            frame_data["stock"] = stock_data  # Store all stock records as a list
 
             data.append(frame_data)
 
@@ -47,43 +77,72 @@ class FrameListCreateView(generics.ListCreateAPIView):
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         """
-        Create a frame and optionally add stock. Supports multiple stocks for different branches.
+        Create a frame and add stock from JSON string array.
+        Handles both with and without image upload.
         """
-        frame_data = request.data.get("frame")
-        stock_data_list = request.data.get("stock", [])  # ✅ Default to an empty list if stock is missing
+        # Make a mutable copy of request data
+        data = request.data.copy()
         
-        # ✅ Create the frame
-        frame_serializer = self.get_serializer(data=request.data)
+        # Set default is_active to True if not provided
+        if 'is_active' not in data:
+            data['is_active'] = True
+
+        # Handle stock data which is sent as a JSON string
+        stock_data = data.get("stock")
+        if stock_data:
+            try:
+                if isinstance(stock_data, str):
+                    stock_data = json.loads(stock_data)
+                # Ensure stock_data is a list
+                stock_data_list = stock_data if isinstance(stock_data, list) else [stock_data] if stock_data else []
+                # Update the mutable copy
+                data["stock"] = stock_data_list
+            except json.JSONDecodeError:
+                return Response(
+                    {"error": "Invalid stock data format. Must be a valid JSON array."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            stock_data_list = []
+
+        # Create the frame using the mutable copy
+        frame_serializer = self.get_serializer(data=data)
         frame_serializer.is_valid(raise_exception=True)
         frame = frame_serializer.save()
         
         stock_entries = []
 
-        # ✅ If stock data is provided, process it
-        if stock_data_list and isinstance(stock_data_list, list):
-            for stock_data in stock_data_list:
-                if "initial_count" not in stock_data:
-                    return Response(
-                        {"error": "initial_count is required for all stock entries."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+        # Process stock data
+        for stock_item in stock_data_list:
+            if not isinstance(stock_item, dict) or "initial_count" not in stock_item:
+                return Response(
+                    {"error": "Each stock entry must be an object with 'initial_count'."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            # Prepare stock data
+            stock_item["frame"] = frame.id
+            if "qty" not in stock_item:
+                stock_item["qty"] = stock_item["initial_count"]
+            
+            stock_serializer = FrameStockSerializer(data=stock_item)
+            stock_serializer.is_valid(raise_exception=True)
+            stock_entries.append(stock_serializer.save())
 
-                stock_data["frame"] = frame.id  # Assign frame ID
-                stock_serializer = FrameStockSerializer(data=stock_data)
-                stock_serializer.is_valid(raise_exception=True)
-                stock_entries.append(stock_serializer.save())
-
-        # ✅ Prepare response
+        # Prepare response
         response_data = frame_serializer.data
-        response_data["stocks"] = FrameStockSerializer(stock_entries, many=True).data if stock_entries else []
-
+        response_data["stocks"] = FrameStockSerializer(stock_entries, many=True).data
+        
         return Response(response_data, status=status.HTTP_201_CREATED)
 
 # Retrieve, Update, and Delete Frames (with stock details)
 class FrameRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Frame.objects.all()
     serializer_class = FrameSerializer
-
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
     def retrieve(self, request, *args, **kwargs):
         """
         Retrieve a frame along with its stock details.
@@ -99,51 +158,122 @@ class FrameRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     def update(self, request, *args, **kwargs):
         """
         Update frame details and optionally update stock details.
+        Handles image updates by cleaning up old images when replaced.
         """
         frame = self.get_object()
-        frame_serializer = self.get_serializer(frame, data=request.data, partial=True)
-        frame_serializer.is_valid(raise_exception=True)
-        frame_serializer.save()
+        old_image = frame.image.path if frame.image and hasattr(frame.image, 'path') else None
+        old_image_relative = str(frame.image) if frame.image else None
+        
+        # Handle stock data which might be a JSON string
+        stock_data = request.data.get("stock")
+        if stock_data and isinstance(stock_data, str):
+            try:
+                stock_data = json.loads(stock_data)
+                if not isinstance(stock_data, list):
+                    stock_data = [stock_data]
+                request.data._mutable = True
+                request.data["stock"] = stock_data
+                request.data._mutable = False
+            except json.JSONDecodeError:
+                return Response(
+                    {"error": "Invalid stock data format. Must be a valid JSON array."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        stock_data_list = request.data.get("stock", [])  # ✅ Default to empty list if no stock data
+        # Process the update
+        serializer = self.get_serializer(frame, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        
+        try:
+            updated_frame = serializer.save()
+            
+            # Handle image cleanup if a new image was uploaded
+            if 'image' in request.data and old_image:
+                try:
+                    # Delete old image file if it exists
+                    if os.path.exists(old_image):
+                        os.remove(old_image)
+                        # Try to remove the directory if it's empty
+                        try:
+                            os.rmdir(os.path.dirname(old_image))
+                        except OSError:
+                            pass  # Directory not empty, that's fine
+                except Exception as e:
+                    # Log the error but don't fail the request
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Error deleting old image {old_image}: {str(e)}")
+            
+            # Handle stock updates
+            stock_entries = []
+            stock_data_list = request.data.get("stock", [])
+            
+            if stock_data_list and isinstance(stock_data_list, list):
+                for stock_item in stock_data_list:
+                    if not isinstance(stock_item, dict) or "initial_count" not in stock_item:
+                        return Response(
+                            {"error": "Each stock entry must be an object with 'initial_count'."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
 
-        stock_entries = []
+                    branch_id = stock_item.get("branch_id")
+                    if not branch_id:
+                        return Response(
+                            {"error": "branch_id is required for stock updates."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
 
-        # ✅ Process stock updates if provided
-        if stock_data_list and isinstance(stock_data_list, list):
-            for stock_data in stock_data_list:
-                if "initial_count" not in stock_data:
-                    return Response(
-                        {"error": "initial_count is required for all stock entries."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+                    # Check if stock entry exists for the frame & branch
+                    stock_instance = frame.stocks.filter(branch_id=branch_id).first()
+                    old_qty = stock_instance.qty if stock_instance else 0
+                    new_qty = stock_item.get('qty', old_qty)
 
-                branch_id = stock_data.get("branch_id")
-                if not branch_id:
-                    return Response(
-                        {"error": "branch_id is required for stock updates."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+                    # Validate that stock can only be decreased, not increased
+                    if stock_instance and new_qty > old_qty:
+                        return Response(
+                            {"error": f"Cannot increase stock quantity. Current: {old_qty}, Requested: {new_qty}"},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
 
-                # ✅ Check if stock entry exists for the frame & branch
-                stock_instance = frame.stocks.filter(branch_id=branch_id).first()
+                    if stock_instance:
+                        # Update existing stock
+                        stock_serializer = FrameStockSerializer(stock_instance, data=stock_item, partial=True)
+                    else:
+                        # Create new stock entry if it doesn't exist
+                        stock_item["frame"] = frame.id
+                        stock_serializer = FrameStockSerializer(data=stock_item)
 
-                if stock_instance:
-                    # ✅ Update existing stock
-                    stock_serializer = FrameStockSerializer(stock_instance, data=stock_data, partial=True)
-                else:
-                    # ✅ Create new stock entry if it doesn't exist
-                    stock_data["frame"] = frame.id
-                    stock_serializer = FrameStockSerializer(data=stock_data)
+                    stock_serializer.is_valid(raise_exception=True)
+                    updated_stock = stock_serializer.save()
+                    stock_entries.append(updated_stock)
+                    
+                    # Create stock history record if quantity changed
+                    qty_difference = updated_stock.qty - old_qty
+                    
+                    if qty_difference != 0:
+                        action = FrameStockHistory.ADD if qty_difference > 0 else FrameStockHistory.REMOVE
+                        FrameStockHistory.objects.create(
+                            frame=frame,
+                            branch_id=branch_id,
+                            action=action,
+                            quantity_changed=abs(qty_difference)
+                        )
 
-                stock_serializer.is_valid(raise_exception=True)
-                stock_entries.append(stock_serializer.save())
-
-        # ✅ Prepare response
-        response_data = frame_serializer.data
-        response_data["stocks"] = FrameStockSerializer(stock_entries, many=True).data if stock_entries else []
-
-        return Response(response_data, status=status.HTTP_200_OK)
+            # Prepare response
+            response_data = serializer.data
+            response_data["stocks"] = FrameStockSerializer(stock_entries, many=True).data if stock_entries else []
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            # If anything fails, make sure to clean up any partially uploaded file
+            if 'image' in request.data and frame.image and frame.image != old_image_relative:
+                try:
+                    if hasattr(frame.image, 'path') and os.path.exists(frame.image.path):
+                        os.remove(frame.image.path)
+                except:
+                    pass
+            raise
 
     def destroy(self, request, *args, **kwargs):
         """
@@ -153,4 +283,3 @@ class FrameRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         frame.is_active = False
         frame.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
-

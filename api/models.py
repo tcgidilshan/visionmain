@@ -255,8 +255,7 @@ class Code(models.Model):
         unique_together = (
             'brand',
             'name'
-        )
-    
+        )    
 def frame_image_upload_path(instance, filename):
     # Use the instance UUID for the folder
     return f"frames/{instance.uuid}/{filename}"
@@ -266,6 +265,7 @@ class Frame(models.Model):
         ('branded', 'Branded'),
         ('non_branded', 'Non-Branded'),
     )
+    branch = models.ForeignKey(Branch, related_name='frames', on_delete=models.CASCADE)
     brand = models.ForeignKey(Brand, related_name='frames', on_delete=models.CASCADE)
     brand_type = models.CharField(max_length=20, choices=BRAND_CHOICES)
     code = models.ForeignKey(Code, related_name='frames', on_delete=models.CASCADE)
@@ -281,11 +281,8 @@ class Frame(models.Model):
     class Meta:
         unique_together = (
             'brand',
-            'brand_type',
             'code',
             'color',
-            'species',
-            'size',
         )
     verbose_name = "Frame"
     verbose_name_plural = "Frames"
@@ -309,24 +306,46 @@ class FrameStock(models.Model):
 
 class FrameStockHistory(models.Model):
     ADD = 'add'
+    TRANSFER = 'transfer'
     REMOVE = 'remove'
 
     ACTION_CHOICES = [
         (ADD, 'Add'),
+        (TRANSFER, 'Transfer'),
         (REMOVE, 'Remove'),
     ]
-
     frame = models.ForeignKey('Frame', on_delete=models.CASCADE, related_name='stock_histories')
-    branch = models.ForeignKey('Branch', on_delete=models.CASCADE, related_name='stock_histories')
+    branch = models.ForeignKey('Branch', on_delete=models.CASCADE, related_name='branch_frame_stock')
+    transfer_to = models.ForeignKey('Branch', on_delete=models.CASCADE, related_name='frame_stock_transfers', null=True, blank=True)
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
     quantity_changed = models.PositiveIntegerField()
     timestamp = models.DateTimeField(auto_now_add=True)
-    performed_by = models.ForeignKey(CustomUser,related_name='stock_histories',on_delete=models.CASCADE, null=True, blank=True)
-    note = models.TextField(blank=True, null=True)
+    # performed_by = models.ForeignKey(CustomUser,related_name='stock_histories',on_delete=models.CASCADE, null=True, blank=True)
+    # note = models.TextField(blank=True, null=True)
 
     def __str__(self):
-        return f"{self.action.upper()} {self.quantity_changed} of {self.frame} at {self.branch} by {self.performed_by}"
-    
+        return f"{self.action.upper()} {self.quantity_changed} of {self.frame} at {self.branch}"
+class LensStockHistory(models.Model):
+    ADD = 'add'
+    TRANSFER = 'transfer'
+    REMOVE = 'remove'
+
+    ACTION_CHOICES = [
+        (ADD, 'Add'),
+        (TRANSFER, 'Transfer'),
+        (REMOVE, 'Remove'),
+    ]
+    lens = models.ForeignKey('Lens', on_delete=models.CASCADE, related_name='stock_histories')
+    branch = models.ForeignKey('Branch', on_delete=models.CASCADE, related_name='lens_stock_histories')  # Changed related_name
+    transfer_to = models.ForeignKey('Branch', on_delete=models.CASCADE, related_name='lens_stock_transfers', null=True, blank=True)
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES)
+    quantity_changed = models.PositiveIntegerField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    # performed_by = models.ForeignKey(CustomUser, related_name='lens_stock_histories', on_delete=models.CASCADE, null=True, blank=True)
+    # note = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.action.upper()} {self.quantity_changed} of {self.lens} at {self.branch}"
 class LenseType(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)  # Allows NULL and empty values
@@ -353,6 +372,7 @@ class Lens(models.Model):
     brand = models.ForeignKey(Brand, related_name='lenses', on_delete=models.CASCADE)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     is_active = models.BooleanField(default=True) 
+    branch = models.ForeignKey(Branch, related_name='lenses', on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.type.name} - {self.coating.name} - ${self.price}"
