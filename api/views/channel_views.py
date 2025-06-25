@@ -17,6 +17,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from ..services.channel_payment_service import ChannelPaymentService  # Update path as per your structure
 from rest_framework.exceptions import ValidationError
+from django.db.models import Count
+from django.utils import timezone
 class ChannelAppointmentView(APIView):
     @transaction.atomic
     def post(self, request, *args, **kwargs):
@@ -444,3 +446,54 @@ class AppointmentStatusListView(ListAPIView):
             queryset = queryset.filter(**filter_kwargs)
 
         return queryset
+
+class BranchAppointmentCountView(APIView):
+    """
+    API endpoint to get today's appointment count by branch.
+    Query Parameters:
+    - branch_id: (optional) Filter by specific branch ID
+    """
+    def get(self, request):
+        # Get today's date
+        today = timezone.now().date()
+        
+        # Get branch_id from query params if provided
+        branch_id = request.query_params.get('branch_id')
+        
+        # Base query
+        query = Appointment.objects.filter(
+            date=today,
+            is_deleted=False
+        )
+        
+        # Apply branch filter if branch_id is provided
+        if branch_id:
+            query = query.filter(branch_id=branch_id)
+        
+        # Get appointment counts by branch
+        branch_counts = query.values(
+            'branch__id',
+            'branch__branch_name'
+        ).annotate(
+            appointment_count=Count('id')
+        ).order_by('branch__branch_name')
+        
+        # Format the response
+        result = [
+            {
+                'branch_id': item['branch__id'],
+                'appointment_count': item['appointment_count']
+            }
+            for item in branch_counts
+        ]
+        
+        response_data = {
+            'date': today,
+            'total_appointments': sum(item['appointment_count'] for item in result)
+        }
+        
+        # If branch_id was provided, include it in the response
+        if branch_id:
+            response_data['filtered_branch_id'] = int(branch_id)
+        
+        return Response(response_data)

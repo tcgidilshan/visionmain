@@ -5,7 +5,7 @@ from .views import (
     BranchListCreateAPIView,OrderRefundView,FactoryOrderReportView,
     BranchRetrieveUpdateDestroyAPIView,NormalOrderReportView,
     RefractionCreateAPIView,ChannelOrderReportView,
-    RefractionListAPIView,
+    RefractionListAPIView,BranchAppointmentCountView,
     RefractionUpdateAPIView,
     RefractionDeleteAPIView,
     RefractionDetailCreateAPIView,
@@ -208,6 +208,7 @@ urlpatterns = [
     #channel repayment
     path('channel/repayments/', ChannelRepaymentView.as_view(), name='channel-repayments'),
     path('doctor/transfer-appointments/', DoctorAppointmentTransferView.as_view(), name='doctor-appointment-transfer'), #appointment trans
+    path('branches/appointments/today-count/', BranchAppointmentCountView.as_view(), name='branch-appointments-today-count'),
     path('lens-stocks/', LensStockListCreateView.as_view(), name='lens-stock-list-create'),
     path('lens-stocks/<int:pk>/', LensStockRetrieveUpdateDeleteView.as_view(), name='lens-stock-detail'),
     path("lenses/search/", LensSearchView.as_view(), name="lens-search"),
