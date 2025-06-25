@@ -67,7 +67,7 @@ from .views import (
     DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView,
     SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
     GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView,MntOrderReportView,
-    ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView
+    ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView
 )
 # from .views import CustomAuthToken
 
@@ -130,6 +130,7 @@ urlpatterns = [
     path('frames/<int:pk>/', FrameRetrieveUpdateDeleteView.as_view(), name='frame-detail'),
     path("frames/colors/", FrameColorListView.as_view(), name="frame-colors"),
     path("frames/stocks/adjust", StockAdjustmentView.as_view(), name="frame-stock-adjustment"),
+    path("frames/filter", FrameFilterView.as_view(), name="frame-stock-filter"),
 
     path('frames/report/', FrameReportView.as_view(), name='frames-report'), #frame reports
 

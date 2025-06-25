@@ -2,7 +2,7 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from ..models import Frame, FrameStock, Branch, FrameStockHistory
-from ..serializers import FrameSerializer, FrameStockSerializer
+from ..serializers import FrameSerializer, FrameStockSerializer, FrameFilterSerializer
 from django.db import transaction
 from ..services.branch_protection_service import BranchProtectionsService
 import json
@@ -228,12 +228,7 @@ class FrameRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
                     old_qty = stock_instance.qty if stock_instance else 0
                     new_qty = stock_item.get('qty', old_qty)
 
-                    # Validate that stock can only be decreased, not increased
-                    if stock_instance and new_qty > old_qty:
-                        return Response(
-                            {"error": f"Cannot increase stock quantity. Current: {old_qty}, Requested: {new_qty}"},
-                            status=status.HTTP_400_BAD_REQUEST
-                        )
+                    
 
                     if stock_instance:
                         # Update existing stock
@@ -283,3 +278,37 @@ class FrameRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         frame.is_active = False
         frame.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+class FrameFilterView(APIView):
+    def get(self, request):
+        # Get active frames with related data
+        frames = Frame.objects.filter(is_active=True).select_related('brand', 'code', 'color')
+        
+        # Group frames by brand and code
+        grouped_frames = {}
+        for frame in frames:
+            key = f"{frame.brand.id}_{frame.code.id}"  # Create a unique key for brand and code combination
+            if key not in grouped_frames:
+                grouped_frames[key] = {
+                    'brand': frame.brand,
+                    'code': frame.code,
+                    'frames': []
+                }
+            grouped_frames[key]['frames'].append(frame)
+        
+        # Convert to list and sort by brand name and code name
+        result = [
+            {
+                'brand': data['brand'],
+                'code': data['code'],
+                'frames': data['frames']
+            }
+            for key, data in sorted(
+                grouped_frames.items(),
+                key=lambda x: (x[1]['brand'].name.lower(), x[1]['code'].name.lower())
+            )
+        ]
+        
+        # Serialize the result
+        serializer = FrameFilterSerializer(result, many=True, context={'request': request})
+        return Response(serializer.data)

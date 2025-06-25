@@ -131,7 +131,7 @@ class FrameSerializer(serializers.ModelSerializer):
             'brand_type_display',
             'is_active',
             'image_url',
-            'branch'
+
         ]
     def validate_image(self, value):
     # Accept only supported types
@@ -1362,3 +1362,53 @@ class MntOrderSerializer(serializers.ModelSerializer):
             'order_total_price'
         ]
         read_only_fields = ['mnt_number', 'created_at', 'branch_name', 'user_username', 'admin_username']
+
+class FrameFilterSerializer(serializers.Serializer):
+    brand = serializers.SerializerMethodField()
+    brand_id = serializers.SerializerMethodField()
+    code = serializers.SerializerMethodField()
+    code_id = serializers.SerializerMethodField()
+    frames = serializers.SerializerMethodField()
+
+    def get_brand(self, obj):
+        return obj['brand'].name if obj['brand'] else None
+    
+    def get_brand_id(self, obj):
+        return obj['brand'].id if obj['brand'] else None
+    
+    def get_code(self, obj):
+        return obj['code'].name if obj['code'] else None
+    
+    def get_code_id(self, obj):
+        return obj['code'].id if obj['code'] else None
+
+    def get_frames(self, obj):
+        request = self.context.get('request')
+        branch_id = request.query_params.get('branch_id') if request else None
+        
+        frames = []
+        for frame in obj['frames']:
+            frame_data = FrameSerializer(frame, context=self.context).data
+            
+            # Get stock information for the frame in the specified branch
+            stock_data = None
+            if branch_id:
+                try:
+                    stock = FrameStock.objects.filter(
+                        frame=frame,
+                        branch_id=branch_id
+                    ).first()
+                    if stock:
+                        stock_data = {
+                            'qty': stock.qty,
+                            'initial_count': stock.initial_count,
+                            'limit': stock.limit,
+                            'branch_id': stock.branch_id
+                        }
+                except Exception as e:
+                    print(f"Error getting stock for frame {frame.id}: {str(e)}")
+            
+            frame_data['stock'] = stock_data
+            frames.append(frame_data)
+            
+        return frames

@@ -265,7 +265,6 @@ class Frame(models.Model):
         ('branded', 'Branded'),
         ('non_branded', 'Non-Branded'),
     )
-    branch = models.ForeignKey(Branch, related_name='frames', on_delete=models.CASCADE)
     brand = models.ForeignKey(Brand, related_name='frames', on_delete=models.CASCADE)
     brand_type = models.CharField(max_length=20, choices=BRAND_CHOICES)
     code = models.ForeignKey(Code, related_name='frames', on_delete=models.CASCADE)
