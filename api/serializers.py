@@ -111,65 +111,113 @@ class CodeSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'brand','brand_name']
         
 class FrameSerializer(serializers.ModelSerializer):
-    brand_name = serializers.CharField(source='brand.name', read_only=True)  # Get brand name
-    code_name = serializers.CharField(source='code.name', read_only=True)    # Get code name
-    color_name = serializers.CharField(source='color.name', read_only=True)  # Get color name
+    brand_name = serializers.CharField(source='brand.name', read_only=True)
+    code_name = serializers.CharField(source='code.name', read_only=True)
+    color_name = serializers.CharField(source='color.name', read_only=True)
     brand_type_display = serializers.CharField(source='get_brand_type_display', read_only=True)
     image_url = serializers.SerializerMethodField()
+    uploaded_url = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    
     class Meta:
         model = Frame
         fields = [
-            'id',
-            'brand', 'brand_name',  
-            'code', 'code_name',   
-            'color', 'color_name',  
-            'price',
-            'size',
-            'species',
-            'image',
-            'brand_type',
-            'brand_type_display',
-            'is_active',
-            'image_url',
-
+            'id', 'brand', 'brand_name', 'code', 'code_name', 'color', 'color_name',
+            'price', 'size', 'species', 'image', 'brand_type', 'brand_type_display',
+            'is_active', 'image_url', 'uploaded_url'
         ]
+        extra_kwargs = {
+            'image': {'required': False}
+        }
+
+    def validate(self, data):
+        # Check if we have either an image file or an uploaded_url
+        has_image = 'image' in data and data['image'] is not None
+        has_uploaded_url = 'uploaded_url' in data and data.get('uploaded_url')
+        
+        if not has_image and not has_uploaded_url:
+            # If this is an update and we're not changing the image, that's fine
+            if self.instance and self.instance.image:
+                return data
+            raise serializers.ValidationError({"image": "Either image file or uploaded_url is required"})
+            
+        return data
+
     def validate_image(self, value):
-    # Accept only supported types
         if value and not value.name.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
             raise serializers.ValidationError("Only PNG, JPG, JPEG, or WEBP files are allowed.")
         return value
+
+    def create(self, validated_data):
+        uploaded_url = validated_data.pop('uploaded_url', None)
+        
+        # If uploaded_url is provided, try to find an existing frame with the same brand and code
+        if uploaded_url:
+            try:
+                existing_frame = Frame.objects.filter(
+                    brand=validated_data['brand'],
+                    code=validated_data['code']
+                ).exclude(image='').first()
+                
+                if existing_frame and existing_frame.image:
+                    # Use the existing image
+                    validated_data['image'] = existing_frame.image
+                else:
+                    # Store the URL as is
+                    validated_data['image'] = uploaded_url
+            except (KeyError, Frame.DoesNotExist):
+                # If brand or code is missing, or no frame found, store the URL as is
+                validated_data['image'] = uploaded_url
+        
+        return super().create(validated_data)
+        
+    def update(self, instance, validated_data):
+        uploaded_url = validated_data.pop('uploaded_url', None)
+        
+        if uploaded_url:
+            # If uploaded_url is provided, use it as the image
+            instance.image = uploaded_url
+        
+        return super().update(instance, validated_data)
+
     def get_image_url(self, obj):
         if not obj.image:
             return None
             
-        # Get the URL and remove any leading slashes to prevent double /media/
-        relative_url = obj.image.url.lstrip('/')
-        request = self.context.get('request')
-        
-        if request is not None:
-            return request.build_absolute_uri(f'/{relative_url}')
-        
-        # Try Django sites framework
+        # If image is a URL (starts with http), return it as is
+        if isinstance(obj.image, str) and (obj.image.startswith('http://') or obj.image.startswith('https://')):
+            return obj.image
+            
+        # Handle file-based images
         try:
-            from django.contrib.sites.shortcuts import get_current_site
-            from django.conf import settings
+            # Get the URL and remove any leading slashes to prevent double /media/
+            relative_url = obj.image.url.lstrip('/')
+            request = self.context.get('request')
             
-            site = get_current_site(None)
-            scheme = 'https' if getattr(settings, 'SECURE_SSL_REDIRECT', False) else 'http'
-            base_url = f"{scheme}://{site.domain}"
-            return f"{base_url}/{relative_url}"
+            if request is not None:
+                return request.build_absolute_uri(f'/{relative_url}')
             
-        except Exception as e:
-            # Fallback to environment variable or default
-            from dotenv import load_dotenv
-            import os
-            
-            # Load environment variables from .env file
-            load_dotenv()
-            
-            # Get SITE_URL from environment variables or use default
-            base_url = os.getenv('SITE_URL', 'http://127.0.0.1:8000')
-            return f"{base_url.rstrip('/')}/{relative_url}"
+            # Try Django sites framework
+            try:
+                from django.contrib.sites.shortcuts import get_current_site
+                from django.conf import settings
+                
+                site = get_current_site(None)
+                scheme = 'https' if getattr(settings, 'SECURE_SSL_REDIRECT', False) else 'http'
+                base_url = f"{scheme}://{site.domain}"
+                return f"{base_url}/{relative_url}"
+                
+            except Exception:
+                # Fallback to environment variable or default
+                from dotenv import load_dotenv
+                import os
+                
+                load_dotenv()
+                base_url = os.getenv('SITE_URL', 'http://127.0.0.1:8000')
+                return f"{base_url.rstrip('/')}/{relative_url}"
+                
+        except ValueError:
+            # If image doesn't have a file associated, return None
+            return None
             
 class FrameStockSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(
