@@ -2,11 +2,12 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from ..models import Frame, FrameStock, Branch, FrameStockHistory
-from ..serializers import FrameSerializer, FrameStockSerializer, FrameFilterSerializer
+from ..serializers import FrameSerializer, FrameStockSerializer
 from django.db import transaction
 from ..services.branch_protection_service import BranchProtectionsService
 import json
 import os
+from django.db.models import Sum
 
 # List and Create Frames (with stock)
 class FrameListCreateView(generics.ListCreateAPIView):
@@ -281,38 +282,59 @@ class FrameRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
 
 class FrameFilterView(APIView):
     def get(self, request):
-        # Get active frames with related data
-        frames = Frame.objects.filter(is_active=True).select_related('brand', 'code', 'color')
-        
-        # Group frames by brand and code
-        grouped_frames = {}
+        branch_id = request.query_params.get("branch_id")
+
+        # You can fetch frames and manually group by brand/code/color
+        frames = Frame.objects.filter(is_active=True).select_related("brand", "code", "color").prefetch_related("stocks")
+
+        grouped = {}
         for frame in frames:
-            key = f"{frame.brand.id}_{frame.code.id}"  # Create a unique key for brand and code combination
-            if key not in grouped_frames:
-                grouped_frames[key] = {
-                    'brand': frame.brand,
-                    'brand_name': frame.brand.name if frame.brand else '',
-                    'code': frame.code,
-                    'code_name': frame.code.name if frame.code else '',
-                    'frames': []
+            key = (frame.brand.id, frame.code.id, frame.color.name, frame.size, frame.species)
+            if key not in grouped:
+                grouped[key] = {
+                    "brand": frame.brand.name,
+                    "brand_id": frame.brand.id,
+                    "code": frame.code.name,
+                    "code_id": frame.code.id,
+                    "color_name": frame.color.name,
+                    "size": frame.size,
+                    "species": frame.species,
+                    "price": float(frame.price),
+                    "total_qty": 0,
+                    "frames": [],
                 }
-            grouped_frames[key]['frames'].append(frame)
-        
-        # Convert to list and sort by brand name and code name
-        result = [
-            {
-                'brand': data['brand'],
-                'brand_name': data['brand_name'],
-                'code': data['code'],
-                'code_name': data['code_name'],
-                'frames': data['frames']
-            }
-            for key, data in sorted(
-                grouped_frames.items(),
-                key=lambda x: (x[1]['brand'].name.lower(), x[1]['code'].name.lower())
-            )
-        ]
-        
-        # Serialize the result
-        serializer = FrameFilterSerializer(result, many=True, context={'request': request})
-        return Response(serializer.data)
+
+            stock_qs = frame.stocks.filter(branch_id=branch_id) if branch_id else frame.stocks.all()
+            stock_list = [
+                {
+                    "qty": s.qty,
+                    "initial_count": s.initial_count,
+                    "limit": s.limit,
+                    "branch_id": s.branch_id
+                }
+                for s in stock_qs
+            ]
+
+            total_qty = sum(s["qty"] for s in stock_list if s)
+
+            grouped[key]["total_qty"] += total_qty
+            grouped[key]["frames"].append({
+                "id": frame.id,
+                "brand": frame.brand.id,
+                "brand_name": frame.brand.name,
+                "code": frame.code.id,
+                "code_name": frame.code.name,
+                "color": frame.color.id,
+                "color_name": frame.color.name,
+                "price": str(frame.price),
+                "size": frame.size,
+                "species": frame.species,
+                "image": frame.image.url if frame.image else None,
+                "image_url": frame.image.url if frame.image else None,
+                "brand_type": frame.brand_type,
+                "brand_type_display": frame.get_brand_type_display(),
+                "is_active": frame.is_active,
+                "stock": stock_list
+            })
+
+        return Response(list(grouped.values()))
