@@ -1408,7 +1408,7 @@ class FrameFilterSerializer(serializers.Serializer):
                 except Exception as e:
                     print(f"Error getting stock for frame {frame.id}: {str(e)}")
             
-            frame_data['stock'] = stock_data
+            frame_data['stock'] = [stock_data]
             frames.append(frame_data)
             
         return frames

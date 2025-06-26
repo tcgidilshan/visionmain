@@ -291,7 +291,9 @@ class FrameFilterView(APIView):
             if key not in grouped_frames:
                 grouped_frames[key] = {
                     'brand': frame.brand,
+                    'brand_name': frame.brand.name if frame.brand else '',
                     'code': frame.code,
+                    'code_name': frame.code.name if frame.code else '',
                     'frames': []
                 }
             grouped_frames[key]['frames'].append(frame)
@@ -300,7 +302,9 @@ class FrameFilterView(APIView):
         result = [
             {
                 'brand': data['brand'],
+                'brand_name': data['brand_name'],
                 'code': data['code'],
+                'code_name': data['code_name'],
                 'frames': data['frames']
             }
             for key, data in sorted(
