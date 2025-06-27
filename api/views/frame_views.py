@@ -88,7 +88,9 @@ class FrameListCreateView(generics.ListCreateAPIView):
         # Set default is_active to True if not provided
         if 'is_active' not in data:
             data['is_active'] = True
-
+        frame_serializer = self.get_serializer(data=data, context={'request': request})
+        frame_serializer.is_valid(raise_exception=True)
+    
         # Handle stock data which is sent as a JSON string
         stock_data = data.get("stock")
         if stock_data:
@@ -289,15 +291,20 @@ class FrameFilterView(APIView):
 
         branch_id = int(branch_id)
 
-        # Prefetch only stock for the relevant branch (including qty=0)
-        frames = Frame.objects.select_related('brand', 'code', 'color') \
-            .prefetch_related(
-                Prefetch(
-                    'stocks',
-                    queryset=FrameStock.objects.filter(branch_id=branch_id),
-                    to_attr='filtered_stocks'
-                )
-            ).filter(is_active=True)
+        # Prefetch related data including the image
+        frames = Frame.objects.select_related(
+            'brand', 'code', 'color', 'image'
+        ).prefetch_related(
+            Prefetch(
+                'stocks',
+                queryset=FrameStock.objects.filter(branch_id=branch_id),
+                to_attr='filtered_stocks'
+            )
+        ).filter(is_active=True)
+
+        # Create serializer context with request for URL building
+        context = {'request': request}
+        frame_serializer = FrameSerializer(context=context)
 
         grouped = {}
 
@@ -309,6 +316,9 @@ class FrameFilterView(APIView):
             brand_name = frame.brand.name
             code_name = frame.code.name
             key = (brand_name, code_name)
+
+            # Get image URL using the serializer's method
+            image_url = frame_serializer.get_image_url(frame) if frame.image else None
 
             if key not in grouped:
                 grouped[key] = {
@@ -327,7 +337,7 @@ class FrameFilterView(APIView):
                 "id": frame.id,
                 "color_name": frame.color.name,
                 "price": str(frame.price),
-                "image_url": frame.image.url if frame.image else "",
+                "image_url": image_url,  # Use the URL from serializer
                 "is_active": frame.is_active,
                 "stock_qty": stock_qty,
                 "stock": [

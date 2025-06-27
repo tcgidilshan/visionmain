@@ -256,6 +256,22 @@ class Code(models.Model):
             'brand',
             'name'
         )    
+
+class FrameImage(models.Model):
+    image = models.ImageField(upload_to='frame_images/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    
+    def __str__(self):
+        return f"Image {self.id}"
+    def save(self, *args, **kwargs):
+        # //TODO: Convert and compress only if new image uploaded or changed
+        if self.image and hasattr(self.image, 'file') and not str(self.image).endswith('.webp'):
+            new_image = compress_image_to_webp(self.image)
+            if new_image:
+                self.image.save(new_image.name, new_image, save=False)
+        super().save(*args, **kwargs)
+
 def frame_image_upload_path(instance, filename):
     # Use the instance UUID for the folder
     return f"frames/{instance.uuid}/{filename}"
@@ -273,8 +289,7 @@ class Frame(models.Model):
     size = models.CharField(max_length=50)
     species = models.CharField(max_length=100)
     is_active = models.BooleanField(default=True) 
-    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
-    image = models.ImageField(upload_to=frame_image_upload_path, blank=True, null=True)
+    image = models.ForeignKey(FrameImage, on_delete=models.SET_NULL, null=True, blank=True)
     def __str__(self):
         return f"{self.brand.name} - {self.code.name} - {self.color.name} - {self.get_brand_type_display()}"
     class Meta:
@@ -285,13 +300,8 @@ class Frame(models.Model):
         )
     verbose_name = "Frame"
     verbose_name_plural = "Frames"
-    def save(self, *args, **kwargs):
-        # //TODO: Convert and compress only if new image uploaded or changed
-        if self.image and hasattr(self.image, 'file') and not str(self.image).endswith('.webp'):
-            new_image = compress_image_to_webp(self.image)
-            if new_image:
-                self.image.save(new_image.name, new_image, save=False)
-        super().save(*args, **kwargs)
+    
+
     
 class FrameStock(models.Model):
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="frame_stocks", null=True, blank=True)

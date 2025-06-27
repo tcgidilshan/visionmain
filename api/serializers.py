@@ -21,7 +21,7 @@ from .models import (
     OtherItem,BankAccount,BankDeposit,
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
     UserBranch,ExpenseMainCategory, ExpenseSubCategory,
-    DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus
+    DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus,FrameImage
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -117,13 +117,19 @@ class FrameSerializer(serializers.ModelSerializer):
     brand_type_display = serializers.CharField(source='get_brand_type_display', read_only=True)
     image_url = serializers.SerializerMethodField()
     uploaded_url = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    image_id = serializers.PrimaryKeyRelatedField(
+        queryset=FrameImage.objects.all(),
+        source='image',
+        required=False,
+        allow_null=True
+    )
     
     class Meta:
         model = Frame
         fields = [
             'id', 'brand', 'brand_name', 'code', 'code_name', 'color', 'color_name',
-            'price', 'size', 'species', 'image', 'brand_type', 'brand_type_display',
-            'is_active', 'image_url', 'uploaded_url'
+            'price', 'size', 'species', 'brand_type', 'brand_type_display',
+            'is_active', 'image_url', 'uploaded_url', 'image_id'
         ]
         extra_kwargs = {
             'image': {'required': False}
@@ -134,11 +140,11 @@ class FrameSerializer(serializers.ModelSerializer):
         has_image = 'image' in data and data['image'] is not None
         has_uploaded_url = 'uploaded_url' in data and data.get('uploaded_url')
         
-        if not has_image and not has_uploaded_url:
+        if not has_image and not has_uploaded_url and 'image_id' not in data:
             # If this is an update and we're not changing the image, that's fine
             if self.instance and self.instance.image:
                 return data
-            raise serializers.ValidationError({"image": "Either image file or uploaded_url is required"})
+            raise serializers.ValidationError({"image": "Either image_id, image file, or uploaded_url is required"})
             
         return data
 
@@ -147,50 +153,78 @@ class FrameSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Only PNG, JPG, JPEG, or WEBP files are allowed.")
         return value
 
+    def handle_uploaded_url(self, url):
+        """
+        Handle URL uploads by downloading and creating a FrameImage instance.
+        """
+        import requests
+        from io import BytesIO
+        from django.core.files.base import ContentFile
+        from urllib.parse import urlparse
+        import os
+
+        try:
+            # Download the image
+            response = requests.get(url, stream=True)
+            response.raise_for_status()
+            
+            # Get the filename from URL or generate one
+            filename = os.path.basename(urlparse(url).path)
+            if not filename:
+                filename = f"frame_{uuid.uuid4()}.jpg"
+            
+            # Create a FrameImage instance
+            frame_image = FrameImage()
+            
+            # Save the image to the FrameImage instance
+            img_data = BytesIO(response.content)
+            frame_image.image.save(filename, ContentFile(img_data.getvalue()), save=False)
+            frame_image.save()
+            
+            return frame_image
+            
+        except Exception as e:
+            raise serializers.ValidationError(f"Error processing image URL: {str(e)}")
+
     def create(self, validated_data):
         uploaded_url = validated_data.pop('uploaded_url', None)
+        image = validated_data.pop('image', None)
         
-        # If uploaded_url is provided, try to find an existing frame with the same brand and code
-        if uploaded_url:
-            try:
-                existing_frame = Frame.objects.filter(
-                    brand=validated_data['brand'],
-                    code=validated_data['code']
-                ).exclude(image='').first()
-                
-                if existing_frame and existing_frame.image:
-                    # Use the existing image
-                    validated_data['image'] = existing_frame.image
-                else:
-                    # Store the URL as is
-                    validated_data['image'] = uploaded_url
-            except (KeyError, Frame.DoesNotExist):
-                # If brand or code is missing, or no frame found, store the URL as is
-                validated_data['image'] = uploaded_url
-        
+        if image:
+            # If image is provided directly (file upload)
+            frame_image = FrameImage(image=image)
+            frame_image.save()
+            validated_data['image'] = frame_image
+        elif uploaded_url:
+            # Handle URL upload
+            frame_image = self.handle_uploaded_url(uploaded_url)
+            validated_data['image'] = frame_image
+            
         return super().create(validated_data)
         
     def update(self, instance, validated_data):
         uploaded_url = validated_data.pop('uploaded_url', None)
+        image = validated_data.pop('image', None)
         
-        if uploaded_url:
-            # If uploaded_url is provided, use it as the image
-            instance.image = uploaded_url
-        
+        if image:
+            # If image is provided directly (file upload)
+            frame_image = FrameImage(image=image)
+            frame_image.save()
+            instance.image = frame_image
+        elif uploaded_url:
+            # Handle URL upload
+            frame_image = self.handle_uploaded_url(uploaded_url)
+            instance.image = frame_image
+            
         return super().update(instance, validated_data)
 
     def get_image_url(self, obj):
         if not obj.image:
             return None
             
-        # If image is a URL (starts with http), return it as is
-        if isinstance(obj.image, str) and (obj.image.startswith('http://') or obj.image.startswith('https://')):
-            return obj.image
-            
-        # Handle file-based images
         try:
             # Get the URL and remove any leading slashes to prevent double /media/
-            relative_url = obj.image.url.lstrip('/')
+            relative_url = obj.image.image.url.lstrip('/')
             request = self.context.get('request')
             
             if request is not None:
@@ -215,10 +249,9 @@ class FrameSerializer(serializers.ModelSerializer):
                 base_url = os.getenv('SITE_URL', 'http://127.0.0.1:8000')
                 return f"{base_url.rstrip('/')}/{relative_url}"
                 
-        except ValueError:
+        except (ValueError, AttributeError):
             # If image doesn't have a file associated, return None
             return None
-            
 class FrameStockSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(),  # Ensures valid branch selection
