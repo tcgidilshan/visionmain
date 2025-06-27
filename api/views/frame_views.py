@@ -8,7 +8,8 @@ from ..services.branch_protection_service import BranchProtectionsService
 import json
 import os
 from django.db.models import Sum
-
+from collections import defaultdict
+from django.db.models import Prefetch
 # List and Create Frames (with stock)
 class FrameListCreateView(generics.ListCreateAPIView):
     queryset = Frame.objects.all()
@@ -282,59 +283,72 @@ class FrameRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
 
 class FrameFilterView(APIView):
     def get(self, request):
-        branch_id = request.query_params.get("branch_id")
+        branch_id = request.query_params.get('branch_id')
+        if not branch_id:
+            return Response({"error": "branch_id is required"}, status=400)
 
-        # You can fetch frames and manually group by brand/code/color
-        frames = Frame.objects.filter(is_active=True).select_related("brand", "code", "color").prefetch_related("stocks")
+        branch_id = int(branch_id)
+
+        # Prefetch only stock for the relevant branch (including qty=0)
+        frames = Frame.objects.select_related('brand', 'code', 'color') \
+            .prefetch_related(
+                Prefetch(
+                    'stocks',
+                    queryset=FrameStock.objects.filter(branch_id=branch_id),
+                    to_attr='filtered_stocks'
+                )
+            ).filter(is_active=True)
 
         grouped = {}
+
         for frame in frames:
-            key = (frame.brand.id, frame.code.id, frame.color.name, frame.size, frame.species)
+            if not frame.filtered_stocks:
+                continue  # skip frames that have no stock entry for this branch
+
+            stock_qty = frame.filtered_stocks[0].qty  # Only one stock per frame per branch
+            brand_name = frame.brand.name
+            code_name = frame.code.name
+            key = (brand_name, code_name)
+
             if key not in grouped:
                 grouped[key] = {
-                    "brand": frame.brand.name,
-                    "brand_id": frame.brand.id,
-                    "code": frame.code.name,
-                    "code_id": frame.code.id,
-                    "color_name": frame.color.name,
+                    "brand_name": brand_name,
+                    "code_name": code_name,
                     "size": frame.size,
                     "species": frame.species,
-                    "price": float(frame.price),
                     "total_qty": 0,
-                    "frames": [],
+                    "color_ids": set(),
+                    "frames": []
                 }
 
-            stock_qs = frame.stocks.filter(branch_id=branch_id) if branch_id else frame.stocks.all()
-            stock_list = [
-                {
-                    "qty": s.qty,
-                    "initial_count": s.initial_count,
-                    "limit": s.limit,
-                    "branch_id": s.branch_id
-                }
-                for s in stock_qs
-            ]
-
-            total_qty = sum(s["qty"] for s in stock_list if s)
-
-            grouped[key]["total_qty"] += total_qty
+            grouped[key]["color_ids"].add(frame.color.id)
+            grouped[key]["total_qty"] += stock_qty
             grouped[key]["frames"].append({
                 "id": frame.id,
-                "brand": frame.brand.id,
-                "brand_name": frame.brand.name,
-                "code": frame.code.id,
-                "code_name": frame.code.name,
-                "color": frame.color.id,
                 "color_name": frame.color.name,
                 "price": str(frame.price),
-                "size": frame.size,
-                "species": frame.species,
-                "image": frame.image.url if frame.image else None,
-                "image_url": frame.image.url if frame.image else None,
-                "brand_type": frame.brand_type,
-                "brand_type_display": frame.get_brand_type_display(),
+                "image_url": frame.image.url if frame.image else "",
                 "is_active": frame.is_active,
-                "stock": stock_list
+                "stock_qty": stock_qty,
+                "stock": [
+                    {
+                        "branch_id": stock.branch_id,
+                        "qty": stock.qty
+                    }
+                    for stock in frame.filtered_stocks
+                ]
             })
 
-        return Response(list(grouped.values()))
+        result = []
+        for group in grouped.values():
+            result.append({
+                "brand_name": group["brand_name"],
+                "code_name": group["code_name"],
+                "size": group["size"],
+                "species": group["species"],
+                "total_color": len(group["color_ids"]),
+                "total_qty": group["total_qty"],
+                "frames": group["frames"]
+            })
+
+        return Response(result)
