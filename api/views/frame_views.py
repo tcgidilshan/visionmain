@@ -335,6 +335,10 @@ class FrameFilterView(APIView):
             grouped[key]["total_qty"] += stock_qty
             grouped[key]["frames"].append({
                 "id": frame.id,
+                "brand": frame.brand.id,
+                "code": frame.code.id,
+                "color": frame.color.id,
+                "image": frame.image.id,
                 "color_name": frame.color.name,
                 "price": str(frame.price),
                 "image_url": image_url,  # Use the URL from serializer

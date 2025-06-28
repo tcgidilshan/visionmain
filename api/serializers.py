@@ -109,149 +109,134 @@ class CodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Code
         fields = ['id', 'name', 'brand','brand_name']
-        
+class FrameImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FrameImage
+        fields = ['id', 'image', 'uploaded_at']
 class FrameSerializer(serializers.ModelSerializer):
+    # Read-only display fields
     brand_name = serializers.CharField(source='brand.name', read_only=True)
     code_name = serializers.CharField(source='code.name', read_only=True)
     color_name = serializers.CharField(source='color.name', read_only=True)
     brand_type_display = serializers.CharField(source='get_brand_type_display', read_only=True)
+
+    # For API consumers
     image_url = serializers.SerializerMethodField()
+
+    # Image input options (one of the three)
+    image_file = serializers.ImageField(write_only=True, required=False)
     uploaded_url = serializers.CharField(write_only=True, required=False, allow_blank=True)
     image_id = serializers.PrimaryKeyRelatedField(
         queryset=FrameImage.objects.all(),
-        source='image',
+        write_only=True,
         required=False,
         allow_null=True
     )
-    
+
     class Meta:
         model = Frame
         fields = [
             'id', 'brand', 'brand_name', 'code', 'code_name', 'color', 'color_name',
             'price', 'size', 'species', 'brand_type', 'brand_type_display',
-            'is_active', 'image_url', 'uploaded_url', 'image_id'
+            'is_active',
+            'image_file', 'uploaded_url', 'image_id',  # ✅ image input options
+            'image_url',  # ✅ read-only image access
         ]
-        extra_kwargs = {
-            'image': {'required': False}
-        }
 
     def validate(self, data):
-        # Check if we have either an image file or an uploaded_url
-        has_image = 'image' in data and data['image'] is not None
-        has_uploaded_url = 'uploaded_url' in data and data.get('uploaded_url')
-        
-        if not has_image and not has_uploaded_url and 'image_id' not in data:
-            # If this is an update and we're not changing the image, that's fine
+        """
+        Ensure at least one of image_file, image_id, or uploaded_url is provided.
+        """
+        has_file = bool(data.get('image_file'))
+        has_id = bool(data.get('image_id'))
+        has_url = bool(data.get('uploaded_url'))
+
+        if not (has_file or has_id or has_url):
+            # On update, allow missing image if already present
             if self.instance and self.instance.image:
                 return data
-            raise serializers.ValidationError({"image": "Either image_id, image file, or uploaded_url is required"})
-            
+            raise serializers.ValidationError({
+                "image_file": "Provide at least one of: image_file, image_id, or uploaded_url"
+            })
+
         return data
-
-    def validate_image(self, value):
-        if value and not value.name.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-            raise serializers.ValidationError("Only PNG, JPG, JPEG, or WEBP files are allowed.")
-        return value
-
-    def handle_uploaded_url(self, url):
-        """
-        Handle URL uploads by downloading and creating a FrameImage instance.
-        """
-        import requests
-        from io import BytesIO
-        from django.core.files.base import ContentFile
-        from urllib.parse import urlparse
-        import os
-
-        try:
-            # Download the image
-            response = requests.get(url, stream=True)
-            response.raise_for_status()
-            
-            # Get the filename from URL or generate one
-            filename = os.path.basename(urlparse(url).path)
-            if not filename:
-                filename = f"frame_{uuid.uuid4()}.jpg"
-            
-            # Create a FrameImage instance
-            frame_image = FrameImage()
-            
-            # Save the image to the FrameImage instance
-            img_data = BytesIO(response.content)
-            frame_image.image.save(filename, ContentFile(img_data.getvalue()), save=False)
-            frame_image.save()
-            
-            return frame_image
-            
-        except Exception as e:
-            raise serializers.ValidationError(f"Error processing image URL: {str(e)}")
 
     def create(self, validated_data):
         uploaded_url = validated_data.pop('uploaded_url', None)
-        image = validated_data.pop('image', None)
-        
-        if image:
-            # If image is provided directly (file upload)
-            frame_image = FrameImage(image=image)
+        image_file = validated_data.pop('image_file', None)
+        image_id = validated_data.pop('image_id', None)
+
+        # Set the image field using one of the provided methods
+        if image_file:
+            frame_image = FrameImage(image=image_file)
             frame_image.save()
             validated_data['image'] = frame_image
         elif uploaded_url:
-            # Handle URL upload
-            frame_image = self.handle_uploaded_url(uploaded_url)
-            validated_data['image'] = frame_image
-            
+            validated_data['image'] = self.handle_uploaded_url(uploaded_url)
+        elif image_id:
+            validated_data['image'] = image_id
+
         return super().create(validated_data)
-        
+
     def update(self, instance, validated_data):
         uploaded_url = validated_data.pop('uploaded_url', None)
-        image = validated_data.pop('image', None)
-        
-        if image:
-            # If image is provided directly (file upload)
-            frame_image = FrameImage(image=image)
+        image_file = validated_data.pop('image_file', None)
+        image_id = validated_data.pop('image_id', None)
+
+        # Optional image update
+        if image_file:
+            frame_image = FrameImage(image=image_file)
             frame_image.save()
             instance.image = frame_image
         elif uploaded_url:
-            # Handle URL upload
-            frame_image = self.handle_uploaded_url(uploaded_url)
-            instance.image = frame_image
-            
+            instance.image = self.handle_uploaded_url(uploaded_url)
+        elif image_id:
+            instance.image = image_id
+
         return super().update(instance, validated_data)
 
     def get_image_url(self, obj):
         if not obj.image:
             return None
-            
         try:
-            # Get the URL and remove any leading slashes to prevent double /media/
             relative_url = obj.image.image.url.lstrip('/')
             request = self.context.get('request')
-            
-            if request is not None:
+            if request:
                 return request.build_absolute_uri(f'/{relative_url}')
-            
-            # Try Django sites framework
-            try:
-                from django.contrib.sites.shortcuts import get_current_site
-                from django.conf import settings
-                
-                site = get_current_site(None)
-                scheme = 'https' if getattr(settings, 'SECURE_SSL_REDIRECT', False) else 'http'
-                base_url = f"{scheme}://{site.domain}"
-                return f"{base_url}/{relative_url}"
-                
-            except Exception:
-                # Fallback to environment variable or default
-                from dotenv import load_dotenv
-                import os
-                
-                load_dotenv()
-                base_url = os.getenv('SITE_URL', 'http://127.0.0.1:8000')
-                return f"{base_url.rstrip('/')}/{relative_url}"
-                
-        except (ValueError, AttributeError):
-            # If image doesn't have a file associated, return None
+            # fallback (optional)
+            from django.conf import settings
+            return f"{settings.SITE_URL.rstrip('/')}/{relative_url}"
+        except Exception:
             return None
+
+    def handle_uploaded_url(self, uploaded_url: str) -> FrameImage:
+        """
+        Download the file from the given URL and store it as a FrameImage.
+        """
+        import tempfile
+        import requests
+        from django.core.files import File
+        import os
+
+        response = requests.get(uploaded_url, stream=True)
+        if response.status_code != 200:
+            raise serializers.ValidationError({"uploaded_url": "Unable to fetch image from URL."})
+
+        filename = uploaded_url.split("/")[-1]
+        ext = os.path.splitext(filename)[-1].lower()
+        if ext not in [".jpg", ".jpeg", ".png", ".webp"]:
+            raise serializers.ValidationError({"uploaded_url": "Unsupported file format."})
+
+        with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
+            for chunk in response.iter_content(1024 * 1024):  # 1MB chunks
+                tmp_file.write(chunk)
+            tmp_file.flush()
+            django_file = File(tmp_file, name=filename)
+            frame_image = FrameImage(image=django_file)
+            frame_image.save()
+            return frame_image
+
+
 class FrameStockSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(),  # Ensures valid branch selection
