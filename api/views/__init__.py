@@ -55,3 +55,4 @@ from .order_report import FittingStatusReportView,MntOrderReportView
 from .user_order_report_view import GlassSenderReportView
 from .order_audit_view import OrderDeleteRefundListView,OrderAuditHistoryView,DailyOrderAuditReportView
 from .inventory_transfer import FrameTransferView
+from .frame_store__report import FrameHistoryReportView

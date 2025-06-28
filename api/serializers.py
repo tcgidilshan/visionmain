@@ -10,7 +10,7 @@ from .models import (
     LenseType,
     Coating,
     Lens,
-    LensStock,
+    LensStock,FrameStockHistory,
     Power,
     LensPower,LensCleaner,
     LensCleanerStock,Order,OrderItem,OrderPayment,Doctor,Patient,Schedule,Appointment,
@@ -109,6 +109,7 @@ class CodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Code
         fields = ['id', 'name', 'brand','brand_name']
+
 class FrameImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = FrameImage
@@ -247,6 +248,12 @@ class FrameStockSerializer(serializers.ModelSerializer):
     class Meta:
         model = FrameStock
         fields = ['id', 'frame', 'qty', 'initial_count','limit','branch_id','branch_name']
+
+
+class FrameStockHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FrameStockHistory
+        fields = ['id', 'frame', 'branch','transfer_to','action','quantity_changed','timestamp']
         
 class LenseTypeSerializer(serializers.ModelSerializer):
     class Meta:

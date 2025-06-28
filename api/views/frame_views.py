@@ -341,6 +341,9 @@ class FrameFilterView(APIView):
                 "image": frame.image.id,
                 "color_name": frame.color.name,
                 "price": str(frame.price),
+                "size": frame.size,
+                "species": frame.species,
+                "brand_type": frame.get_brand_type_display(),
                 "image_url": image_url,  # Use the URL from serializer
                 "is_active": frame.is_active,
                 "stock_qty": stock_qty,

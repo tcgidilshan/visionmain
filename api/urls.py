@@ -67,7 +67,8 @@ from .views import (
     DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView,
     SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
     GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView,MntOrderReportView,
-    ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView
+    ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
+    FrameHistoryReportView
 )
 # from .views import CustomAuthToken
 
@@ -260,5 +261,8 @@ urlpatterns = [
     path("arrival-status/bulk-create/", ArrivalStatusBulkCreateView.as_view(),
          name="arrival-status-bulk"),
     path("orders/audit-report/", DailyOrderAuditReportView.as_view(), name="daily-order-audit-report"),
+
+    #store report
+    path('report/frame-history/',FrameHistoryReportView.as_view(), name='report-frame-history'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
