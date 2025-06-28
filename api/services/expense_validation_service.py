@@ -32,7 +32,7 @@ class ExpenseValidationService:
         #     payment_method="cash" 
         #     ).aggregate(total=Sum('amount'))['total'] or 0
 
-        total_available = summary['cash_in_hand']
+        total_available = summary.get('cash_in_hand', 0) + summary.get('before_balance', 0)
         # 🔹 Sum of today's expenses
         total_expenses = Expense.objects.filter(
             branch_id=branch_id,
@@ -41,7 +41,7 @@ class ExpenseValidationService:
 
         if (total_expenses + amount) > total_available:
             raise ValidationError(
-                "🚫 Expense exceeds today's available income. "
+                "Expense exceeds available funds. "
                 f"Available: {total_available}, Attempted: {total_expenses + amount}"
             )
 
