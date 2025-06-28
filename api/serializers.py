@@ -251,10 +251,29 @@ class FrameStockSerializer(serializers.ModelSerializer):
 
 
 class FrameStockHistorySerializer(serializers.ModelSerializer):
+    frame_id = serializers.IntegerField(source='frame.id', read_only=True)
+    brand = serializers.CharField(source='frame.brand.name', read_only=True)
+    code = serializers.CharField(source='frame.code.name', read_only=True)
+    color = serializers.CharField(source='frame.color.name', read_only=True)
+    size = serializers.CharField(source='frame.size', read_only=True)
+    species = serializers.CharField(source='frame.species', read_only=True)
+    action = serializers.CharField()
+    quantity_changed = serializers.IntegerField()
+    
+    # Nested serializers for related objects
+    branch = BranchSerializer(read_only=True)
+    transfer_to = BranchSerializer(read_only=True)
+    
     class Meta:
         model = FrameStockHistory
-        fields = ['id', 'frame', 'branch','transfer_to','action','quantity_changed','timestamp']
-        
+        fields = [
+            'id', 
+            'frame_id', 'brand', 'code', 'color', 'size', 'species',
+            'action', 'quantity_changed', 'timestamp',
+            'branch', 'transfer_to'
+        ]
+
+
 class LenseTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = LenseType
