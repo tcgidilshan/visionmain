@@ -76,8 +76,10 @@ class FrameSaleReportView(generics.ListAPIView):
     serializer_class = FrameStockHistorySerializer
     
     def get_queryset(self):
-        from django.db.models import Sum, Q, F
-        from ..models import Frame, FrameStock
+        from django.db.models import Sum, Q, F, Count
+        from datetime import datetime
+        from django.utils import timezone
+        from ..models import Frame, FrameStock, Order, OrderItem
         
         # Get query parameters
         store_branch_id = self.request.query_params.get('store_branch_id')
@@ -88,16 +90,66 @@ class FrameSaleReportView(generics.ListAPIView):
         if not all([store_branch_id, branch_id, date_start, date_end]):
             return FrameStock.objects.none()
             
-        # Get all frames with their quantities in the specified store branch
-        store_stocks = FrameStock.objects.filter(
+        # Convert date strings to datetime objects
+        try:
+            start_date = datetime.strptime(date_start, '%Y-%m-%d').date()
+            end_date = datetime.strptime(date_end, '%Y-%m-%d').date()
+            # Add time to end_date to include the entire day
+            end_date = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
+        except (ValueError, TypeError):
+            return FrameStock.objects.none()
+            
+        # Get frame stock history up to the end date
+        from ..models import FrameStockHistory
+        
+        # Get all frame stock history up to the end date
+        stock_history = FrameStockHistory.objects.filter(
+            timestamp__lte=end_date
+        )
+        
+        # Calculate stock levels as of the end date for the store branch
+        store_stocks = stock_history.filter(
+            branch_id=store_branch_id
+        ).values('frame').annotate(
+            qty=Sum('quantity_changed')
+        )
+        
+        # Get frame details for the store branch
+        frame_details = FrameStock.objects.filter(
             branch_id=store_branch_id
         ).select_related('frame__brand', 'frame__code', 'frame__color')
         
-        # Get total quantities from all other branches
-        other_branches_stocks = FrameStock.objects.filter(
+        # Create a mapping of frame_id to frame details
+        frame_details_dict = {stock.frame.id: stock.frame for stock in frame_details}
+        
+        # Calculate stock levels for the current branch
+        current_branch_stocks = stock_history.filter(
+            branch_id=branch_id
+        ).values('frame').annotate(
+            current_branch_qty=Sum('quantity_changed')
+        )
+        current_branch_dict = {
+            item['frame']: max(0, item['current_branch_qty'])  # Ensure non-negative
+            for item in current_branch_stocks
+        }
+        
+        # Calculate stock levels for all other branches
+        other_branches_stocks = stock_history.filter(
             ~Q(branch_id=store_branch_id)
         ).values('frame').annotate(
-            total_other_qty=Sum('qty')
+            total_other_qty=Sum('quantity_changed')
+        )
+        
+        # Get sold quantities for each frame in the specified date range and branch
+        sold_quantities = OrderItem.objects.filter(
+            order__branch_id=branch_id,
+            order__order_date__date__range=(start_date, end_date),
+            frame__isnull=False,
+            is_deleted=False,
+            order__is_deleted=False,
+            order__is_refund=False
+        ).values('frame').annotate(
+            total_sold=Sum('quantity')
         )
         
         # Convert to dictionary for faster lookup
@@ -106,24 +158,40 @@ class FrameSaleReportView(generics.ListAPIView):
             for item in other_branches_stocks
         }
         
+        sold_quantities_dict = {
+            item['frame']: item['total_sold'] 
+            for item in sold_quantities if item['total_sold']
+        }
+        
         # Prepare the result
         result = []
         for stock in store_stocks:
-            frame = stock.frame
+            frame_id = stock['frame']
+            frame = frame_details_dict.get(frame_id)
+            if not frame:
+                continue
+                
+            qty = max(0, stock['qty'])  # Ensure non-negative
+            other_qty = max(0, other_branches_dict.get(frame_id, 0))
+            
             result.append({
-                'frame_id': frame.id,
+                'frame_id': frame_id,
                 'brand': frame.brand.name,
                 'code': frame.code.name,
                 'color': frame.color.name,
                 'size': frame.size,
                 'species': frame.species,
-                'store_branch_qty': stock.qty,
-                'other_branches_qty': other_branches_dict.get(frame.id, 0),
-                'total_qty': stock.qty + other_branches_dict.get(frame.id, 0)
+                'store_branch_qty': qty,
+                'current_branch_qty': current_branch_dict.get(frame_id, 0),
+                'other_branches_qty': other_qty,
+                'total_qty': qty + other_qty,
+                'sold_count': sold_quantities_dict.get(frame_id, 0),
+                'as_of_date': end_date.date().isoformat()
             })
             
         return result
     
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
-        return Response(queryset)  # Allow searching by frame ID and branch ID
+        return Response(queryset)
+git
