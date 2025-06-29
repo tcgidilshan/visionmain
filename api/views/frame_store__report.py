@@ -73,7 +73,57 @@ class FrameHistoryReportView(generics.ListAPIView):
         return Response(serializer.data)
 
 class FrameSaleReportView(generics.ListAPIView):
-    pagination_class = PaginationService
     serializer_class = FrameStockHistorySerializer
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['frame__id', 'branch__id']  # Allow searching by frame ID and branch ID
+    
+    def get_queryset(self):
+        from django.db.models import Sum, Q, F
+        from ..models import Frame, FrameStock
+        
+        # Get query parameters
+        store_branch_id = self.request.query_params.get('store_branch_id')
+        date_start = self.request.query_params.get('date_start')
+        date_end = self.request.query_params.get('date_end')
+        branch_id = self.request.query_params.get('branch_id')
+        
+        if not all([store_branch_id, branch_id, date_start, date_end]):
+            return FrameStock.objects.none()
+            
+        # Get all frames with their quantities in the specified store branch
+        store_stocks = FrameStock.objects.filter(
+            branch_id=store_branch_id
+        ).select_related('frame__brand', 'frame__code', 'frame__color')
+        
+        # Get total quantities from all other branches
+        other_branches_stocks = FrameStock.objects.filter(
+            ~Q(branch_id=store_branch_id)
+        ).values('frame').annotate(
+            total_other_qty=Sum('qty')
+        )
+        
+        # Convert to dictionary for faster lookup
+        other_branches_dict = {
+            item['frame']: item['total_other_qty'] 
+            for item in other_branches_stocks
+        }
+        
+        # Prepare the result
+        result = []
+        for stock in store_stocks:
+            frame = stock.frame
+            result.append({
+                'frame_id': frame.id,
+                'brand': frame.brand.name,
+                'code': frame.code.name,
+                'color': frame.color.name,
+                'size': frame.size,
+                'species': frame.species,
+                'store_branch_qty': stock.qty,
+                'other_branches_qty': other_branches_dict.get(frame.id, 0),
+                'total_qty': stock.qty + other_branches_dict.get(frame.id, 0)
+            })
+            
+        return result
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        return Response(queryset)  # Allow searching by frame ID and branch ID
