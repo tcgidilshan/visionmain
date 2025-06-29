@@ -68,7 +68,7 @@ from .views import (
     SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
     GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView,MntOrderReportView,
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
-    FrameHistoryReportView
+    FrameHistoryReportView,FrameSaleReportView
 )
 # from .views import CustomAuthToken
 
@@ -264,5 +264,7 @@ urlpatterns = [
 
     #store report
     path('report/frame-history/',FrameHistoryReportView.as_view(), name='report-frame-history'),
+    #sale report
+    path('report/frame-sale/',FrameSaleReportView.as_view(), name='report-frame-sale'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),

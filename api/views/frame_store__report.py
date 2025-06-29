@@ -71,3 +71,9 @@ class FrameHistoryReportView(generics.ListAPIView):
         
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+class FrameSaleReportView(generics.ListAPIView):
+    pagination_class = PaginationService
+    serializer_class = FrameStockHistorySerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['frame__id', 'branch__id']  # Allow searching by frame ID and branch ID
