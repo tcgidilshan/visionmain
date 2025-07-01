@@ -139,14 +139,14 @@ class FrameSaleReportView(generics.ListAPIView):
             total_other_qty=Sum('quantity_changed')
         )
         
-        # Get sold quantities for each frame in the specified date range across all branches
+        # Get sold quantities for each frame per branch in the specified date range
         sold_quantities = OrderItem.objects.filter(
             order__order_date__date__range=(start_date, end_date),
             frame__isnull=False,
             is_deleted=False,
             order__is_deleted=False,
             order__is_refund=False
-        ).values('frame').annotate(
+        ).values('frame', 'order__branch').annotate(
             total_sold=Sum('quantity')
         )
         
@@ -156,10 +156,15 @@ class FrameSaleReportView(generics.ListAPIView):
             for item in other_branches_stocks
         }
         
-        sold_quantities_dict = {
-            item['frame']: item['total_sold'] 
-            for item in sold_quantities if item['total_sold']
-        }
+        # Create a dictionary to store sold quantities per frame and branch
+        sold_quantities_dict = {}
+        for item in sold_quantities:
+            if item['total_sold']:
+                frame_id = str(item['frame'])  # Ensure frame_id is string for consistent lookup
+                branch_id = int(item['order__branch'])  # Convert branch_id to int for consistent comparison
+                if frame_id not in sold_quantities_dict:
+                    sold_quantities_dict[frame_id] = {}
+                sold_quantities_dict[frame_id][branch_id] = item['total_sold']
         
         # Get all branches and their stock for each frame
         from ..models import Branch
@@ -255,12 +260,13 @@ class FrameSaleReportView(generics.ListAPIView):
                 if current_stock:
                     current_qty = current_stock.qty
                 
-                # Initialize branch data with current stock
+                # Initialize branch data with current stock and sold quantity
                 branch_data = {
                     'branch_id': branch_id,
                     'branch_name': branch_name,
                     'stock_count': max(0, current_qty),  # Current stock count in the branch
                     'stock_received': 0,  # Total received from store
+                    'sold_qty': sold_quantities_dict.get(str(frame_id), {}).get(int(branch_id), 0),  # Sold in date range
                 }
                 
                 # Update with received from store count if exists
