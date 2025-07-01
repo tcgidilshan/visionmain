@@ -1,7 +1,7 @@
 from rest_framework import generics, filters
 from rest_framework.response import Response
 from django.db import models
-from ..models import FrameStockHistory, Frame
+from ..models import FrameStockHistory, FrameStock
 from ..serializers import FrameStockHistorySerializer
 from ..services.pagination_service import PaginationService
 
@@ -85,9 +85,8 @@ class FrameSaleReportView(generics.ListAPIView):
         store_branch_id = self.request.query_params.get('store_branch_id')
         date_start = self.request.query_params.get('date_start')
         date_end = self.request.query_params.get('date_end')
-        branch_id = self.request.query_params.get('branch_id')
         
-        if not all([store_branch_id, branch_id, date_start, date_end]):
+        if not all([store_branch_id, date_start, date_end]):
             return FrameStock.objects.none()
             
         # Convert date strings to datetime objects
@@ -122,9 +121,9 @@ class FrameSaleReportView(generics.ListAPIView):
         # Create a mapping of frame_id to frame details
         frame_details_dict = {stock.frame.id: stock.frame for stock in frame_details}
         
-        # Calculate stock levels for the current branch
+        # Calculate stock levels for the store branch
         current_branch_stocks = stock_history.filter(
-            branch_id=branch_id
+            branch_id=store_branch_id
         ).values('frame').annotate(
             current_branch_qty=Sum('quantity_changed')
         )
@@ -140,9 +139,8 @@ class FrameSaleReportView(generics.ListAPIView):
             total_other_qty=Sum('quantity_changed')
         )
         
-        # Get sold quantities for each frame in the specified date range and branch
+        # Get sold quantities for each frame in the specified date range across all branches
         sold_quantities = OrderItem.objects.filter(
-            order__branch_id=branch_id,
             order__order_date__date__range=(start_date, end_date),
             frame__isnull=False,
             is_deleted=False,
@@ -163,6 +161,57 @@ class FrameSaleReportView(generics.ListAPIView):
             for item in sold_quantities if item['total_sold']
         }
         
+        # Get all branches and their stock for each frame
+        from ..models import Branch
+        
+        # Get all branches except the store branch
+        all_branches = Branch.objects.exclude(id=store_branch_id)
+        
+        # Get stock quantities for each branch for each frame
+        branch_stocks = {}
+        # Get transfer counts from store branch to each branch for each frame
+        branch_transfers = {}
+        
+        for branch in all_branches:
+            # Current stock in branch
+            branch_stock = stock_history.filter(
+                branch_id=branch.id
+            ).values('frame').annotate(
+                qty=Sum('quantity_changed')
+            )
+            
+            # Count of frames received from store branch
+            received_from_store = FrameStockHistory.objects.filter(
+                branch_id=store_branch_id,
+                transfer_to=branch,
+                action='transfer',
+                timestamp__lte=end_date
+            ).values('frame').annotate(
+                received_count=Sum('quantity_changed')
+            )
+            
+            # Store the received counts
+            for item in received_from_store:
+                frame_id = item['frame']
+                if frame_id not in branch_transfers:
+                    branch_transfers[frame_id] = []
+                branch_transfers[frame_id].append({
+                    'branch_id': branch.id,
+                    'branch_name': branch.branch_name,
+                    'received_from_store': item['received_count'] or 0
+                })
+            
+            # Store the current stock
+            for item in branch_stock:
+                frame_id = item['frame']
+                if frame_id not in branch_stocks:
+                    branch_stocks[frame_id] = []
+                branch_stocks[frame_id].append({
+                    'branch_id': branch.id,
+                    'branch_name': branch.branch_name,
+                    'qty': max(0, item['qty'])  # Ensure non-negative
+                })
+        
         # Prepare the result
         result = []
         for stock in store_stocks:
@@ -174,6 +223,56 @@ class FrameSaleReportView(generics.ListAPIView):
             qty = max(0, stock['qty'])  # Ensure non-negative
             other_qty = max(0, other_branches_dict.get(frame_id, 0))
             
+            # Get current stock from FrameStock for all branches for this fram
+            frame_branches = []
+            
+            # Get all branches that have this frame in stock
+            current_stocks = FrameStock.objects.filter(
+                frame_id=frame_id
+            ).select_related('branch')
+            
+            # Get all branches that received this frame from store (even if they have no current stock)
+            all_relevant_branches = set()
+            
+            # Add branches that have current stock
+            for stock in current_stocks:
+                all_relevant_branches.add((stock.branch.id, stock.branch.branch_name))
+            
+            # Add branches that received frames from store (even if they have no current stock)
+            if frame_id in branch_transfers:
+                for transfer in branch_transfers[frame_id]:
+                    all_relevant_branches.add((transfer['branch_id'], transfer['branch_name']))
+            
+            # Create the branches array with complete information
+            for branch_id, branch_name in all_relevant_branches:
+                # Get current stock for this branch
+                current_qty = 0
+                current_stock = FrameStock.objects.filter(
+                    frame_id=frame_id,
+                    branch_id=branch_id
+                ).first()
+                
+                if current_stock:
+                    current_qty = current_stock.qty
+                
+                # Initialize branch data with current stock
+                branch_data = {
+                    'branch_id': branch_id,
+                    'branch_name': branch_name,
+                    'stock_count': max(0, current_qty),  # Current stock count in the branch
+                    'stock_received': 0,  # Total received from store
+                }
+                
+                # Update with received from store count if exists
+                if frame_id in branch_transfers:
+                    for transfer in branch_transfers[frame_id]:
+                        if transfer['branch_id'] == branch_id:
+                            received_qty = transfer['received_from_store']
+                            branch_data['stock_received'] = received_qty
+                            break
+                
+                frame_branches.append(branch_data)
+            
             result.append({
                 'frame_id': frame_id,
                 'brand': frame.brand.name,
@@ -182,11 +281,12 @@ class FrameSaleReportView(generics.ListAPIView):
                 'size': frame.size,
                 'species': frame.species,
                 'store_branch_qty': qty,
-                'current_branch_qty': current_branch_dict.get(frame_id, 0),
+                'store_branch_qty': current_branch_dict.get(frame_id, 0),
                 'other_branches_qty': other_qty,
                 'total_qty': qty + other_qty,
                 'sold_count': sold_quantities_dict.get(frame_id, 0),
-                'as_of_date': end_date.date().isoformat()
+                'as_of_date': end_date.date().isoformat(),
+                'branches': frame_branches  # Includes branch_id, branch_name, qty, and received_from_store
             })
             
         return result
