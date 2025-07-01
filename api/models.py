@@ -937,7 +937,8 @@ class Appointment(models.Model):
             for _ in range(5):  # retry up to 5 times
                 try:
                     with transaction.atomic():
-                        max_id = Appointment.objects.select_for_update().filter(
+                        # Use all_objects to include soft-deleted records
+                        max_id = Appointment.all_objects.select_for_update().filter(
                             branch=self.branch
                         ).aggregate(Max('invoice_number'))['invoice_number__max']
                         self.invoice_number = (max_id or 0) + 1

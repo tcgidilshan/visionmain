@@ -326,6 +326,7 @@ class FrameFilterView(APIView):
                     "code_name": code_name,
                     "size": frame.size,
                     "species": frame.species,
+                    "image_url": image_url,
                     "total_qty": 0,
                     "color_ids": set(),
                     "frames": []
@@ -362,6 +363,7 @@ class FrameFilterView(APIView):
                 "brand_name": group["brand_name"],
                 "code_name": group["code_name"],
                 "size": group["size"],
+                "image_url": group["image_url"],
                 "species": group["species"],
                 "total_color": len(group["color_ids"]),
                 "total_qty": group["total_qty"],

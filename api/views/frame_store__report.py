@@ -194,4 +194,3 @@ class FrameSaleReportView(generics.ListAPIView):
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         return Response(queryset)
-git
