@@ -1,9 +1,12 @@
 from rest_framework import generics, filters
 from rest_framework.response import Response
 from django.db import models
-from ..models import FrameStockHistory, FrameStock
+from ..models import FrameStockHistory, FrameStock,OrderItem
 from ..serializers import FrameStockHistorySerializer
 from ..services.pagination_service import PaginationService
+from django.db.models import Sum, Q, F, Count
+from datetime import datetime
+from django.utils import timezone
 
 class FrameHistoryReportView(generics.ListAPIView):
     pagination_class = PaginationService
@@ -76,10 +79,7 @@ class FrameSaleReportView(generics.ListAPIView):
     serializer_class = FrameStockHistorySerializer
     
     def get_queryset(self):
-        from django.db.models import Sum, Q, F, Count
-        from datetime import datetime
-        from django.utils import timezone
-        from ..models import Frame, FrameStock, Order, OrderItem
+     
         
         # Get query parameters
         store_branch_id = self.request.query_params.get('store_branch_id')
@@ -98,12 +98,18 @@ class FrameSaleReportView(generics.ListAPIView):
         except (ValueError, TypeError):
             return FrameStock.objects.none()
             
-        # Get frame stock history up to the end date
+        # First, get all frames that exist in the store branch
+        store_frames = FrameStock.objects.filter(
+            branch_id=store_branch_id
+        ).select_related('frame__brand', 'frame__code', 'frame__color')
+        
+        # Get frame stock history up to the end date for these frames
         from ..models import FrameStockHistory
         
-        # Get all frame stock history up to the end date
+        # Get all frame stock history up to the end date for frames in the store
         stock_history = FrameStockHistory.objects.filter(
-            timestamp__lte=end_date
+            timestamp__lte=end_date,
+            frame_id__in=[f.frame_id for f in store_frames]
         )
         
         # Calculate stock levels as of the end date for the store branch
@@ -113,13 +119,10 @@ class FrameSaleReportView(generics.ListAPIView):
             qty=Sum('quantity_changed')
         )
         
-        # Get frame details for the store branch
-        frame_details = FrameStock.objects.filter(
-            branch_id=store_branch_id
-        ).select_related('frame__brand', 'frame__code', 'frame__color')
+        # Create a mapping of frame_id to frame details for frames in the store
+        frame_details_dict = {stock.frame.id: stock.frame for stock in store_frames if hasattr(stock, 'frame')}
         
-        # Create a mapping of frame_id to frame details
-        frame_details_dict = {stock.frame.id: stock.frame for stock in frame_details}
+        # frame_details_dict is already created above
         
         # Calculate stock levels for the store branch
         current_branch_stocks = stock_history.filter(
@@ -185,26 +188,43 @@ class FrameSaleReportView(generics.ListAPIView):
                 qty=Sum('quantity_changed')
             )
             
-            # Count of frames received from store branch
-            received_from_store = FrameStockHistory.objects.filter(
-                branch_id=store_branch_id,
+            # Count of frames received from any branch (including store branch)
+            received_transfers = FrameStockHistory.objects.filter(
                 transfer_to=branch,
                 action='transfer',
                 timestamp__lte=end_date
-            ).values('frame').annotate(
+            ).values('frame', 'branch').annotate(
                 received_count=Sum('quantity_changed')
             )
             
-            # Store the received counts
-            for item in received_from_store:
+            # Store the received transfers
+            for item in received_transfers:
                 frame_id = item['frame']
+                from_branch_id = item['branch']
+                
                 if frame_id not in branch_transfers:
                     branch_transfers[frame_id] = []
-                branch_transfers[frame_id].append({
-                    'branch_id': branch.id,
-                    'branch_name': branch.branch_name,
-                    'received_from_store': item['received_count'] or 0
-                })
+                
+                # Find or create branch entry
+                branch_entry = next((x for x in branch_transfers[frame_id] 
+                                  if x['branch_id'] == branch.id), None)
+                
+                if not branch_entry:
+                    branch_entry = {
+                        'branch_id': branch.id,
+                        'branch_name': branch.branch_name,
+                        'received_from_store': 0,
+                        'received_from_other': 0
+                    }
+                    branch_transfers[frame_id].append(branch_entry)
+                
+                # Track if transfer is from store or another branch
+                if from_branch_id == int(store_branch_id):
+                    branch_entry['received_from_store'] = (branch_entry.get('received_from_store', 0) + 
+                                                         (item['received_count'] or 0))
+                else:
+                    branch_entry['received_from_other'] = (branch_entry.get('received_from_other', 0) + 
+                                                         (item['received_count'] or 0))
             
             # Store the current stock
             for item in branch_stock:
@@ -266,15 +286,16 @@ class FrameSaleReportView(generics.ListAPIView):
                     'branch_name': branch_name,
                     'stock_count': max(0, current_qty),  # Current stock count in the branch
                     'stock_received': 0,  # Total received from store
+                    'received_from_other': 0,  # Total received from other branches
                     'sold_qty': sold_quantities_dict.get(str(frame_id), {}).get(int(branch_id), 0),  # Sold in date range
                 }
                 
-                # Update with received from store count if exists
+                # Update with received transfers if they exist
                 if frame_id in branch_transfers:
                     for transfer in branch_transfers[frame_id]:
                         if transfer['branch_id'] == branch_id:
-                            received_qty = transfer['received_from_store']
-                            branch_data['stock_received'] = received_qty
+                            branch_data['stock_received'] = transfer.get('received_from_store', 0)
+                            branch_data['received_from_other'] = transfer.get('received_from_other', 0)
                             break
                 
                 frame_branches.append(branch_data)
