@@ -131,7 +131,16 @@ class FrameListCreateView(generics.ListCreateAPIView):
             
             stock_serializer = FrameStockSerializer(data=stock_item)
             stock_serializer.is_valid(raise_exception=True)
-            stock_entries.append(stock_serializer.save())
+            stock_entry = stock_serializer.save()
+            stock_entries.append(stock_entry)
+            
+            # Create FrameStockHistory entry for the initial stock addition
+            FrameStockHistory.objects.create(
+                frame=frame,
+                branch=stock_entry.branch,
+                action=FrameStockHistory.ADD,
+                quantity_changed=stock_entry.qty
+            )
 
         # Prepare response
         response_data = frame_serializer.data
