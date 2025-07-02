@@ -30,27 +30,23 @@ class FrameListCreateView(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         """
         List frames with optional filters:
-        - status: active|inactive|all
-        - init_branch_id: filter by initial branch
-        - branch_id: filter stock by branch
+        - status: active|inactive|all - Filter frames by active status
+        - init_branch_id - Filter by initial branch
+        
+        Required parameters (one of):
+        - branch_id - Return ALL frames, but only include stock data for this branch
+        - store_id - Return ONLY frames that have stock in this branch, with their stock data
         """
         status_filter = request.query_params.get("status", "active").lower()
         branch_id = request.query_params.get("branch_id")
+        store_id = request.query_params.get("store_id")
         
-        if not branch_id:
+        if not (branch_id or store_id):
             return Response(
-                {"error": "branch_id parameter is required"},
+                {"error": "Either branch_id or store_id parameter is required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
             
-        try:
-            branch = Branch.objects.get(id=branch_id)
-        except Branch.DoesNotExist:
-            return Response(
-                {"error": "Branch not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
         frames = self.get_queryset()
         
         # Apply status filter if provided
@@ -65,14 +61,30 @@ class FrameListCreateView(generics.ListCreateAPIView):
             )
 
         data = []
-        for frame in frames:
-            stocks = frame.stocks.filter(branch_id=branch.id)  # Get all stock entries for this frame
-            stock_data = FrameStockSerializer(stocks, many=True).data  # Ensure many=True
-
-            frame_data = FrameSerializer(frame).data
-            frame_data["stock"] = stock_data  # Store all stock records as a list
-
-            data.append(frame_data)
+        
+        if store_id:
+            # STORE_ID MODE: Only return frames that have stock in the specified branch
+            # and only include stock data for that branch
+            frame_ids_with_stock = FrameStock.objects.filter(
+                branch_id=store_id,
+                qty__gt=0  # Only include frames with positive quantity
+            ).values_list('frame_id', flat=True).distinct()
+            
+            frames = frames.filter(id__in=frame_ids_with_stock)
+            
+            for frame in frames:
+                stocks = frame.stocks.filter(branch_id=store_id, qty__gt=0)
+                frame_data = FrameSerializer(frame).data
+                frame_data["stock"] = FrameStockSerializer(stocks, many=True).data
+                data.append(frame_data)
+                
+        elif branch_id:
+            # BRANCH_ID MODE: Return ALL frames, but only include stock data for the specified branch
+            for frame in frames:
+                stocks = frame.stocks.filter(branch_id=branch_id)
+                frame_data = FrameSerializer(frame).data
+                frame_data["stock"] = FrameStockSerializer(stocks, many=True).data
+                data.append(frame_data)
 
         return Response(data, status=status.HTTP_200_OK)
 
