@@ -273,6 +273,28 @@ class FrameSaleReportView(generics.ListAPIView):
         print(f"DEBUG: Found {len(frames_with_sales)} frames with sales data")
         print(f"DEBUG: Frames with sales: {frames_with_sales}")
         
+        # Get removed quantities for each frame and branch in the date range
+        removed_quantities = FrameStockHistory.objects.filter(
+            action='remove',
+            timestamp__range=(start_date, end_date)
+        ).values(
+            'frame',
+            'branch'
+        ).annotate(
+            total_removed=Sum('quantity_changed')
+        )
+        
+        # Convert to a nested dictionary: {frame_id: {branch_id: removed_count}}
+        removed_quantities_dict = {}
+        for item in removed_quantities:
+            frame_id = str(item['frame'])
+            branch_id = item['branch']
+            if frame_id not in removed_quantities_dict:
+                removed_quantities_dict[frame_id] = {}
+            removed_quantities_dict[frame_id][branch_id] = abs(item['total_removed'])  # Take absolute value since removed quantities are negative
+        
+        print(f"DEBUG: Removed quantities: {removed_quantities_dict}")
+        
         # Get all branches and their stock for each frame
   
         
@@ -335,7 +357,7 @@ class FrameSaleReportView(generics.ListAPIView):
             qty = max(0, stock['qty'])  # Ensure non-negative
             other_qty = max(0, other_branches_dict.get(frame_id, 0))
             
-            # Get current stock from FrameStock for all branches for this fram
+            # Get current stock from FrameStock for all branches for this frame
             frame_branches = []
             
             # Get all branches that have this frame in stock
@@ -378,14 +400,19 @@ class FrameSaleReportView(generics.ListAPIView):
                     all_stock = FrameStock.objects.filter(frame_id=frame_id).values('branch_id', 'qty')
                     print(f"    - All stock records for frame {frame_id}: {list(all_stock)}")
                     
-                # Initialize branch data with current stock and sold quantity
+                # Initialize branch data with current stock, sold and removed quantities
                 branch_data = {
                     'branch_id': branch_id,
                     'branch_name': branch_name,
                     'stock_count': max(0, current_qty),  # Current stock count in the branch
                     'stock_received': 0,  # Total received from store
+                    'stock_removed': 0,  # Total removed from store
                     'sold_qty': sold_quantities_dict.get(str(frame_id), {}).get(int(branch_id), 0),  # Sold in date range
                 }
+                
+                # Set removed quantity if exists
+                if str(frame_id) in removed_quantities_dict and branch_id in removed_quantities_dict[str(frame_id)]:
+                    branch_data['stock_removed'] = removed_quantities_dict[str(frame_id)][branch_id]
                 
                 # Update with received from store count if exists
                 if frame_id in branch_transfers:
@@ -393,6 +420,7 @@ class FrameSaleReportView(generics.ListAPIView):
                         if transfer['branch_id'] == branch_id:
                             received_qty = transfer['received_from_store']
                             branch_data['stock_received'] = received_qty
+                            
                             break
                 
                 frame_branches.append(branch_data)
