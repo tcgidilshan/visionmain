@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from ..models import FrameStockHistory, FrameStock,OrderItem,Branch
 from ..serializers import FrameStockHistorySerializer
 from ..services.pagination_service import PaginationService
-from django.db.models import Sum, Q 
+from django.db.models import Sum, Q, Min, Max
 from datetime import datetime
 from django.utils import timezone
 
@@ -80,24 +80,34 @@ class FrameSaleReportView(generics.ListAPIView):
     def get_queryset(self):
        
         # Get query parameters
-        branch_id = self.request.query_params.get('branch_id')
         store_id = self.request.query_params.get('store_id')
         date_start = self.request.query_params.get('date_start')
         date_end = self.request.query_params.get('date_end')
         
-        if not branch_id and not store_id:
+        if not store_id:
             return FrameStock.objects.none()
             
-        # Use store_id if provided, otherwise use branch_id
-        store_branch_id = store_id if store_id else branch_id
+        store_branch_id = store_id
             
-        # Convert date strings to datetime objects
+        # Convert date strings to datetime objects with proper timezone handling
         try:
-            start_date = datetime.strptime(date_start, '%Y-%m-%d').date()
-            end_date = datetime.strptime(date_end, '%Y-%m-%d').date()
-            # Add time to end_date to include the entire day
-            end_date = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
-        except (ValueError, TypeError):
+            # Parse dates as naive datetimes first
+            start_date = datetime.strptime(date_start, '%Y-%m-%d')
+            end_date = datetime.strptime(date_end, '%Y-%m-%d')
+            
+            # Make end_date include the entire day
+            end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            
+            # Make timezone aware if needed
+            if timezone.is_naive(start_date):
+                start_date = timezone.make_aware(start_date)
+            if timezone.is_naive(end_date):
+                end_date = timezone.make_aware(end_date)
+                
+            print(f"DEBUG: Parsed date range - Start: {start_date}, End: {end_date}")
+                
+        except (ValueError, TypeError) as e:
+            print(f"ERROR: Invalid date format - {e}")
             return FrameStock.objects.none()
             
         # Get frame stock history up to the end date
@@ -106,38 +116,25 @@ class FrameSaleReportView(generics.ListAPIView):
             timestamp__lte=end_date
         )
         
-        # Get frame stock history up to the end date for the branch
-        if store_id:
-            # STORE_ID MODE: Only include frames that have stock in the specified branch
-            frame_ids_with_stock = FrameStock.objects.filter(
-                branch_id=store_branch_id,
-                qty__gt=0
-            ).values_list('frame_id', flat=True).distinct()
-            
-            store_stocks = stock_history.filter(
-                branch_id=store_branch_id,
-                frame_id__in=frame_ids_with_stock
-            ).values('frame').annotate(
-                qty=Sum('quantity_changed')
-            )
-            
-            # Get frame details for the store branch with positive stock
-            frame_details = FrameStock.objects.filter(
-                branch_id=store_branch_id,
-                qty__gt=0
-            ).select_related('frame__brand', 'frame__code', 'frame__color')
-        else:
-            # BRANCH_ID MODE: Include all frames, but only show data for the specified branch
-            store_stocks = stock_history.filter(
-                branch_id=store_branch_id
-            ).values('frame').annotate(
-                qty=Sum('quantity_changed')
-            )
-            
-            # Get all frame details for the branch (including zero stock)
-            frame_details = FrameStock.objects.filter(
-                branch_id=store_branch_id
-            ).select_related('frame__brand', 'frame__code', 'frame__color')
+        # Get frame stock history up to the end date for the store
+        # Only include frames that have stock in the specified store
+        frame_ids_with_stock = FrameStock.objects.filter(
+            branch_id=store_branch_id,
+            qty__gt=0
+        ).values_list('frame_id', flat=True).distinct()
+        
+        store_stocks = stock_history.filter(
+            branch_id=store_branch_id,
+            frame_id__in=frame_ids_with_stock
+        ).values('frame').annotate(
+            qty=Sum('quantity_changed')
+        )
+        
+        # Get frame details for the store with positive stock
+        frame_details = FrameStock.objects.filter(
+            branch_id=store_branch_id,
+            qty__gt=0
+        ).select_related('frame__brand', 'frame__code', 'frame__color')
         
         # Create a mapping of frame_id to frame details
         frame_details_dict = {stock.frame.id: stock.frame for stock in frame_details}
@@ -161,8 +158,39 @@ class FrameSaleReportView(generics.ListAPIView):
         )
         
         # Get sold quantities for each frame per branch in the specified date range
+        print(f"\n=== DEBUG: Fetching sold quantities from {start_date} to {end_date} for store: {store_branch_id}")
+        
+        # Debug: Print the exact query being executed
+        print(f"DEBUG: Sales query date range: {start_date} to {end_date}")
+        
+        # Debug: Check if there are any OrderItems at all
+        total_order_items = OrderItem.objects.filter(frame__isnull=False).count()
+        print(f"DEBUG: Total OrderItems with frames: {total_order_items}")
+        
+        # Debug: Check if there are any OrderItems in the date range
+        date_range_items = OrderItem.objects.filter(
+            order__order_date__gte=start_date,
+            order__order_date__lte=end_date,
+            frame__isnull=False
+        ).count()
+        print(f"DEBUG: OrderItems in date range: {date_range_items}")
+        
+        # Debug: Print the actual date range of orders in the system
+        date_range = OrderItem.objects.filter(
+            frame__isnull=False
+        ).aggregate(
+            min_date=Min('order__order_date'),
+            max_date=Max('order__order_date')
+        )
+        print(f"DEBUG: System order date range: {date_range['min_date']} to {date_range['max_date']}")
+        
+        # Debug: Check the actual query being executed
+        print(f"DEBUG: Querying sales from {start_date} to {end_date}")
+        
+        # Use direct datetime comparison instead of __date__range to avoid timezone issues
         sold_quantities = OrderItem.objects.filter(
-            order__order_date__date__range=(start_date, end_date),
+            order__order_date__gte=start_date,
+            order__order_date__lte=end_date,
             frame__isnull=False,
             is_deleted=False,
             order__is_deleted=False,
@@ -171,13 +199,31 @@ class FrameSaleReportView(generics.ListAPIView):
             total_sold=Sum('quantity')
         )
         
-        # Convert to dictionary for faster lookup
-        other_branches_dict = {
-            item['frame']: item['total_other_qty'] 
-            for item in other_branches_stocks
-        }
+        # Debug: Print the raw SQL query
+        print(f"DEBUG: Raw SQL Query: {sold_quantities.query}")
         
-        # Create a dictionary to store sold quantities per frame and branch
+        results = list(sold_quantities)
+        print(f"DEBUG: Raw sold quantities query results: {results}")
+        
+        # Debug: Print sample order dates to verify the range
+        if not results:
+            print("\n=== DEBUG: No sales found in the specified date range. Checking for any sales data...")
+            sample_sales = OrderItem.objects.filter(
+                frame__isnull=False,
+                is_deleted=False,
+                order__is_deleted=False,
+                order__is_refund=False
+            ).select_related('order').order_by('-order__order_date')[:5]
+            
+            if sample_sales.exists():
+                print("DEBUG: Sample of recent sales (most recent first):")
+                for item in sample_sales:
+                    print(f"  - Order {item.order.id} on {item.order.order_date}: "
+                          f"Frame {item.frame_id}, Qty: {item.quantity}")
+            else:
+                print("DEBUG: No sales records found in the system at all.")
+        
+        # Convert to dictionary for faster lookup
         sold_quantities_dict = {}
         for item in sold_quantities:
             if item['total_sold']:
@@ -186,6 +232,31 @@ class FrameSaleReportView(generics.ListAPIView):
                 if frame_id not in sold_quantities_dict:
                     sold_quantities_dict[frame_id] = {}
                 sold_quantities_dict[frame_id][branch_id] = item['total_sold']
+        
+        # Calculate other branches quantity
+        other_branches_stocks = stock_history.filter(
+            ~Q(branch_id=store_branch_id)
+        ).values('frame').annotate(
+            total_other_qty=Sum('quantity_changed')
+        )
+        
+        other_branches_dict = {
+            item['frame']: item['total_other_qty'] 
+            for item in other_branches_stocks
+        }
+        
+        print(f"DEBUG: Processed sold_quantities_dict: {sold_quantities_dict}")
+        print(f"DEBUG: other_branches_dict: {other_branches_dict}")
+        print(f"DEBUG: Total frames with sales: {len(sold_quantities_dict)}")
+        
+        # Debug: Print frame_ids we're processing
+        frame_ids = list(frame_details_dict.keys())
+        print(f"DEBUG: Processing {len(frame_ids)} frames. First 5 frame IDs: {frame_ids[:5]}")
+        
+        # Debug: Check if any frame has sales
+        frames_with_sales = [fid for fid in frame_ids if str(fid) in sold_quantities_dict]
+        print(f"DEBUG: Found {len(frames_with_sales)} frames with sales data")
+        print(f"DEBUG: Frames with sales: {frames_with_sales}")
         
         # Get all branches and their stock for each frame
   
@@ -311,7 +382,8 @@ class FrameSaleReportView(generics.ListAPIView):
                 'store_branch_qty': current_branch_dict.get(frame_id, 0),
                 'other_branches_qty': other_qty,
                 'total_qty': qty + other_qty,
-                'sold_count': sold_quantities_dict.get(frame_id, 0),
+                'sold_count': sum(sold_quantities_dict.get(str(frame_id), {}).values()) if str(frame_id) in sold_quantities_dict else 0,
+                'debug_sold_data': sold_quantities_dict.get(str(frame_id), "No sales data"),
                 'as_of_date': end_date.date().isoformat(),
                 'branches': frame_branches  # Includes branch_id, branch_name, qty, and received_from_store
             })
