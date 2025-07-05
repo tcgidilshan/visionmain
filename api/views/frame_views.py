@@ -11,6 +11,7 @@ from django.db.models import Sum
 from collections import defaultdict
 from django.db.models import Prefetch
 # List and Create Frames (with stock)
+
 class FrameListCreateView(generics.ListCreateAPIView):
     queryset = Frame.objects.all()
     serializer_class = FrameSerializer

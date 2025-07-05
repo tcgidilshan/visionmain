@@ -1,9 +1,11 @@
 from rest_framework import generics, filters
 from rest_framework.response import Response
-from django.db import models
-from ..models import FrameStockHistory, FrameStock
+from ..models import FrameStockHistory, FrameStock,OrderItem,Branch
 from ..serializers import FrameStockHistorySerializer
 from ..services.pagination_service import PaginationService
+from django.db.models import Sum, Q 
+from datetime import datetime
+from django.utils import timezone
 
 class FrameHistoryReportView(generics.ListAPIView):
     pagination_class = PaginationService
@@ -33,8 +35,8 @@ class FrameHistoryReportView(generics.ListAPIView):
         if branch_id:
             # Include records where branch is either source (branch_id) or destination (transfer_to_id)
             queryset = queryset.filter(
-                models.Q(branch_id=branch_id) | 
-                models.Q(transfer_to_id=branch_id)
+                Q(branch_id=branch_id) | 
+                Q(transfer_to_id=branch_id)
             )
             
         if action:
@@ -76,18 +78,18 @@ class FrameSaleReportView(generics.ListAPIView):
     serializer_class = FrameStockHistorySerializer
     
     def get_queryset(self):
-        from django.db.models import Sum, Q, F, Count
-        from datetime import datetime
-        from django.utils import timezone
-        from ..models import Frame, FrameStock, Order, OrderItem
-        
+       
         # Get query parameters
-        store_branch_id = self.request.query_params.get('store_branch_id')
+        branch_id = self.request.query_params.get('branch_id')
+        store_id = self.request.query_params.get('store_id')
         date_start = self.request.query_params.get('date_start')
         date_end = self.request.query_params.get('date_end')
         
-        if not all([store_branch_id, date_start, date_end]):
+        if not branch_id and not store_id:
             return FrameStock.objects.none()
+            
+        # Use store_id if provided, otherwise use branch_id
+        store_branch_id = store_id if store_id else branch_id
             
         # Convert date strings to datetime objects
         try:
@@ -99,24 +101,43 @@ class FrameSaleReportView(generics.ListAPIView):
             return FrameStock.objects.none()
             
         # Get frame stock history up to the end date
-        from ..models import FrameStockHistory
-        
         # Get all frame stock history up to the end date
         stock_history = FrameStockHistory.objects.filter(
             timestamp__lte=end_date
         )
         
-        # Calculate stock levels as of the end date for the store branch
-        store_stocks = stock_history.filter(
-            branch_id=store_branch_id
-        ).values('frame').annotate(
-            qty=Sum('quantity_changed')
-        )
-        
-        # Get frame details for the store branch
-        frame_details = FrameStock.objects.filter(
-            branch_id=store_branch_id
-        ).select_related('frame__brand', 'frame__code', 'frame__color')
+        # Get frame stock history up to the end date for the branch
+        if store_id:
+            # STORE_ID MODE: Only include frames that have stock in the specified branch
+            frame_ids_with_stock = FrameStock.objects.filter(
+                branch_id=store_branch_id,
+                qty__gt=0
+            ).values_list('frame_id', flat=True).distinct()
+            
+            store_stocks = stock_history.filter(
+                branch_id=store_branch_id,
+                frame_id__in=frame_ids_with_stock
+            ).values('frame').annotate(
+                qty=Sum('quantity_changed')
+            )
+            
+            # Get frame details for the store branch with positive stock
+            frame_details = FrameStock.objects.filter(
+                branch_id=store_branch_id,
+                qty__gt=0
+            ).select_related('frame__brand', 'frame__code', 'frame__color')
+        else:
+            # BRANCH_ID MODE: Include all frames, but only show data for the specified branch
+            store_stocks = stock_history.filter(
+                branch_id=store_branch_id
+            ).values('frame').annotate(
+                qty=Sum('quantity_changed')
+            )
+            
+            # Get all frame details for the branch (including zero stock)
+            frame_details = FrameStock.objects.filter(
+                branch_id=store_branch_id
+            ).select_related('frame__brand', 'frame__code', 'frame__color')
         
         # Create a mapping of frame_id to frame details
         frame_details_dict = {stock.frame.id: stock.frame for stock in frame_details}
@@ -167,7 +188,7 @@ class FrameSaleReportView(generics.ListAPIView):
                 sold_quantities_dict[frame_id][branch_id] = item['total_sold']
         
         # Get all branches and their stock for each frame
-        from ..models import Branch
+  
         
         # Get all branches except the store branch
         all_branches = Branch.objects.exclude(id=store_branch_id)
