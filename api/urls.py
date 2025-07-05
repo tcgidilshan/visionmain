@@ -3,6 +3,7 @@ from .views import LoginView, AdminOnlyView, SuperAdminOnlyView
 from .views import UserRegistrationView, AdminRegistrationView
 from django.conf import settings
 from django.conf.urls.static import static
+from .views.inventory_transfer import LensTransferView
 from .views import (
     BranchListCreateAPIView,OrderRefundView,FactoryOrderReportView,
     BranchRetrieveUpdateDestroyAPIView,NormalOrderReportView,
@@ -128,6 +129,7 @@ urlpatterns = [
     path('frame-stocks/<int:pk>/', FrameStockRetrieveUpdateDeleteView.as_view(), name='frame-stock-detail'),
     path('frames/', FrameListCreateView.as_view(), name='frame-list-create'),
     path('frames/transfer/', FrameTransferView.as_view(), name='frame-transfer'),
+    path('lenses/transfer/', LensTransferView.as_view(), name='lens-transfer'),
     path('frames/<int:pk>/', FrameRetrieveUpdateDeleteView.as_view(), name='frame-detail'),
     path("frames/colors/", FrameColorListView.as_view(), name="frame-colors"),
     path("frames/stocks/adjust", StockAdjustmentView.as_view(), name="frame-stock-adjustment"),

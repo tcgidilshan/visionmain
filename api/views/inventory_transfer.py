@@ -3,8 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
-from ..models import Frame, FrameStock, FrameStockHistory, Branch
-from ..serializers import FrameStockSerializer
+from ..models import Frame, FrameStock, FrameStockHistory, Branch, Lens, LensStock, LensStockHistory
+from ..serializers import FrameStockSerializer, LensStockSerializer
 
 class FrameTransferView(APIView):
     permission_classes = [IsAuthenticated]
@@ -118,6 +118,129 @@ class FrameTransferView(APIView):
         except Frame.DoesNotExist:
             return Response(
                 {"error": "Frame not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Branch.DoesNotExist:
+            return Response(
+                {"error": "One or both branches not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class LensTransferView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        """
+        Transfer lenses between branches.
+        Expected request data:
+        {
+            "lens_id": 1,              # ID of the lens to transfer
+            "from_branch_id": 1,        # Source branch ID
+            "to_branch_id": 2,          # Destination branch ID
+            "quantity": 5,              # Quantity to transfer
+            "note": "Transfer note"     # Optional note
+        }
+        """
+        lens_id = request.data.get('lens_id')
+        from_branch_id = request.data.get('from_branch_id')
+        to_branch_id = request.data.get('to_branch_id')
+        quantity = request.data.get('quantity')
+
+        # Validate required fields
+        if not all([lens_id, from_branch_id, to_branch_id, quantity]):
+            return Response(
+                {"error": "lens_id, from_branch_id, to_branch_id, and quantity are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if from_branch_id == to_branch_id:
+            return Response(
+                {"error": "Source and destination branches cannot be the same"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if quantity <= 0:
+            return Response(
+                {"error": "Quantity must be greater than 0"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Check if lens exists and is active
+            lens = Lens.objects.get(id=lens_id, is_active=True)
+            
+            # Get or create source stock
+            from_branch = Branch.objects.get(id=from_branch_id)
+            from_stock, created = LensStock.objects.get_or_create(
+                lens=lens,
+                branch=from_branch,
+                defaults={
+                    'qty': 0,
+                    'initial_count': 0
+                }
+            )
+
+            # Check if source has enough quantity
+            if from_stock.qty < quantity:
+                return Response(
+                    {"error": f"Insufficient stock. Available: {from_stock.qty}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Get or create destination stock
+            to_branch = Branch.objects.get(id=to_branch_id)
+            to_stock, created = LensStock.objects.get_or_create(
+                lens=lens,
+                branch=to_branch,
+                defaults={
+                    'qty': 0,
+                    'initial_count': 0
+                }
+            )
+
+            # Update quantities
+            from_stock.qty -= quantity
+            to_stock.qty += quantity
+            
+            # If this is a new stock record or initial_count is None, set it to the transferred quantity
+            # Otherwise, increment the existing initial_count
+            if created or to_stock.initial_count is None:
+                to_stock.initial_count = quantity
+            else:
+                to_stock.initial_count += quantity
+
+            # Save both stock records
+            from_stock.save()
+            to_stock.save()
+
+            # Create history record
+            LensStockHistory.objects.create(
+                lens=lens,
+                branch_id=from_branch_id,
+                transfer_to_id=to_branch_id,
+                action=LensStockHistory.TRANSFER,
+                quantity_changed=quantity,
+            )
+
+            # Prepare response
+            response_data = {
+                "message": "Lens transfer successful",
+                "from_stock": LensStockSerializer(from_stock).data,
+                "to_stock": LensStockSerializer(to_stock).data
+            }
+
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        except Lens.DoesNotExist:
+            return Response(
+                {"error": "Lens not found or is inactive"},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Branch.DoesNotExist:
