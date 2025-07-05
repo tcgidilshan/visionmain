@@ -116,32 +116,46 @@ class FrameSaleReportView(generics.ListAPIView):
             timestamp__lte=end_date
         )
         
-        # Get frame stock history up to the end date for the store
-        # Only include frames that have stock in the specified store
-        frame_ids_with_stock = FrameStock.objects.filter(
+        # First, get all frames that have stock in the specified store (qty >= 0)
+        frame_ids_in_store = FrameStock.objects.filter(
             branch_id=store_branch_id,
-            qty__gt=0
+            qty__gte=0  # Include frames with zero quantity
         ).values_list('frame_id', flat=True).distinct()
         
+        print(f"\n=== DEBUG: Frames in store {store_branch_id} (qty >= 0): {list(frame_ids_in_store)}")
+        
+        # Get frame details for all frames in the store (including zero quantity)
+        frame_details = FrameStock.objects.filter(
+            branch_id=store_branch_id,
+            frame_id__in=frame_ids_in_store
+        ).select_related('frame__brand', 'frame__code', 'frame__color')
+        
+        # Calculate store stocks for these frames
         store_stocks = stock_history.filter(
             branch_id=store_branch_id,
-            frame_id__in=frame_ids_with_stock
+            frame_id__in=frame_ids_in_store
         ).values('frame').annotate(
             qty=Sum('quantity_changed')
         )
         
-        # Get frame details for the store with positive stock
-        frame_details = FrameStock.objects.filter(
-            branch_id=store_branch_id,
-            qty__gt=0
-        ).select_related('frame__brand', 'frame__code', 'frame__color')
+        # Debug: Print frame details being processed
+        print("\n=== DEBUG: Frame Details ===")
+        print(f"Total frames with stock > 0 in store {store_branch_id}: {frame_details.count()}")
+        for stock in frame_details:
+            print(f"  - Frame ID: {stock.frame_id}, Qty: {stock.qty}, Branch: {stock.branch_id}")
         
         # Create a mapping of frame_id to frame details
-        frame_details_dict = {stock.frame.id: stock.frame for stock in frame_details}
+        frame_details_dict = {}
+        for stock in frame_details:
+            if stock.frame_id not in frame_details_dict:  # Only keep the first occurrence
+                frame_details_dict[stock.frame_id] = stock.frame
+        
+        print(f"DEBUG: Processed frame_details_dict: {list(frame_details_dict.keys())}")
         
         # Calculate stock levels for the store branch
         current_branch_stocks = stock_history.filter(
-            branch_id=store_branch_id
+            branch_id=store_branch_id,
+            frame_id__in=frame_details_dict.keys()  # Only include frames that exist in the store
         ).values('frame').annotate(
             current_branch_qty=Sum('quantity_changed')
         )
@@ -149,6 +163,7 @@ class FrameSaleReportView(generics.ListAPIView):
             item['frame']: max(0, item['current_branch_qty'])  # Ensure non-negative
             for item in current_branch_stocks
         }
+        print(f"DEBUG: current_branch_dict: {current_branch_dict}")
         
         # Calculate stock levels for all other branches
         other_branches_stocks = stock_history.filter(
@@ -351,7 +366,18 @@ class FrameSaleReportView(generics.ListAPIView):
                 
                 if current_stock:
                     current_qty = current_stock.qty
-                
+                    print(f"  - Found stock for frame {frame_id} in branch {branch_id}: {current_qty}")
+                else:
+                    print(f"  - No stock record found for frame {frame_id} in branch {branch_id}")
+                    # Debug: Check if this frame exists in Frame model
+                    from ..models import Frame
+                    frame_exists = Frame.objects.filter(id=frame_id).exists()
+                    print(f"    - Frame {frame_id} exists in Frame model: {frame_exists}")
+                    
+                    # Debug: Check all stock records for this frame
+                    all_stock = FrameStock.objects.filter(frame_id=frame_id).values('branch_id', 'qty')
+                    print(f"    - All stock records for frame {frame_id}: {list(all_stock)}")
+                    
                 # Initialize branch data with current stock and sold quantity
                 branch_data = {
                     'branch_id': branch_id,
