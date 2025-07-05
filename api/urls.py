@@ -67,6 +67,7 @@ from .views import (
     GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView,MntOrderReportView,
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView
 )
+from .views.customer_report_views import BestCustomersReportView
 # from .views import CustomAuthToken
 
 urlpatterns = [
@@ -179,7 +180,7 @@ urlpatterns = [
      name='factory-invoice-bulk-whatsapp-sent'),
     #invoice
     path('invoices/<int:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'), #invoice
-    path('invoices/', InvoiceDetailView.as_view(), name='invoice-by-order'),  # ✅ Filter by order_id
+    path('invoices/', InvoiceDetailView.as_view(), name='invoice-by-order'),  # Filter by order_id
     # path('factory-invoices/<int:pk>/update-status/', InvoiceProgressUpdateView.as_view(), name='factory-invoice-status-update'), (removed)
    
     path("factory-invoices/search/", FactoryInvoiceSearchView.as_view(), name="factory-invoice-search"),
@@ -254,15 +255,13 @@ urlpatterns = [
     # order audir hostory 
     path('orders/audit-history/', OrderAuditHistoryView.as_view(), name='order-audit-history'),
     path('report/mnt-order-report/', MntOrderReportView.as_view(), name='mnt-order-report'),
-    path("arrival-status/bulk-create/", ArrivalStatusBulkCreateView.as_view(),
-         name="arrival-status-bulk"),
+    path("arrival-status/bulk-create/", ArrivalStatusBulkCreateView.as_view(),name="arrival-status-bulk"),
     path("orders/audit-report/", DailyOrderAuditReportView.as_view(), name="daily-order-audit-report"),
 
     #reports
     path('reports/factory-orders/', FactoryOrderReportView.as_view(), name='factory-order-report'),
     path('reports/normal-orders/', NormalOrderReportView.as_view(), name='normal-order-report'),
     path('reports/channel-orders/', ChannelOrderReportView.as_view(), name='channel-order-report'),
+    path('reports/best-customers/', BestCustomersReportView.as_view(), name='best-customers-report'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
-
- 
