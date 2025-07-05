@@ -13,48 +13,84 @@ class LensListCreateView(generics.ListCreateAPIView):
     queryset = Lens.objects.all()
     serializer_class = LensSerializer
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        init_branch_id = self.request.query_params.get('init_branch_id')
+        if init_branch_id:
+            queryset = queryset.filter(branch_id=init_branch_id)
+        return queryset
+
     def list(self, request, *args, **kwargs):
         """
-        List all ACTIVE lenses with their branch-wise stock and powers.
-        If branch_id is passed, only show stock for that branch.
+        List lenses with optional filters:
+        - status: active|inactive|all - Filter lenses by active status
+        - init_branch_id - Filter by initial branch
+        
+        Required parameters (one of):
+        - branch_id - Return ALL lenses, but only include stock data for this branch
+        - store_id - Return ONLY lenses that have stock in this branch, with their stock data
         """
-        BranchProtectionsService.validate_branch_id(request)
-        branch_id = request.query_params.get('branch_id', None)
-        status_filter = request.query_params.get('status', 'active').lower()
-
-        lenses = self.get_queryset()
-
-        # 🔍 Apply is_active filter
-        if status_filter == 'active':
-            lenses = lenses.filter(is_active=True)
-        elif status_filter == 'inactive':
-            lenses = lenses.filter(is_active=False)
-        elif status_filter == 'all':
-            pass  # no filtering
-        else:
+        status_filter = request.query_params.get("status", "active").lower()
+        branch_id = request.query_params.get("branch_id")
+        store_id = request.query_params.get("store_id")
+        
+        if not (branch_id or store_id):
             return Response(
-                {"error": "Invalid status. Allowed values: active, inactive, all."},
+                {"error": "Either branch_id or store_id parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        lenses = self.get_queryset()
+        
+        # Apply status filter if provided
+        if status_filter == "active":
+            lenses = lenses.filter(is_active=True)
+        elif status_filter == "inactive":
+            lenses = lenses.filter(is_active=False)
+        elif status_filter != "all":
+            return Response(
+                {"error": "Invalid status filter. Use 'active', 'inactive', or 'all'."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         data = []
-
-        for lens in lenses:
-            # 🔍 Filter stock by branch if branch_id is provided
-            if branch_id:
+        
+        if store_id:
+            # STORE_ID MODE: Only return lenses that have stock in the specified branch
+            # and only include stock data for that branch
+            lens_ids_with_stock = LensStock.objects.filter(
+                branch_id=store_id,
+                qty__gt=0
+            ).values_list('lens_id', flat=True).distinct()
+            
+            lenses = lenses.filter(id__in=lens_ids_with_stock)
+            
+            for lens in lenses:
+                stocks = lens.stocks.filter(branch_id=store_id, qty__gt=0)
+                powers = lens.lens_powers.all()
+                
+                lens_data = LensSerializer(lens).data
+                lens_data['stock'] = LensStockSerializer(stocks, many=True).data
+                lens_data['powers'] = LensPowerSerializer(powers, many=True).data
+                data.append(lens_data)
+                
+        elif branch_id:
+            # BRANCH_ID MODE: Return ALL lenses, but only include stock data for the specified branch
+            for lens in lenses:
                 stocks = lens.stocks.filter(branch_id=branch_id)
-            else:
-                stocks = lens.stocks.all()
+                powers = lens.lens_powers.all()
+                
+                lens_data = LensSerializer(lens).data
+                lens_data['stock'] = LensStockSerializer(stocks, many=True).data
+                lens_data['powers'] = LensPowerSerializer(powers, many=True).data
+                data.append(lens_data)
 
-            powers = lens.lens_powers.all()
-
-            lens_data = LensSerializer(lens).data
-            lens_data['stock'] = LensStockSerializer(stocks, many=True).data
-            lens_data['powers'] = LensPowerSerializer(powers, many=True).data
-
-            data.append(lens_data)
-
-        return Response(data)
+        return Response(data, status=status.HTTP_200_OK)
 
     @transaction.atomic
     @transaction.atomic
@@ -107,10 +143,6 @@ class LensListCreateView(generics.ListCreateAPIView):
                 )
 
         # ✅ STEP 5: Save Lens
-        # Get branch_id from the first stock entry if not provided in lens_data
-        if 'branch' not in lens_data and stock_data_list and isinstance(stock_data_list, list) and len(stock_data_list) > 0:
-            lens_data['branch'] = stock_data_list[0].get('branch_id')
-            
         lens_serializer = self.get_serializer(data=lens_data)
         lens_serializer.is_valid(raise_exception=True)
         lens = lens_serializer.save()
