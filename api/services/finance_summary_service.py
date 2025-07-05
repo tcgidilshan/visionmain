@@ -105,6 +105,9 @@ class DailyFinanceSummaryService:
         today_expenses = DailyFinanceSummaryService._sum(
             Expense.objects.filter(branch_id=branch_id, created_at__date=date, paid_source="cash")
         )
+        today_safe_expenses = DailyFinanceSummaryService._sum(
+            Expense.objects.filter(branch_id=branch_id, created_at__date=date, paid_source="safe")
+        )
 
         # Get today's safe balance from the SafeBalance model
         
@@ -156,7 +159,7 @@ class DailyFinanceSummaryService:
             "today_other_income": today_other_income,
 
             # Expenses
-            "today_expenses": today_expenses,
+            "today_expenses": today_expenses + today_safe_expenses,
 
             # Summary
             "before_balance": previous_balance,

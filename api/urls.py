@@ -4,10 +4,10 @@ from .views import UserRegistrationView, AdminRegistrationView
 from django.conf import settings
 from django.conf.urls.static import static
 from .views import (
-    BranchListCreateAPIView,OrderRefundView,
-    BranchRetrieveUpdateDestroyAPIView,
-    RefractionCreateAPIView,
-    RefractionListAPIView,
+    BranchListCreateAPIView,OrderRefundView,FactoryOrderReportView,
+    BranchRetrieveUpdateDestroyAPIView,NormalOrderReportView,
+    RefractionCreateAPIView,ChannelOrderReportView,
+    RefractionListAPIView,BranchAppointmentCountView,
     RefractionUpdateAPIView,
     RefractionDeleteAPIView,
     RefractionDetailCreateAPIView,
@@ -213,6 +213,7 @@ urlpatterns = [
     #channel repayment
     path('channel/repayments/', ChannelRepaymentView.as_view(), name='channel-repayments'),
     path('doctor/transfer-appointments/', DoctorAppointmentTransferView.as_view(), name='doctor-appointment-transfer'), #appointment trans
+    path('branches/appointments/today-count/', BranchAppointmentCountView.as_view(), name='branch-appointments-today-count'),
     path('lens-stocks/', LensStockListCreateView.as_view(), name='lens-stock-list-create'),
     path('lens-stocks/<int:pk>/', LensStockRetrieveUpdateDeleteView.as_view(), name='lens-stock-detail'),
     path("lenses/search/", LensSearchView.as_view(), name="lens-search"),
@@ -266,5 +267,9 @@ urlpatterns = [
     path('report/frame-history/',FrameHistoryReportView.as_view(), name='report-frame-history'),
     #sale report
     path('report/frame-sale/',FrameSaleReportView.as_view(), name='report-frame-sale'),
+    #reports
+    path('reports/factory-orders/', FactoryOrderReportView.as_view(), name='factory-order-report'),
+    path('reports/normal-orders/', NormalOrderReportView.as_view(), name='normal-order-report'),
+    path('reports/channel-orders/', ChannelOrderReportView.as_view(), name='channel-order-report'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
