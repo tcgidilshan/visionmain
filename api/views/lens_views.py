@@ -107,6 +107,10 @@ class LensListCreateView(generics.ListCreateAPIView):
                 )
 
         # ✅ STEP 5: Save Lens
+        # Get branch_id from the first stock entry if not provided in lens_data
+        if 'branch' not in lens_data and stock_data_list and isinstance(stock_data_list, list) and len(stock_data_list) > 0:
+            lens_data['branch'] = stock_data_list[0].get('branch_id')
+            
         lens_serializer = self.get_serializer(data=lens_data)
         lens_serializer.is_valid(raise_exception=True)
         lens = lens_serializer.save()

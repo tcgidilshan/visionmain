@@ -296,7 +296,7 @@ class LensSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lens
-        fields = ['id', 'type', 'coating', 'price','brand','branch', 'brand_name','type_name','coating_name','is_active']
+        fields = ['id', 'type', 'coating', 'price','brand','brand_name','type_name','coating_name','is_active']
 
     def validate(self, data):
         if 'brand' not in data:
