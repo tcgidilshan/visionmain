@@ -1,0 +1,268 @@
+from django.db.models import Sum, Count, Q, Case, When, IntegerField
+from django.utils import timezone
+from datetime import datetime
+from typing import List, Dict, Any, Optional
+from ..models import Order, CustomUser, OrderItem, Frame, Lens, Branch
+
+
+class EmployeeReportService:
+    """
+    Service class for generating employee history reports based on sales performance.
+    """
+    
+    @staticmethod
+    def validate_date_range(start_date: str, end_date: str) -> tuple:
+        """
+        Validate and convert date strings to datetime objects.
+        
+        Args:
+            start_date: Start date string in YYYY-MM-DD format
+            end_date: End date string in YYYY-MM-DD format
+            
+        Returns:
+            Tuple of (start_datetime, end_datetime) or raises ValueError
+        """
+        
+        try:
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+            
+            # Set end date to end of day
+            end_dt = end_dt.replace(hour=23, minute=59, second=59)
+            
+            if start_dt > end_dt:
+                raise ValueError("Start date cannot be after end date")
+            
+            return start_dt, end_dt
+            
+        except ValueError as e:
+            if "time data" in str(e):
+                raise ValueError("Invalid date format. Use YYYY-MM-DD format")
+            raise e
+    
+    @staticmethod
+    def get_employee_history_report(
+        start_date: datetime,
+        end_date: datetime,
+        employee_code: str = None,
+        branch_id: int = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Generate employee history report based on sales performance within date range.
+        
+        Args:
+            start_date: Start date for filtering orders
+            end_date: End date for filtering orders
+            employee_code: Optional specific employee code to filter by
+            branch_id: Optional branch ID to filter by
+            
+        Returns:
+            List of dictionaries containing employee performance data
+        """
+        
+        # Base query for orders within date range
+        orders_query = Order.objects.filter(
+            order_date__range=[start_date, end_date],
+            is_deleted=False,
+            sales_staff_code__isnull=False
+        )
+        
+        # Filter by branch if provided
+        if branch_id:
+            orders_query = orders_query.filter(branch_id=branch_id)
+        
+        # Filter by specific employee if provided
+        if employee_code:
+            orders_query = orders_query.filter(
+                sales_staff_code__user_code=employee_code
+            )
+        
+        # Get all employees who have orders in the date range
+        employees = CustomUser.objects.filter(
+            orders__in=orders_query
+        ).distinct()
+        
+        result = []
+        
+        for employee in employees:
+            # Get employee's orders in the date range
+            employee_orders = orders_query.filter(
+                sales_staff_code=employee
+            )
+            
+            # Get order items for this employee's orders
+            order_items = OrderItem.objects.filter(
+                order__in=employee_orders,
+                is_deleted=False
+            )
+            
+            # Count branded frames sold
+            branded_frames_count = order_items.filter(
+                frame__isnull=False,
+                frame__brand_type='branded'
+            ).aggregate(
+                total=Sum('quantity')
+            )['total'] or 0
+            
+            # Count branded lenses sold
+            branded_lenses_count = order_items.filter(
+                lens__isnull=False,
+                lens__brand__isnull=False
+            ).aggregate(
+                total=Sum('quantity')
+            )['total'] or 0
+            
+            # Count factory orders
+            factory_orders_count = employee_orders.filter(
+                # Add your factory order criteria here
+                # For example: is_factory_order=True or specific status
+                # Currently using a placeholder condition
+                is_frame_only=False  # Adjust this based on your factory order logic
+            ).count()
+            
+            # Count normal orders
+            normal_orders_count = employee_orders.filter(
+                # Add your normal order criteria here
+                # Currently using opposite of factory order condition
+                is_frame_only=True  # Adjust this based on your normal order logic
+            ).count()
+            
+            # Customer feedback count (placeholder for future implementation)
+            customer_feedback_count = 0  # Will be implemented later
+            
+            # Calculate total count
+            total_count = (
+                branded_frames_count + 
+                branded_lenses_count + 
+                factory_orders_count + 
+                normal_orders_count + 
+                customer_feedback_count
+            )
+            
+            # Calculate total sales amount for this employee
+            total_sales = employee_orders.aggregate(
+                total=Sum('total_price')
+            )['total'] or 0
+            
+            # Get branch info if orders exist
+            branch_info = None
+            if employee_orders.exists():
+                first_order_branch = employee_orders.first().branch
+                if first_order_branch:
+                    branch_info = {
+                        'id': first_order_branch.id,
+                        'name': first_order_branch.branch_name,
+                        'location': first_order_branch.location
+                    }
+            
+            employee_data = {
+                'employee_id': employee.id,
+                'user_code': employee.user_code or 'N/A',
+                'username': employee.username,
+                'full_name': f"{employee.first_name} {employee.last_name}".strip() or employee.username,
+                'branded_frames_sold_count': int(branded_frames_count),
+                'branded_lenses_sold_count': int(branded_lenses_count),
+                'factory_order_count': factory_orders_count,
+                'normal_order_count': normal_orders_count,
+                'customer_feedback_count': customer_feedback_count,
+                'total_count': int(total_count),
+                'total_sales_amount': float(total_sales),
+                'total_orders': employee_orders.count(),
+                'branch': branch_info
+            }
+            
+            result.append(employee_data)
+        
+        # Sort by total_count descending
+        result.sort(key=lambda x: x['total_count'], reverse=True)
+        
+        return result
+    
+    @staticmethod
+    def get_report_summary(
+        start_date: datetime,
+        end_date: datetime,
+        branch_id: int = None
+    ) -> Dict[str, Any]:
+        """
+        Get summary statistics for the employee history report.
+        
+        Args:
+            start_date: Start date for filtering orders
+            end_date: End date for filtering orders
+            branch_id: Optional branch ID to filter by
+            
+        Returns:
+            Dictionary containing summary statistics
+        """
+        
+        # Get all orders in date range
+        all_orders = Order.objects.filter(
+            order_date__range=[start_date, end_date],
+            is_deleted=False,
+            sales_staff_code__isnull=False
+        )
+        
+        # Filter by branch if provided
+        if branch_id:
+            all_orders = all_orders.filter(branch_id=branch_id)
+        
+        # Get all order items in date range
+        all_order_items = OrderItem.objects.filter(
+            order__in=all_orders,
+            is_deleted=False
+        )
+        
+        # Calculate totals
+        total_employees = CustomUser.objects.filter(
+            orders__in=all_orders
+        ).distinct().count()
+        
+        total_orders = all_orders.count()
+        total_revenue = all_orders.aggregate(total=Sum('total_price'))['total'] or 0
+        
+        total_frames_sold = all_order_items.filter(
+            frame__isnull=False
+        ).aggregate(total=Sum('quantity'))['total'] or 0
+        
+        total_lenses_sold = all_order_items.filter(
+            lens__isnull=False
+        ).aggregate(total=Sum('quantity'))['total'] or 0
+        
+        factory_orders = all_orders.filter(is_frame_only=False).count()
+        normal_orders = all_orders.filter(is_frame_only=True).count()
+        
+        # Get branch info if filtering by branch
+        branch_info = None
+        if branch_id:
+            try:
+                branch = Branch.objects.get(id=branch_id)
+                branch_info = {
+                    'id': branch.id,
+                    'name': branch.branch_name,
+                    'location': branch.location
+                }
+            except Branch.DoesNotExist:
+                pass
+        
+        return {
+            'date_range': {
+                'start': start_date,
+                'end': end_date
+            },
+            'branch': branch_info,
+            'totals': {
+                'active_employees': total_employees,
+                'total_orders': total_orders,
+                'total_revenue': float(total_revenue),
+                'total_frames_sold': int(total_frames_sold),
+                'total_lenses_sold': int(total_lenses_sold),
+                'factory_orders': factory_orders,
+                'normal_orders': normal_orders
+            },
+            'averages': {
+                'avg_revenue_per_employee': float(total_revenue / total_employees) if total_employees > 0 else 0,
+                'avg_orders_per_employee': total_orders / total_employees if total_employees > 0 else 0,
+                'avg_items_per_order': (total_frames_sold + total_lenses_sold) / total_orders if total_orders > 0 else 0
+            }
+        }

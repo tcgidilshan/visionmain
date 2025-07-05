@@ -68,6 +68,7 @@ from .views import (
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView
 )
 from .views.customer_report_views import BestCustomersReportView
+from .views.employee_report_views import EmployeeHistoryReportView
 # from .views import CustomAuthToken
 
 urlpatterns = [
@@ -263,5 +264,6 @@ urlpatterns = [
     path('reports/normal-orders/', NormalOrderReportView.as_view(), name='normal-order-report'),
     path('reports/channel-orders/', ChannelOrderReportView.as_view(), name='channel-order-report'),
     path('reports/best-customers/', BestCustomersReportView.as_view(), name='best-customers-report'),
+    path('reports/employee-history/', EmployeeHistoryReportView.as_view(), name='employee-history-report')
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
