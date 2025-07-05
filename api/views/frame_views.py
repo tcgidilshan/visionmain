@@ -68,7 +68,6 @@ class FrameListCreateView(generics.ListCreateAPIView):
             # and only include stock data for that branch
             frame_ids_with_stock = FrameStock.objects.filter(
                 branch_id=store_id,
-                qty__gt=0  # Only include frames with positive quantity
             ).values_list('frame_id', flat=True).distinct()
             
             frames = frames.filter(id__in=frame_ids_with_stock)

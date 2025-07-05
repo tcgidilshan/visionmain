@@ -397,6 +397,56 @@ class FrameSaleReportView(generics.ListAPIView):
                 
                 frame_branches.append(branch_data)
             
+            # Get current stock levels across all branches
+            all_branch_stock = FrameStock.objects.filter(
+                frame_id=frame_id
+            ).aggregate(
+                total=Sum('qty')
+            )['total'] or 0
+            
+            # Get store branch quantity
+            store_qty = current_branch_dict.get(frame_id, 0)
+            other_qty = all_branch_stock - store_qty
+            
+            # Calculate starting inventory (stock at beginning of period)
+            starting_stock = FrameStockHistory.objects.filter(
+                frame_id=frame_id,
+                branch_id=store_branch_id,
+                timestamp__lt=start_date
+            ).aggregate(
+                total=Sum('quantity_changed')
+            )['total'] or 0
+            
+            # Calculate additions (positive quantity changes in the period)
+            additions = FrameStockHistory.objects.filter(
+                frame_id=frame_id,
+                branch_id=store_branch_id,
+                timestamp__range=(start_date, end_date),
+                quantity_changed__gt=0
+            ).aggregate(
+                total=Sum('quantity_changed')
+            )['total'] or 0
+            
+            # Get sales count for the period
+            sold_count = sum(sold_quantities_dict.get(str(frame_id), {}).values()) if str(frame_id) in sold_quantities_dict else 0
+            
+            # Calculate ending inventory (should match current stock)
+            calculated_ending = starting_stock + additions - sold_count
+            
+            # Debug output
+            print(f"\n=== DEBUG: Inventory Movement for Frame {frame_id} ===")
+            print(f"Starting Stock (before {start_date}): {starting_stock}")
+            print(f"Additions (received stock): {additions}")
+            print(f"Sold in period: {sold_count}")
+            print(f"Calculated Ending Stock: {calculated_ending}")
+            print(f"Actual Current Stock: {store_qty}")
+            print(f"Other Branches Stock: {other_qty}")
+            print(f"Total Available Across All Branches: {all_branch_stock}")
+            
+            # Verify calculation matches actual
+            if calculated_ending != store_qty:
+                print(f"WARNING: Stock calculation mismatch! Calculated: {calculated_ending}, Actual: {store_qty}")
+            
             result.append({
                 'frame_id': frame_id,
                 'brand': frame.brand.name,
@@ -404,10 +454,12 @@ class FrameSaleReportView(generics.ListAPIView):
                 'color': frame.color.name,
                 'size': frame.size,
                 'species': frame.species,
-                'store_branch_qty': qty,
-                'store_branch_qty': current_branch_dict.get(frame_id, 0),
+                'starting_stock': starting_stock,
+                'additions': additions,
+                'sold_count': sold_count,
+                'ending_stock': store_qty,
                 'other_branches_qty': other_qty,
-                'total_qty': qty + other_qty,
+                'total_available': all_branch_stock,  # Sum of all branches including store
                 'sold_count': sum(sold_quantities_dict.get(str(frame_id), {}).values()) if str(frame_id) in sold_quantities_dict else 0,
                 'debug_sold_data': sold_quantities_dict.get(str(frame_id), "No sales data"),
                 'as_of_date': end_date.date().isoformat(),
