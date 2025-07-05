@@ -140,99 +140,187 @@ class LensTransferView(APIView):
         """
         Manage lens stock with different actions: ADD, TRANSFER, REMOVE
         
-        For ADD action (add stock to a branch):
+        Single Operation:
+        {
+            "operations": [
+                {
+                    "action": "add",
+                    "lens_id": 1,
+                    "to_branch_id": 2,
+                    "quantity": 5
+                },
+                {
+                    "action": "transfer",
+                    "lens_id": 2,
+                    "from_branch_id": 1,
+                    "to_branch_id": 3,
+                    "quantity": 3
+                },
+                {
+                    "action": "remove",
+                    "lens_id": 3,
+                    "from_branch_id": 1,
+                    "quantity": 2
+                }
+            ]
+        }
+        
+        Each operation in the operations array can be one of:
+        
+        1. ADD action:
         {
             "action": "add",
             "lens_id": 1,              # ID of the lens
             "to_branch_id": 2,          # Destination branch ID
-            "quantity": 5,              # Quantity to add
-            "note": "Adding new stock"  # Optional note
+            "quantity": 5               # Quantity to add
         }
         
-        For TRANSFER action (transfer between branches):
+        2. TRANSFER action:
         {
             "action": "transfer",
             "lens_id": 1,              # ID of the lens
             "from_branch_id": 1,        # Source branch ID
             "to_branch_id": 2,          # Destination branch ID
-            "quantity": 5,              # Quantity to transfer
-            "note": "Transfer note"     # Optional note
+            "quantity": 5               # Quantity to transfer
         }
         
-        For REMOVE action (remove stock from a branch):
+        3. REMOVE action:
         {
             "action": "remove",
             "lens_id": 1,              # ID of the lens
             "from_branch_id": 1,        # Branch ID to remove from
-            "quantity": 2,              # Quantity to remove
-            "reason": "Damaged",        # Reason for removal
-            "note": "Damaged stock"     # Optional note
+            "quantity": 2               # Quantity to remove
         }
         """
-        action = request.data.get('action', '').lower()
-        lens_id = request.data.get('lens_id')
-        quantity = request.data.get('quantity')
+        operations = request.data.get('operations', [])
         
-        # Validate common required fields
-        if not all([action, lens_id, quantity is not None]):
+        if not operations:
             return Response(
-                {"error": "action, lens_id, and quantity are required"},
+                {"error": "No operations provided. Use 'operations' array to specify actions."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-            
-        if quantity <= 0:
-            return Response(
-                {"error": "Quantity must be greater than 0"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-            
+        
+        results = []
+        
         try:
-            # Check if lens exists and is active
-            lens = Lens.objects.get(id=lens_id, is_active=True)
+            # Pre-fetch all lenses and branches to reduce DB queries
+            lens_ids = {op.get('lens_id') for op in operations if op.get('lens_id')}
+            branch_ids = set()
             
-            if action == 'add':
-                return self._handle_add_action(request, lens)
-            elif action == 'transfer':
-                return self._handle_transfer_action(request, lens)
-            elif action == 'remove':
-                return self._handle_remove_action(request, lens)
-            else:
+            for op in operations:
+                if 'to_branch_id' in op:
+                    branch_ids.add(op['to_branch_id'])
+                if 'from_branch_id' in op:
+                    branch_ids.add(op['from_branch_id'])
+            
+            # Get all lenses and branches in one query each
+            lenses = {lens.id: lens for lens in Lens.objects.filter(id__in=lens_ids, is_active=True)}
+            branches = {branch.id: branch for branch in Branch.objects.filter(id__in=branch_ids)}
+            
+            for idx, operation in enumerate(operations):
+                try:
+                    action = operation.get('action', '').lower()
+                    lens_id = operation.get('lens_id')
+                    quantity = operation.get('quantity')
+                    
+                    # Validate common required fields
+                    if not all([action, lens_id is not None, quantity is not None]):
+                        results.append({
+                            "index": idx,
+                            "status": "error",
+                            "error": "action, lens_id, and quantity are required"
+                        })
+                        continue
+                        
+                    if quantity <= 0:
+                        results.append({
+                            "index": idx,
+                            "status": "error",
+                            "error": "Quantity must be greater than 0"
+                        })
+                        continue
+                    
+                    # Check if lens exists and is active
+                    lens = lenses.get(lens_id)
+                    if not lens:
+                        results.append({
+                            "index": idx,
+                            "status": "error",
+                            "error": f"Lens with ID {lens_id} not found or is inactive"
+                        })
+                        continue
+                    
+                    # Handle the action
+                    if action == 'add':
+                        result = self._handle_add_action(operation, lens, branches)
+                    elif action == 'transfer':
+                        result = self._handle_transfer_action(operation, lens, branches)
+                    elif action == 'remove':
+                        result = self._handle_remove_action(operation, lens, branches)
+                    else:
+                        results.append({
+                            "index": idx,
+                            "status": "error",
+                            "error": "Invalid action. Must be one of: add, transfer, remove"
+                        })
+                        continue
+                    
+                    results.append({
+                        "index": idx,
+                        "status": "success",
+                        "action": action,
+                        "lens_id": lens_id,
+                        **result
+                    })
+                    
+                except Branch.DoesNotExist as e:
+                    results.append({
+                        "index": idx,
+                        "status": "error",
+                        "error": "Branch not found"
+                    })
+                except ValueError as e:
+                    results.append({
+                        "index": idx,
+                        "status": "error",
+                        "error": str(e)
+                    })
+                except Exception as e:
+                    results.append({
+                        "index": idx,
+                        "status": "error",
+                        "error": str(e)
+                    })
+            
+            # Check if all operations failed
+            if all(result.get('status') == 'error' for result in results):
                 return Response(
-                    {"error": "Invalid action. Must be one of: add, transfer, remove"},
+                    {"results": results},
                     status=status.HTTP_400_BAD_REQUEST
                 )
                 
-        except Lens.DoesNotExist:
-            return Response(
-                {"error": "Lens not found or is inactive"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        except Branch.DoesNotExist:
-            return Response(
-                {"error": "Branch not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        except ValueError as e:
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"results": results}, status=status.HTTP_200_OK)
+            
         except Exception as e:
             return Response(
-                {"error": str(e)},
+                {"error": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    def _handle_add_action(self, request, lens):
+    def _handle_add_action(self, operation, lens, branches):
         """Handle adding stock to a branch"""
-        to_branch_id = request.data.get('to_branch_id')
-        quantity = int(request.data.get('quantity'))
+        to_branch_id = operation.get('to_branch_id')
+        quantity = int(operation.get('quantity'))
         
         if not to_branch_id:
             raise ValueError("to_branch_id is required for add action")
             
+        # Get destination branch from pre-fetched branches
+        to_branch = branches.get(to_branch_id)
+        if not to_branch:
+            raise Branch.DoesNotExist(f"Branch with ID {to_branch_id} not found")
+            
         # Get or create destination stock
-        to_branch = Branch.objects.get(id=to_branch_id)
         to_stock, created = LensStock.objects.get_or_create(
             lens=lens,
             branch=to_branch,
@@ -255,16 +343,18 @@ class LensTransferView(APIView):
             quantity_changed=quantity
         )
         
-        return Response({
+        return {
             "message": "Stock added successfully",
+            "to_branch_id": to_branch_id,
+            "quantity": quantity,
             "stock": LensStockSerializer(to_stock).data
-        }, status=status.HTTP_200_OK)
+        }
     
-    def _handle_transfer_action(self, request, lens):
+    def _handle_transfer_action(self, operation, lens, branches):
         """Handle transferring stock between branches"""
-        from_branch_id = request.data.get('from_branch_id')
-        to_branch_id = request.data.get('to_branch_id')
-        quantity = int(request.data.get('quantity'))
+        from_branch_id = operation.get('from_branch_id')
+        to_branch_id = operation.get('to_branch_id')
+        quantity = int(operation.get('quantity'))
         
         if not all([from_branch_id, to_branch_id]):
             raise ValueError("from_branch_id and to_branch_id are required for transfer action")
@@ -272,8 +362,16 @@ class LensTransferView(APIView):
         if from_branch_id == to_branch_id:
             raise ValueError("Source and destination branches cannot be the same")
         
+        # Get branches from pre-fetched branches
+        from_branch = branches.get(from_branch_id)
+        to_branch = branches.get(to_branch_id)
+        
+        if not from_branch:
+            raise Branch.DoesNotExist(f"Source branch with ID {from_branch_id} not found")
+        if not to_branch:
+            raise Branch.DoesNotExist(f"Destination branch with ID {to_branch_id} not found")
+        
         # Get or create source stock
-        from_branch = Branch.objects.get(id=from_branch_id)
         from_stock, _ = LensStock.objects.get_or_create(
             lens=lens,
             branch=from_branch,
@@ -285,7 +383,6 @@ class LensTransferView(APIView):
             raise ValueError(f"Insufficient stock. Available: {from_stock.qty}")
         
         # Get or create destination stock
-        to_branch = Branch.objects.get(id=to_branch_id)
         to_stock, created = LensStock.objects.get_or_create(
             lens=lens,
             branch=to_branch,
@@ -314,22 +411,29 @@ class LensTransferView(APIView):
             quantity_changed=quantity
         )
         
-        return Response({
+        return {
             "message": "Transfer successful",
+            "from_branch_id": from_branch_id,
+            "to_branch_id": to_branch_id,
+            "quantity": quantity,
             "from_stock": LensStockSerializer(from_stock).data,
             "to_stock": LensStockSerializer(to_stock).data
-        }, status=status.HTTP_200_OK)
+        }
     
-    def _handle_remove_action(self, request, lens):
+    def _handle_remove_action(self, operation, lens, branches):
         """Handle removing stock from a branch"""
-        from_branch_id = request.data.get('from_branch_id')
-        quantity = int(request.data.get('quantity'))
+        from_branch_id = operation.get('from_branch_id')
+        quantity = int(operation.get('quantity'))
         
         if not from_branch_id:
             raise ValueError("from_branch_id is required for remove action")
         
+        # Get branch from pre-fetched branches
+        from_branch = branches.get(from_branch_id)
+        if not from_branch:
+            raise Branch.DoesNotExist(f"Branch with ID {from_branch_id} not found")
+        
         # Get source stock
-        from_branch = Branch.objects.get(id=from_branch_id)
         from_stock = LensStock.objects.get(
             lens=lens,
             branch=from_branch
@@ -351,7 +455,9 @@ class LensTransferView(APIView):
             quantity_changed=quantity
         )
         
-        return Response({
+        return {
             "message": f"Removed {quantity} items from stock",
+            "from_branch_id": from_branch_id,
+            "quantity": quantity,
             "stock": LensStockSerializer(from_stock).data
-        }, status=status.HTTP_200_OK)
+        }
