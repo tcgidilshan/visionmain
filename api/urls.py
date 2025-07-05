@@ -69,6 +69,7 @@ from .views import (
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
+from .views.banking_views import BankingReportView,ConfirmDepositView
 # from .views import CustomAuthToken
 
 urlpatterns = [
@@ -264,6 +265,9 @@ urlpatterns = [
     path('reports/normal-orders/', NormalOrderReportView.as_view(), name='normal-order-report'),
     path('reports/channel-orders/', ChannelOrderReportView.as_view(), name='channel-order-report'),
     path('reports/best-customers/', BestCustomersReportView.as_view(), name='best-customers-report'),
-    path('reports/employee-history/', EmployeeHistoryReportView.as_view(), name='employee-history-report')
+    path('reports/employee-history/', EmployeeHistoryReportView.as_view(), name='employee-history-report'),
+    path('banking-report/', BankingReportView.as_view(), name='banking-report'),
+    # 2. Banking confirm action endpoint
+    path('banking-report/confirm/<int:deposit_id>/', ConfirmDepositView.as_view(), name='confirm-deposit'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
