@@ -65,7 +65,6 @@ class LensListCreateView(generics.ListCreateAPIView):
             # and only include stock data for that branch
             lens_ids_with_stock = LensStock.objects.filter(
                 branch_id=store_id,
-                qty__gt=0
             ).values_list('lens_id', flat=True).distinct()
             
             lenses = lenses.filter(id__in=lens_ids_with_stock)
