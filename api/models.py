@@ -723,30 +723,53 @@ class Invoice(models.Model):
             if not self.order or not self.order.branch:
                 raise ValueError("Invoice must be linked to an order with a valid branch.")
 
-            branch_code = self.order.branch.branch_name[:3].upper()
-            day_str = self.invoice_date.strftime('%d')  # Last 2 digits for day
+            # Handle 'normal' invoice type with branch prefix
+            if self.invoice_type == 'normal':
+                with transaction.atomic():
+                    # Get the first 3 letters of branch name in uppercase
+                    branch_prefix = self.order.branch.branch_name[:3].upper()
+                    
+                    # Get the last invoice with 'normal' type for this branch
+                    last_invoice = Invoice.all_objects.select_for_update().filter(
+                        invoice_type='normal',
+                        order__branch=self.order.branch
+                    ).order_by('-id').first()
 
-            # Choose invoice type key (map 'manual' to 'manual', 'factory' to 'factory')
-            invoice_type_key = self.invoice_type
-
-            with transaction.atomic():
-                last_invoice = Invoice.all_objects.select_for_update().filter(
-                    invoice_type=invoice_type_key,
-                    order__branch=self.order.branch
-                ).order_by('-id').first()
-
-                if last_invoice and last_invoice.invoice_number:
-                    try:
-                        # Extract padded number between branch_code (3 chars) and day_str (last 2 chars)
-                        last_number_part = last_invoice.invoice_number[3:-2]
-                        number = int(last_number_part) + 1
-                    except Exception:
+                    if last_invoice and last_invoice.invoice_number and last_invoice.invoice_number.startswith(branch_prefix):
+                        try:
+                            # Extract the numeric part after branch prefix and increment
+                            number_part = last_invoice.invoice_number[3:]  # Skip the 3-letter branch prefix
+                            number = int(number_part) + 1
+                        except (ValueError, IndexError):
+                            number = 1
+                    else:
                         number = 1
-                else:
-                    number = 1
 
-                padded = str(number).zfill(5)
-                self.invoice_number = f"{branch_code}{padded}{day_str}"
+                    # Format as {BRANCH_PREFIX} followed by sequential number (e.g., COL001, COL002)
+                    self.invoice_number = f"{branch_prefix}{number:03d}"
+            else:
+                # Original logic for other invoice types
+                branch_code = self.order.branch.branch_name[:3].upper()
+                day_str = self.invoice_date.strftime('%d')  # Last 2 digits for day
+
+                with transaction.atomic():
+                    last_invoice = Invoice.all_objects.select_for_update().filter(
+                        invoice_type=self.invoice_type,
+                        order__branch=self.order.branch
+                    ).order_by('-id').first()
+
+                    if last_invoice and last_invoice.invoice_number:
+                        try:
+                            # Extract padded number between branch_code (3 chars) and day_str (last 2 chars)
+                            last_number_part = last_invoice.invoice_number[3:-2]
+                            number = int(last_number_part) + 1
+                        except Exception:
+                            number = 1
+                    else:
+                        number = 1
+
+                    padded = str(number).zfill(5)
+                    self.invoice_number = f"{branch_code}{padded}{day_str}"
 
         super().save(*args, **kwargs)
 
