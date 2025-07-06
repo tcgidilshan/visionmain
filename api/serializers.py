@@ -140,24 +140,31 @@ class FrameSerializer(serializers.ModelSerializer):
             'id', 'brand', 'brand_name', 'code', 'code_name', 'color', 'color_name',
             'price', 'size', 'species', 'brand_type', 'brand_type_display',
             'is_active',
-            'image_file', 'uploaded_url', 'image_id',  # ✅ image input options
-            'image_url',  # ✅ read-only image access
+            'image_file', 'uploaded_url', 'image_id',  # image input options
+            'image_url',  # read-only image access
         ]
 
     def validate(self, data):
         """
-        Ensure at least one of image_file, image_id, or uploaded_url is provided.
+        If any image-related fields are provided, ensure they are valid.
+        If none are provided, that's fine too - the frame can be created without an image.
         """
         has_file = bool(data.get('image_file'))
         has_id = bool(data.get('image_id'))
         has_url = bool(data.get('uploaded_url'))
 
+        # If no image fields are provided and this is not an update with existing image
         if not (has_file or has_id or has_url):
-            # On update, allow missing image if already present
             if self.instance and self.instance.image:
+                # Keep existing image if updating without providing new image
                 return data
+            # Allow creating/updating without an image
+            return data
+
+        # If we get here, at least one image field was provided, so validate them
+        if sum([has_file, has_id, has_url]) > 1:
             raise serializers.ValidationError({
-                "image_file": "Provide at least one of: image_file, image_id, or uploaded_url"
+                "image": "Provide only one of: image_file, image_id, or uploaded_url"
             })
 
         return data
