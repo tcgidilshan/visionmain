@@ -72,9 +72,10 @@ class FrameListCreateView(generics.ListCreateAPIView):
             
             frames = frames.filter(id__in=frame_ids_with_stock)
             
-            for frame in frames:
+            for frame in frames:               
                 stocks = frame.stocks.filter(branch_id=store_id, qty__gt=0)
-                frame_data = FrameSerializer(frame).data
+                frame_serializer = FrameSerializer(frame, context=self.get_serializer_context())
+                frame_data = frame_serializer.data
                 frame_data["stock"] = FrameStockSerializer(stocks, many=True).data
                 data.append(frame_data)
                 
