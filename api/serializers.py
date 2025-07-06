@@ -1163,6 +1163,7 @@ class FrameOnlyOrderSerializer(serializers.Serializer):
     sub_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     discount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0.00)
     total_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    order_remark = serializers.CharField(required=False, allow_blank=True)
     progress_status = serializers.ChoiceField(
     choices=[
         ('received_from_customer', 'Received from Customer'),

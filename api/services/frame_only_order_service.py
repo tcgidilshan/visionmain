@@ -52,7 +52,8 @@ class FrameOnlyOrderService:
             total_price=total_price,
             discount=discount,
             status=data.get("status", "pending"),
-            user_date=date.today()
+            user_date=date.today(),
+            order_remark=data.get("order_remark", "")  # Add order_remark from payload
         )
         
 
