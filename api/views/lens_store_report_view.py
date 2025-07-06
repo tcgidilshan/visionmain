@@ -358,8 +358,13 @@ class LensSaleReportView(generics.ListAPIView):
             coating = lens.coating.name if lens.coating else ""
             
             # Get powers for this lens
-            powers = LensPower.objects.filter(lens=lens).values('power__name', 'value', 'side')
-            
+            powers = LensPower.objects.filter(lens=lens).select_related('power').values(
+                    'lens',
+                    'power',
+                    'value',
+                    'side',
+                    power_name=F('power__name')
+                )
             result.append({
                 'lens_id': lens_id,
                 'lens_type': lens_type,
