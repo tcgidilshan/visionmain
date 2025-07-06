@@ -2,7 +2,7 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db import transaction
-from ..models import Lens, LensStock, LensPower
+from ..models import Lens, LensStock, LensPower,LensStockHistory
 from ..serializers import LensSerializer, LensStockSerializer, LensPowerSerializer
 from ..services.branch_protection_service import BranchProtectionsService
 from rest_framework.exceptions import ValidationError
@@ -160,6 +160,12 @@ class LensListCreateView(generics.ListCreateAPIView):
                 stock_serializer = LensStockSerializer(data=stock_data)
                 stock_serializer.is_valid(raise_exception=True)
                 created_stocks.append(stock_serializer.save())
+                LensStockHistory.objects.create(
+                    lens=lens,
+                    branch_id=stock_data['branch_id'],
+                    action=LensStockHistory.ADD,
+                    quantity_changed=stock_data['qty']
+                )
         else:
             return Response(
                 {"error": "Stock data must be a list."},

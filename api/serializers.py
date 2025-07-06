@@ -20,7 +20,7 @@ from .models import (
     ExternalLens,BusSystemSetting,
     OtherItem,BankAccount,BankDeposit,
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
-    UserBranch,ExpenseMainCategory, ExpenseSubCategory,
+    UserBranch,ExpenseMainCategory, ExpenseSubCategory,LensStockHistory,
     DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus,FrameImage
 )
 
@@ -269,6 +269,29 @@ class FrameStockHistorySerializer(serializers.ModelSerializer):
         fields = [
             'id', 
             'frame_id', 'brand', 'code', 'color', 'size', 'species',
+            'action', 'quantity_changed', 'timestamp',
+            'branch', 'transfer_to'
+        ]
+
+
+class LensStockHistorySerializer(serializers.ModelSerializer):
+    lens_id = serializers.IntegerField(source='lens.id', read_only=True)
+    brand = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all())
+    brand_name = serializers.CharField(source='brand.name', read_only=True)  # Get brand name  
+    type_name = serializers.CharField(source='type.name', read_only=True)  # Get brand name 
+    coating_name = serializers.CharField(source='coating.name', read_only=True)  # Get brand name 
+    action = serializers.CharField()
+    quantity_changed = serializers.IntegerField()
+    
+    # Nested serializers for related objects
+    branch = BranchSerializer(read_only=True)
+    transfer_to = BranchSerializer(read_only=True)
+    
+    class Meta:
+        model = LensStockHistory
+        fields = [
+            'id', 
+            'lens_id', 'brand_name', 'type_name', 'coating_name', 'size', 'species',
             'action', 'quantity_changed', 'timestamp',
             'branch', 'transfer_to'
         ]
