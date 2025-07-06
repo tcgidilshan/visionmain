@@ -745,8 +745,8 @@ class Invoice(models.Model):
                     else:
                         number = 1
 
-                    # Format as {BRANCH_PREFIX} followed by sequential number (e.g., COL001, COL002)
-                    self.invoice_number = f"{branch_prefix}{number:03d}"
+                    # Format as {BRANCH_PREFIX}N{number} (e.g., COMN001, COMN002)
+                    self.invoice_number = f"{branch_prefix}N{number:03d}"
             else:
                 # Original logic for other invoice types
                 branch_code = self.order.branch.branch_name[:3].upper()
