@@ -69,7 +69,7 @@ from .views import (
     SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
     GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView,MntOrderReportView,
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
-    FrameHistoryReportView,FrameSaleReportView
+    FrameHistoryReportView,FrameSaleReportView,LensSaleReportView
 )
 # from .views import CustomAuthToken
 
@@ -269,6 +269,7 @@ urlpatterns = [
     path('report/frame-history/',FrameHistoryReportView.as_view(), name='report-frame-history'),
     #sale report
     path('report/frame-sale/',FrameSaleReportView.as_view(), name='report-frame-sale'),
+    path('report/lens-sale/',LensSaleReportView.as_view(), name='report-lens-sale'),
     #reports
     path('reports/factory-orders/', FactoryOrderReportView.as_view(), name='factory-order-report'),
     path('reports/normal-orders/', NormalOrderReportView.as_view(), name='normal-order-report'),
