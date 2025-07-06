@@ -227,44 +227,48 @@ class LensRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         stock_data_list = request.data.get('stock', [])
         powers_data = request.data.get('powers', [])
 
-        if not lens_data:
-            return Response({"error": "Lens data is required."}, status=status.HTTP_400_BAD_REQUEST)
-        if not powers_data:
-            return Response({"error": "Powers data are required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not lens_data and not stock_data_list and not powers_data:
+            return Response({"error": "No data provided for update."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # If lens data is provided, validate it
+        if lens_data:
+            # Check for duplicate lens only if type, coating, or brand are being updated
+            type_id = lens_data.get('type', lens_instance.type_id)
+            coating_id = lens_data.get('coating', lens_instance.coating_id)
+            brand_id = lens_data.get('brand', lens_instance.brand_id)
 
-        # 🔥 STEP 1: Extract updated Lens Info
-        type_id = lens_data.get('type')
-        coating_id = lens_data.get('coating')
-        brand_id = lens_data.get('brand')
+            # Check for duplicate lens (excluding current one) only if we have powers data
+            if powers_data:
+                existing_lenses = Lens.objects.filter(
+                    type_id=type_id,
+                    coating_id=coating_id,
+                    brand_id=brand_id
+                ).exclude(id=lens_id)
 
-        # 🔥 STEP 2: Check for duplicate lens (excluding current one)
-        existing_lenses = Lens.objects.filter(
-            type_id=type_id,
-            coating_id=coating_id,
-            brand_id=brand_id
-        ).exclude(id=lens_id)
-
-        incoming_power_set = set(
-            (power['side'], str(power['value']), power['power'])
-            for power in powers_data
-        )
-
-        for existing_lens in existing_lenses:
-            existing_power_set = set(
-                (p.side, str(p.value), p.power_id)
-                for p in existing_lens.lens_powers.all()
-            )
-            if incoming_power_set == existing_power_set:
-                raise ValidationError(
-                    "Another lens with the same type, coating, brand, and powers already exists."
+                incoming_power_set = set(
+                    (power['side'], str(power['value']), power['power'])
+                    for power in powers_data
                 )
 
-        # ✅ STEP 3: Update Lens
-        lens_serializer = self.get_serializer(lens_instance, data=lens_data, partial=True)
-        lens_serializer.is_valid(raise_exception=True)
-        lens = lens_serializer.save()
+                for existing_lens in existing_lenses:
+                    existing_power_set = set(
+                        (p.side, str(p.value), p.power_id)
+                        for p in existing_lens.lens_powers.all()
+                    )
+                    if incoming_power_set == existing_power_set:
+                        raise ValidationError(
+                            "Another lens with the same type, coating, brand, and powers already exists."
+                        )
 
-        # ✅ STEP 4: Update/Create Stock
+        # If lens data is being updated, validate and save it
+        if lens_data:
+            lens_serializer = self.get_serializer(lens_instance, data=lens_data, partial=True)
+            lens_serializer.is_valid(raise_exception=True)
+            lens = lens_serializer.save()
+        else:
+            lens = lens_instance
+
+        # ✅ Update/Create Stock if stock data is provided
         if not isinstance(stock_data_list, list):
             return Response({"error": "Stock data must be a list."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -277,27 +281,49 @@ class LensRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
             stock_data['lens'] = lens.id
 
             stock_instance = LensStock.objects.filter(lens=lens, branch_id=branch_id).first()
+            old_qty = stock_instance.qty if stock_instance else 0
+            
             if stock_instance:
                 stock_serializer = LensStockSerializer(stock_instance, data=stock_data, partial=True)
             else:
                 stock_serializer = LensStockSerializer(data=stock_data)
 
             stock_serializer.is_valid(raise_exception=True)
-            updated_stocks.append(stock_serializer.save())
+            updated_stock = stock_serializer.save()
+            updated_stocks.append(updated_stock)
+            
+            # Create stock history record if quantity changed
+            if 'qty' in stock_data and stock_instance:
+                qty_difference = int(stock_data['qty']) - old_qty
+                if qty_difference != 0:
+                    action = LensStockHistory.ADD if qty_difference > 0 else LensStockHistory.REMOVE
+                    LensStockHistory.objects.create(
+                        lens=lens,
+                        branch_id=branch_id,
+                        action=action,
+                        quantity_changed=abs(qty_difference)
+                    )
 
-        # ✅ STEP 5: Replace Powers
-        lens.lens_powers.all().delete()
-        updated_powers = []
-        for power_data in powers_data:
-            power_data['lens'] = lens.id
-            power_serializer = LensPowerSerializer(data=power_data)
-            power_serializer.is_valid(raise_exception=True)
-            updated_powers.append(power_serializer.save())
+        # ✅ Update Powers if powers data is provided
+        if powers_data:
+            lens.lens_powers.all().delete()
+            updated_powers = []
+            for power_data in powers_data:
+                power_data['lens'] = lens.id
+                power_serializer = LensPowerSerializer(data=power_data)
+                power_serializer.is_valid(raise_exception=True)
+                updated_powers.append(power_serializer.save())
 
-        # ✅ STEP 6: Return Response
-        response_data = lens_serializer.data
-        response_data['stock'] = LensStockSerializer(updated_stocks, many=True).data
-        response_data['powers'] = powers_data
+        # ✅ Prepare Response
+        response_data = self.get_serializer(lens).data
+        response_data['stock'] = LensStockSerializer(
+            lens.stocks.all(), 
+            many=True
+        ).data if not stock_data_list else LensStockSerializer(updated_stocks, many=True).data
+        response_data['powers'] = LensPowerSerializer(
+            lens.lens_powers.all(), 
+            many=True
+        ).data if not powers_data else powers_data
 
         return Response(response_data, status=status.HTTP_200_OK)
 
