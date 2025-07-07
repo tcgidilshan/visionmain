@@ -1,6 +1,9 @@
 from django.urls import path
 from .views import LoginView, AdminOnlyView, SuperAdminOnlyView
 from .views import UserRegistrationView, AdminRegistrationView
+from django.conf import settings
+from django.conf.urls.static import static
+from .views.inventory_transfer import LensTransferView
 from .views import (
     BranchListCreateAPIView,OrderRefundView,FactoryOrderReportView,
     BranchRetrieveUpdateDestroyAPIView,NormalOrderReportView,
@@ -65,7 +68,8 @@ from .views import (
     DoctorClaimChannelListCreateView,DoctorClaimChannelRetrieveUpdateDestroyView,
     SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
     GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView,MntOrderReportView,
-    ArrivalStatusBulkCreateView,DailyOrderAuditReportView
+    ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
+    FrameHistoryReportView,FrameSaleReportView,LensSaleReportView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -129,9 +133,12 @@ urlpatterns = [
     path('frame-stocks/', FrameStockListCreateView.as_view(), name='frame-stock-list-create'),
     path('frame-stocks/<int:pk>/', FrameStockRetrieveUpdateDeleteView.as_view(), name='frame-stock-detail'),
     path('frames/', FrameListCreateView.as_view(), name='frame-list-create'),
+    path('frames/transfer/', FrameTransferView.as_view(), name='frame-transfer'),
+    path('lenses/transfer/', LensTransferView.as_view(), name='lens-transfer'),
     path('frames/<int:pk>/', FrameRetrieveUpdateDeleteView.as_view(), name='frame-detail'),
     path("frames/colors/", FrameColorListView.as_view(), name="frame-colors"),
     path("frames/stocks/adjust", StockAdjustmentView.as_view(), name="frame-stock-adjustment"),
+    path("frames/filter", FrameFilterView.as_view(), name="frame-stock-filter"),
 
     path('frames/report/', FrameReportView.as_view(), name='frames-report'), #frame reports
 
@@ -262,6 +269,11 @@ urlpatterns = [
     path("arrival-status/bulk-create/", ArrivalStatusBulkCreateView.as_view(),name="arrival-status-bulk"),
     path("orders/audit-report/", DailyOrderAuditReportView.as_view(), name="daily-order-audit-report"),
 
+    #store report
+    path('report/frame-history/',FrameHistoryReportView.as_view(), name='report-frame-history'),
+    #sale report
+    path('report/frame-sale/',FrameSaleReportView.as_view(), name='report-frame-sale'),
+    path('report/lens-sale/',LensSaleReportView.as_view(), name='report-lens-sale'),
     #reports
     path('reports/factory-orders/', FactoryOrderReportView.as_view(), name='factory-order-report'),
     path('reports/normal-orders/', NormalOrderReportView.as_view(), name='normal-order-report'),
@@ -273,7 +285,5 @@ urlpatterns = [
     path('banking-report/confirm/<int:deposit_id>/', ConfirmDepositView.as_view(), name='confirm-deposit'),
     path('reports/customer-location-statistics/', CustomerLocationStatisticsView.as_view(), name='customer-location-statistics-report'),
     path('reports/customer-location-table/', CustomerLocationTableView.as_view(), name='customer-location-table-report'),
-    
-    
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),

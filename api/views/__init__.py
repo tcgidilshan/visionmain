@@ -6,7 +6,7 @@ from .brand_views import BrandListCreateView,BrandRetrieveUpdateDeleteView
 from .color_views import ColorListCreateView,ColorRetrieveUpdateDeleteView
 from .code_views import CodeListCreateView,CodeRetrieveUpdateDeleteView
 from .frames_stock_views import FrameStockListCreateView,FrameStockRetrieveUpdateDeleteView,StockAdjustmentView
-from .frame_views import FrameListCreateView,FrameRetrieveUpdateDeleteView
+from .frame_views import FrameListCreateView,FrameRetrieveUpdateDeleteView,FrameFilterView
 from .power_views import PowerListCreateView,PowerRetrieveUpdateDeleteView
 from .lens_views import LensListCreateView,LensRetrieveUpdateDeleteView
 from .lens_power_views import LensPowerListCreateView,LensPowerRetrieveUpdateDeleteView
@@ -54,3 +54,6 @@ from .soldering_order_views import CreateSolderingOrderView,SolderingOrderProgre
 from .order_report import FittingStatusReportView,MntOrderReportView
 from .user_order_report_view import GlassSenderReportView
 from .order_audit_view import OrderDeleteRefundListView,OrderAuditHistoryView,DailyOrderAuditReportView
+from .inventory_transfer import FrameTransferView
+from .frame_store__report import FrameHistoryReportView,FrameSaleReportView
+from .lens_store_report_view import LensSaleReportView

@@ -10,6 +10,8 @@ from django.db.models import Max,Sum,Q
 from .managers import SoftDeleteManager
 from django.db import IntegrityError
 from django.utils.timezone import now
+from .services.image_uploard_service import compress_image_to_webp
+import uuid
 
 class Item(models.Model):
     name = models.CharField(max_length=100)
@@ -253,7 +255,26 @@ class Code(models.Model):
         unique_together = (
             'brand',
             'name'
-        )
+        )    
+
+class FrameImage(models.Model):
+    image = models.ImageField(upload_to='frame_images/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    
+    def __str__(self):
+        return f"Image {self.id}"
+    def save(self, *args, **kwargs):
+        # //TODO: Convert and compress only if new image uploaded or changed
+        if self.image and hasattr(self.image, 'file') and not str(self.image).endswith('.webp'):
+            new_image = compress_image_to_webp(self.image)
+            if new_image:
+                self.image.save(new_image.name, new_image, save=False)
+        super().save(*args, **kwargs)
+
+def frame_image_upload_path(instance, filename):
+    # Use the instance UUID for the folder
+    return f"frames/{instance.uuid}/{filename}"
     
 class Frame(models.Model):
     BRAND_CHOICES = (
@@ -267,22 +288,20 @@ class Frame(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     size = models.CharField(max_length=50)
     species = models.CharField(max_length=100)
-    image = models.CharField(max_length=255, blank=True, null=True)
     is_active = models.BooleanField(default=True) 
-
+    image = models.ForeignKey(FrameImage, on_delete=models.SET_NULL, null=True, blank=True)
     def __str__(self):
         return f"{self.brand.name} - {self.code.name} - {self.color.name} - {self.get_brand_type_display()}"
     class Meta:
         unique_together = (
             'brand',
-            'brand_type',
             'code',
             'color',
-            'species',
-            'size',
         )
     verbose_name = "Frame"
     verbose_name_plural = "Frames"
+    
+
     
 class FrameStock(models.Model):
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="frame_stocks", null=True, blank=True)
@@ -296,24 +315,46 @@ class FrameStock(models.Model):
 
 class FrameStockHistory(models.Model):
     ADD = 'add'
+    TRANSFER = 'transfer'
     REMOVE = 'remove'
 
     ACTION_CHOICES = [
         (ADD, 'Add'),
+        (TRANSFER, 'Transfer'),
         (REMOVE, 'Remove'),
     ]
-
     frame = models.ForeignKey('Frame', on_delete=models.CASCADE, related_name='stock_histories')
-    branch = models.ForeignKey('Branch', on_delete=models.CASCADE, related_name='stock_histories')
+    branch = models.ForeignKey('Branch', on_delete=models.CASCADE, related_name='branch_frame_stock')
+    transfer_to = models.ForeignKey('Branch', on_delete=models.CASCADE, related_name='frame_stock_transfers', null=True, blank=True)
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
     quantity_changed = models.PositiveIntegerField()
     timestamp = models.DateTimeField(auto_now_add=True)
-    performed_by = models.ForeignKey(CustomUser,related_name='stock_histories',on_delete=models.CASCADE, null=True, blank=True)
-    note = models.TextField(blank=True, null=True)
+    # performed_by = models.ForeignKey(CustomUser,related_name='stock_histories',on_delete=models.CASCADE, null=True, blank=True)
+    # note = models.TextField(blank=True, null=True)
 
     def __str__(self):
-        return f"{self.action.upper()} {self.quantity_changed} of {self.frame} at {self.branch} by {self.performed_by}"
-    
+        return f"{self.action.upper()} {self.quantity_changed} of {self.frame} at {self.branch}"
+class LensStockHistory(models.Model):
+    ADD = 'add'
+    TRANSFER = 'transfer'
+    REMOVE = 'remove'
+
+    ACTION_CHOICES = [
+        (ADD, 'Add'),
+        (TRANSFER, 'Transfer'),
+        (REMOVE, 'Remove'),
+    ]
+    lens = models.ForeignKey('Lens', on_delete=models.CASCADE, related_name='stock_histories')
+    branch = models.ForeignKey('Branch', on_delete=models.CASCADE, related_name='lens_stock_histories')  # Changed related_name
+    transfer_to = models.ForeignKey('Branch', on_delete=models.CASCADE, related_name='lens_stock_transfers', null=True, blank=True)
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES)
+    quantity_changed = models.PositiveIntegerField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    # performed_by = models.ForeignKey(CustomUser, related_name='lens_stock_histories', on_delete=models.CASCADE, null=True, blank=True)
+    # note = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.action.upper()} {self.quantity_changed} of {self.lens} at {self.branch}"
 class LenseType(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)  # Allows NULL and empty values
@@ -675,7 +716,6 @@ class Invoice(models.Model):
         self.save()
    
     def save(self, *args, **kwargs):
-        # Ensure invoice_date is set
         if not self.invoice_date:
             self.invoice_date = timezone.now()
 
@@ -683,44 +723,53 @@ class Invoice(models.Model):
             if not self.order or not self.order.branch:
                 raise ValueError("Invoice must be linked to an order with a valid branch.")
 
-            branch_code = self.order.branch.branch_name[:3].upper()
-            day_str = self.invoice_date.strftime('%d')  # 2-digit day
-
-            with transaction.atomic():
-                number = 1
-                if self.invoice_type == 'factory':
-                    # Just get the last invoice (ignore prefix), factory invoices are globally incrementing
-                    last_invoice = Invoice.all_objects.select_for_update().filter(
-                        invoice_type='factory'
-                    ).order_by('-id').first()
-
-                    if last_invoice and last_invoice.invoice_number:
-                        try:
-                            # Extract number by slicing out day digits (last 2 digits)
-                            last_number_part = last_invoice.invoice_number[-7:-2]  # 5 digits before day
-                            number = int(last_number_part) + 1
-                        except Exception:
-                            number = 1  # fallback
-
-                    padded = str(number).zfill(5)  # 5-digit padded number
-                    self.invoice_number = f"{branch_code}{padded}{day_str}"
-
-                elif self.invoice_type == 'normal':
-                    # Normal: MATN1, MATN2...
-                    prefix = f"{branch_code}N"
+            # Handle 'normal' invoice type with branch prefix
+            if self.invoice_type == 'normal':
+                with transaction.atomic():
+                    # Get the first 3 letters of branch name in uppercase
+                    branch_prefix = self.order.branch.branch_name[:3].upper()
+                    
+                    # Get the last invoice with 'normal' type for this branch
                     last_invoice = Invoice.all_objects.select_for_update().filter(
                         invoice_type='normal',
-                        invoice_number__startswith=prefix
+                        order__branch=self.order.branch
+                    ).order_by('-id').first()
+
+                    if last_invoice and last_invoice.invoice_number and last_invoice.invoice_number.startswith(branch_prefix):
+                        try:
+                            # Extract the numeric part after branch prefix and increment
+                            number_part = last_invoice.invoice_number[3:]  # Skip the 3-letter branch prefix
+                            number = int(number_part) + 1
+                        except (ValueError, IndexError):
+                            number = 1
+                    else:
+                        number = 1
+
+                    # Format as {BRANCH_PREFIX}N{number} (e.g., COMN001, COMN002)
+                    self.invoice_number = f"{branch_prefix}N{number:03d}"
+            else:
+                # Original logic for other invoice types
+                branch_code = self.order.branch.branch_name[:3].upper()
+                day_str = self.invoice_date.strftime('%d')  # Last 2 digits for day
+
+                with transaction.atomic():
+                    last_invoice = Invoice.all_objects.select_for_update().filter(
+                        invoice_type=self.invoice_type,
+                        order__branch=self.order.branch
                     ).order_by('-id').first()
 
                     if last_invoice and last_invoice.invoice_number:
                         try:
-                            last_number = int(last_invoice.invoice_number.replace(prefix, '', 1))
-                            number = last_number + 1
-                        except ValueError:
+                            # Extract padded number between branch_code (3 chars) and day_str (last 2 chars)
+                            last_number_part = last_invoice.invoice_number[3:-2]
+                            number = int(last_number_part) + 1
+                        except Exception:
                             number = 1
+                    else:
+                        number = 1
 
-                    self.invoice_number = f"{prefix}{number}"
+                    padded = str(number).zfill(5)
+                    self.invoice_number = f"{branch_code}{padded}{day_str}"
 
         super().save(*args, **kwargs)
 
@@ -910,7 +959,8 @@ class Appointment(models.Model):
             for _ in range(5):  # retry up to 5 times
                 try:
                     with transaction.atomic():
-                        max_id = Appointment.objects.select_for_update().filter(
+                        # Use all_objects to include soft-deleted records
+                        max_id = Appointment.all_objects.select_for_update().filter(
                             branch=self.branch
                         ).aggregate(Max('invoice_number'))['invoice_number__max']
                         self.invoice_number = (max_id or 0) + 1

@@ -10,22 +10,40 @@ class InvoiceReportService:
         """
         Returns filtered invoice data (factory & normal) based on payment date and branch.
         """
+        # print(f"\n=== DEBUG: get_invoice_report_by_payment_date ===")
+        # print(f"Input - payment_date_str: {payment_date_str}, branch_id: {branch_id}")
 
         try:
             payment_date = datetime.strptime(payment_date_str, "%Y-%m-%d").date()
-        except ValueError:
+            # print(f"Parsed payment_date: {payment_date}")
+        except ValueError as e:
+            error_msg = f"Error parsing date {payment_date_str}: {str(e)}"
+            # print(error_msg)
             raise ValueError("Invalid payment date format. Use YYYY-MM-DD.")
 
         # Get all payments made on that date for that branch
+        # print(f"Querying OrderPayment for date: {payment_date}, branch_id: {branch_id}")
+        
+        # Using range to handle timezone issues
+        start_datetime = datetime.combine(payment_date, datetime.min.time())
+        end_datetime = datetime.combine(payment_date, datetime.max.time())
+        
+        # print(f"Date range for query: {start_datetime} to {end_datetime}")
+        
         payments = OrderPayment.objects.select_related("order").filter(
-            payment_date__date=payment_date,
+            payment_date__range=(start_datetime, end_datetime),
             order__branch_id=branch_id
         )
+        # print(f"Found {payments.count()} payments")
 
         # Organize payments by order
+        # print("\n=== Processing Payments ===")
         payments_by_order = {}
         for payment in payments:
             oid = payment.order_id
+            # print(f"\nProcessing payment ID: {payment.id} for order ID: {oid}")
+            # print(f"Payment amount: {payment.amount}, method: {payment.payment_method}, date: {payment.payment_date}")
+            
             if oid not in payments_by_order:
                 payments_by_order[oid] = {
                     "cash": 0,
@@ -37,6 +55,9 @@ class InvoiceReportService:
             payments_by_order[oid][payment.payment_method] += float(payment.amount)
             payments_by_order[oid]["total"] += float(payment.amount)
 
+        # Debug: Print the payments_by_order keys (order IDs)
+        # print(f"\nOrders with payments: {list(payments_by_order.keys())}")
+        
         # Get all invoices where related order has at least 1 payment on that date
         invoice_qs = Invoice.objects.select_related("order").filter(
             order_id__in=payments_by_order.keys(),
@@ -44,6 +65,8 @@ class InvoiceReportService:
             is_deleted=False,
             order__is_deleted=False
         )
+        
+        # print(f"Found {invoice_qs.count()} invoices for these orders")
 
         results = []
 
@@ -67,6 +90,23 @@ class InvoiceReportService:
 
             results.append(data)
 
+        # Debug output for the report data
+        # print("\n=== Final Report Data ===")
+        # print(f"Number of orders in report: {len(results)}")
+        # if results:
+        #     print("Sample order data:")
+        #     for i, order in enumerate(results[:3]):  # Print first 3 orders or fewer
+        #         print(f"Order {i+1}: {order}")
+        # else:
+        #     print("No orders found in report data")
+            
+        #     # Debug: Check if there are any payments at all in the system
+        #     total_payments = OrderPayment.objects.count()
+        #     print(f"\nDebug: Total payments in system: {total_payments}")
+        #     if total_payments > 0:
+        #         latest_payment = OrderPayment.objects.order_by('-payment_date').first()
+        #         print(f"Latest payment in system: ID={latest_payment.id}, Date={latest_payment.payment_date}, Amount={latest_payment.amount}")
+        
         return results
 
     @staticmethod

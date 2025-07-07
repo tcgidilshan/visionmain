@@ -1,3 +1,4 @@
+from datetime import datetime
 from django.db.models import Sum, Q, F
 from api.models import Appointment, ChannelPayment
 
@@ -9,11 +10,18 @@ class ChannelReportService:
         Fetch and summarize all channel payments on a specific date and branch.
         """
 
-        # Step 1: Filter ChannelPayments
-        payments = ChannelPayment.objects.filter(
-           payment_date__date=payment_date,
-           appointment__branch_id=branch_id
-        ).select_related('appointment')
+        # Step 1: Filter ChannelPayments with timezone handling
+        try:
+            payment_date_obj = datetime.strptime(payment_date, "%Y-%m-%d").date()
+            start_datetime = datetime.combine(payment_date_obj, datetime.min.time())
+            end_datetime = datetime.combine(payment_date_obj, datetime.max.time())
+            
+            payments = ChannelPayment.objects.filter(
+                payment_date__range=(start_datetime, end_datetime),
+                appointment__branch_id=branch_id
+            ).select_related('appointment')
+        except (ValueError, TypeError) as e:
+            raise ValueError("Invalid payment date format. Use YYYY-MM-DD.")
 
         # Step 2: Group by appointment
         results = {}

@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.db.models import Sum
 from django.db import models
 from rest_framework.exceptions import ValidationError
+import os
 from .models import (
     Branch,Refraction,RefractionDetails,RefractionDetailsAuditLog,
     Brand,Color,Code,Frame,
@@ -9,7 +10,7 @@ from .models import (
     LenseType,
     Coating,
     Lens,
-    LensStock,
+    LensStock,FrameStockHistory,
     Power,
     LensPower,LensCleaner,
     LensCleanerStock,Order,OrderItem,OrderPayment,Doctor,Patient,Schedule,Appointment,
@@ -19,8 +20,8 @@ from .models import (
     ExternalLens,BusSystemSetting,
     OtherItem,BankAccount,BankDeposit,
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
-    UserBranch,ExpenseMainCategory, ExpenseSubCategory,
-    DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus
+    UserBranch,ExpenseMainCategory, ExpenseSubCategory,LensStockHistory,
+    DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus,FrameImage
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -108,29 +109,176 @@ class CodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Code
         fields = ['id', 'name', 'brand','brand_name']
-        
+
+class FrameImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FrameImage
+        fields = ['id', 'image', 'uploaded_at']
 class FrameSerializer(serializers.ModelSerializer):
-    brand_name = serializers.CharField(source='brand.name', read_only=True)  # Get brand name
-    code_name = serializers.CharField(source='code.name', read_only=True)    # Get code name
-    color_name = serializers.CharField(source='color.name', read_only=True)  # Get color name
+    # Read-only display fields
+    brand_name = serializers.CharField(source='brand.name', read_only=True)
+    code_name = serializers.CharField(source='code.name', read_only=True)
+    color_name = serializers.CharField(source='color.name', read_only=True)
     brand_type_display = serializers.CharField(source='get_brand_type_display', read_only=True)
+
+    # For API consumers
+    image_url = serializers.SerializerMethodField()
+
+    # Image input options (one of the three)
+    image_file = serializers.ImageField(write_only=True, required=False)
+    uploaded_url = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    image_id = serializers.PrimaryKeyRelatedField(
+        queryset=FrameImage.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
 
     class Meta:
         model = Frame
         fields = [
-            'id',
-            'brand', 'brand_name',  
-            'code', 'code_name',   
-            'color', 'color_name',  
-            'price',
-            'size',
-            'species',
-            'image',
-            'brand_type',
-            'brand_type_display',
+            'id', 'brand', 'brand_name', 'code', 'code_name', 'color', 'color_name',
+            'price', 'size', 'species', 'brand_type', 'brand_type_display',
             'is_active',
+            'image_file', 'uploaded_url', 'image_id',  # image input options
+            'image_url',  # read-only image access
         ]
-        
+
+    def validate(self, data):
+        """
+        If any image-related fields are provided, ensure they are valid.
+        If none are provided, that's fine too - the frame can be created without an image.
+        """
+        has_file = bool(data.get('image_file'))
+        has_id = bool(data.get('image_id'))
+        has_url = bool(data.get('uploaded_url'))
+
+        # If no image fields are provided and this is not an update with existing image
+        if not (has_file or has_id or has_url):
+            if self.instance and self.instance.image:
+                # Keep existing image if updating without providing new image
+                return data
+            # Allow creating/updating without an image
+            return data
+
+        # If we get here, at least one image field was provided, so validate them
+        if sum([has_file, has_id, has_url]) > 1:
+            raise serializers.ValidationError({
+                "image": "Provide only one of: image_file, image_id, or uploaded_url"
+            })
+
+        return data
+
+    def create(self, validated_data):
+        uploaded_url = validated_data.pop('uploaded_url', None)
+        image_file = validated_data.pop('image_file', None)
+        image_id = validated_data.pop('image_id', None)
+
+        # Set the image field using one of the provided methods
+        if image_file:
+            frame_image = FrameImage(image=image_file)
+            frame_image.save()
+            validated_data['image'] = frame_image
+        elif uploaded_url:
+            validated_data['image'] = self.handle_uploaded_url(uploaded_url)
+        elif image_id:
+            validated_data['image'] = image_id
+
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        uploaded_url = validated_data.pop('uploaded_url', None)
+        image_file = validated_data.pop('image_file', None)
+        image_id = validated_data.pop('image_id', None)
+
+        # Optional image update
+        if image_file:
+            frame_image = FrameImage(image=image_file)
+            frame_image.save()
+            instance.image = frame_image
+        elif uploaded_url:
+            instance.image = self.handle_uploaded_url(uploaded_url)
+        elif image_id:
+            instance.image = image_id
+
+        return super().update(instance, validated_data)
+
+    def get_image_url(self, obj):
+        print(f"\n[DEBUG] Getting image URL for frame ID: {obj.id}")
+        if not hasattr(obj, 'image') or not obj.image:
+            print(f"[DEBUG] No image found for frame {obj.id}")
+            return None
+            
+        try:
+            print(f"[DEBUG] Frame {obj.id} has image: {obj.image.id}")
+            print(f"[DEBUG] Image file: {obj.image.image}")
+            print(f"[DEBUG] Image file exists: {obj.image.image and hasattr(obj.image.image, 'url')}")
+            
+            if not hasattr(obj.image, 'image') or not obj.image.image:
+                print(f"[DEBUG] No image file found for frame {obj.id}")
+                return None
+                
+            # Get the URL from the image field
+            image_url = obj.image.image.url
+            print(f"[DEBUG] Image URL from model: {image_url}")
+            
+            # If it's already a full URL, return as is
+            if image_url.startswith(('http://', 'https://')):
+                print(f"[DEBUG] Already a full URL: {image_url}")
+                return image_url
+                
+            # Handle relative URLs
+            request = self.context.get('request')
+            if request:
+                full_url = request.build_absolute_uri(image_url)
+                print(f"[DEBUG] Built full URL with request: {full_url}")
+                return full_url
+                
+            # Fallback: Try to construct URL from settings
+            from django.conf import settings
+            if hasattr(settings, 'SITE_URL'):
+                full_url = f"{settings.SITE_URL.rstrip('/')}/{image_url.lstrip('/')}"
+                print(f"[DEBUG] Using SITE_URL fallback: {full_url}")
+                return full_url
+                
+            # Last resort: Just return the relative URL
+            print("[DEBUG] No request context or SITE_URL setting found, returning relative URL")
+            return image_url
+            
+        except Exception as e:
+            print(f"[ERROR] Error getting image URL for frame {obj.id}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def handle_uploaded_url(self, uploaded_url: str) -> FrameImage:
+        """
+        Download the file from the given URL and store it as a FrameImage.
+        """
+        import tempfile
+        import requests
+        from django.core.files import File
+        import os
+
+        response = requests.get(uploaded_url, stream=True)
+        if response.status_code != 200:
+            raise serializers.ValidationError({"uploaded_url": "Unable to fetch image from URL."})
+
+        filename = uploaded_url.split("/")[-1]
+        ext = os.path.splitext(filename)[-1].lower()
+        if ext not in [".jpg", ".jpeg", ".png", ".webp"]:
+            raise serializers.ValidationError({"uploaded_url": "Unsupported file format."})
+
+        with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
+            for chunk in response.iter_content(1024 * 1024):  # 1MB chunks
+                tmp_file.write(chunk)
+            tmp_file.flush()
+            django_file = File(tmp_file, name=filename)
+            frame_image = FrameImage(image=django_file)
+            frame_image.save()
+            return frame_image
+
+
 class FrameStockSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(),  # Ensures valid branch selection
@@ -141,7 +289,55 @@ class FrameStockSerializer(serializers.ModelSerializer):
     class Meta:
         model = FrameStock
         fields = ['id', 'frame', 'qty', 'initial_count','limit','branch_id','branch_name']
-        
+
+
+class FrameStockHistorySerializer(serializers.ModelSerializer):
+    frame_id = serializers.IntegerField(source='frame.id', read_only=True)
+    brand = serializers.CharField(source='frame.brand.name', read_only=True)
+    code = serializers.CharField(source='frame.code.name', read_only=True)
+    color = serializers.CharField(source='frame.color.name', read_only=True)
+    size = serializers.CharField(source='frame.size', read_only=True)
+    species = serializers.CharField(source='frame.species', read_only=True)
+    action = serializers.CharField()
+    quantity_changed = serializers.IntegerField()
+    
+    # Nested serializers for related objects
+    branch = BranchSerializer(read_only=True)
+    transfer_to = BranchSerializer(read_only=True)
+    
+    class Meta:
+        model = FrameStockHistory
+        fields = [
+            'id', 
+            'frame_id', 'brand', 'code', 'color', 'size', 'species',
+            'action', 'quantity_changed', 'timestamp',
+            'branch', 'transfer_to'
+        ]
+
+
+class LensStockHistorySerializer(serializers.ModelSerializer):
+    lens_id = serializers.IntegerField(source='lens.id', read_only=True)
+    brand = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all())
+    brand_name = serializers.CharField(source='brand.name', read_only=True)  # Get brand name  
+    type_name = serializers.CharField(source='type.name', read_only=True)  # Get brand name 
+    coating_name = serializers.CharField(source='coating.name', read_only=True)  # Get brand name 
+    action = serializers.CharField()
+    quantity_changed = serializers.IntegerField()
+    
+    # Nested serializers for related objects
+    branch = BranchSerializer(read_only=True)
+    transfer_to = BranchSerializer(read_only=True)
+    
+    class Meta:
+        model = LensStockHistory
+        fields = [
+            'id', 
+            'lens_id', 'brand_name', 'type_name', 'coating_name', 'size', 'species',
+            'action', 'quantity_changed', 'timestamp',
+            'branch', 'transfer_to'
+        ]
+
+
 class LenseTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = LenseType
@@ -158,13 +354,13 @@ class CoatingSerializer(serializers.ModelSerializer):
         
 class LensSerializer(serializers.ModelSerializer):
     brand = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all())
-    brand_name = serializers.CharField(source='brand.name', read_only=True)  # ✅ Get brand name  
-    type_name = serializers.CharField(source='type.name', read_only=True)  # ✅ Get brand name 
-    coating_name = serializers.CharField(source='coating.name', read_only=True)  # ✅ Get brand name 
+    brand_name = serializers.CharField(source='brand.name', read_only=True)  # Get brand name  
+    type_name = serializers.CharField(source='type.name', read_only=True)  # Get brand name 
+    coating_name = serializers.CharField(source='coating.name', read_only=True)  # Get brand name 
 
     class Meta:
         model = Lens
-        fields = ['id', 'type', 'coating', 'price','brand', 'brand_name','type_name','coating_name','is_active']
+        fields = ['id', 'type', 'coating', 'price','brand','brand_name','type_name','coating_name','is_active']
 
     def validate(self, data):
         if 'brand' not in data:
@@ -771,7 +967,7 @@ class OrderProgressSerializer(serializers.ModelSerializer):
         fields = ['id', 'progress_status', 'changed_at']
 
 class InvoiceSearchSerializer(serializers.ModelSerializer):
-    customer = serializers.PrimaryKeyRelatedField(source='order.customer.name', read_only=True)  # ✅ Fetch customer ID
+    customer = serializers.PrimaryKeyRelatedField(source='order.customer.name', read_only=True)  # Fetch customer ID
     # customer_details = PatientSerializer(source='order.customer', read_only=True)  #  Full customer details
     # refraction_details = RefractionSerializer(source='order.refraction', read_only=True)  # Refraction details (if exists)
     payments = serializers.SerializerMethodField()
@@ -968,8 +1164,8 @@ class BankDepositSerializer(serializers.ModelSerializer):
             'id',
             'branch',
             'bank_account',
-            'bank_name',         # 🔁 from FK (read-only)
-            'account_number',    # 🔁 from FK (read-only)
+            'bank_name',         # from FK (read-only)
+            'account_number',    # from FK (read-only)
             'amount',
             'date',
             'is_confirmed',
@@ -1008,6 +1204,7 @@ class FrameOnlyOrderSerializer(serializers.Serializer):
     sub_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     discount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0.00)
     total_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    order_remark = serializers.CharField(required=False, allow_blank=True)
     progress_status = serializers.ChoiceField(
     choices=[
         ('received_from_customer', 'Received from Customer'),
