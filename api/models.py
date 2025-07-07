@@ -260,7 +260,7 @@ class Code(models.Model):
 class FrameImage(models.Model):
     image = models.ImageField(upload_to='frame_images/')
     uploaded_at = models.DateTimeField(auto_now_add=True)
-    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=False)
     
     def __str__(self):
         return f"Image {self.id}"
