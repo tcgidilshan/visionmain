@@ -42,7 +42,7 @@ class BankDeposit(models.Model):
     bank_account = models.ForeignKey(BankAccount, on_delete=models.CASCADE, related_name="deposits")
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField()
-    is_confirmed = models.BooleanField(default=False)  # ✅ For "ticking" confirmed deposits
+    is_confirmed = models.BooleanField(default=False)  # For "ticking" confirmed deposits
     note = models.TextField(blank=True, null=True)
 
 class CustomUser(AbstractUser):
@@ -260,7 +260,7 @@ class Code(models.Model):
 class FrameImage(models.Model):
     image = models.ImageField(upload_to='frame_images/')
     uploaded_at = models.DateTimeField(auto_now_add=True)
-    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=False)
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     
     def __str__(self):
         return f"Image {self.id}"
@@ -424,7 +424,7 @@ class LensPower(models.Model):
 class LensCleaner(models.Model):
     name = models.CharField(max_length=255)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    is_active = models.BooleanField(default=True)  # ✅ Soft delete flag
+    is_active = models.BooleanField(default=True)  # Soft delete flag
 
     def __str__(self):
         return self.name
@@ -793,7 +793,7 @@ class OrderItem(models.Model):
     quantity = models.PositiveIntegerField(default=1)
     price_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
-    is_non_stock = models.BooleanField(default=False)  # ✅ Mark Non-Stock Items
+    is_non_stock = models.BooleanField(default=False)  # Mark Non-Stock Items
     note = models.TextField(blank=True, null=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
@@ -1233,8 +1233,3 @@ class DailyCashInHandRecord(models.Model):
 
     def __str__(self):
         return f"Branch {self.branch_id} - {self.date}: {self.cash_in_hand}"
-
-
-
-
-    
