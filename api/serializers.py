@@ -204,51 +204,48 @@ class FrameSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
     def get_image_url(self, obj):
-        print(f"\n[DEBUG] Getting image URL for frame ID: {obj.id}")
+        """
+        Safely get the image URL with proper error handling
+        """
         if not hasattr(obj, 'image') or not obj.image:
-            print(f"[DEBUG] No image found for frame {obj.id}")
             return None
             
         try:
-            print(f"[DEBUG] Frame {obj.id} has image: {obj.image.id}")
-            print(f"[DEBUG] Image file: {obj.image.image}")
-            print(f"[DEBUG] Image file exists: {obj.image.image and hasattr(obj.image.image, 'url')}")
-            
+            # Check if image field exists and has a value
             if not hasattr(obj.image, 'image') or not obj.image.image:
-                print(f"[DEBUG] No image file found for frame {obj.id}")
                 return None
-                
-            # Get the URL from the image field
-            image_url = obj.image.image.url
-            print(f"[DEBUG] Image URL from model: {image_url}")
-            
+
+            # Get the image field
+            image_field = obj.image.image
+
+            # Check if the file exists
+            if not image_field:
+                return None
+
+            # Get the URL
+            url = image_field.url
+
             # If it's already a full URL, return as is
-            if image_url.startswith(('http://', 'https://')):
-                print(f"[DEBUG] Already a full URL: {image_url}")
-                return image_url
-                
+            if url.startswith(('http://', 'https://')):
+                return url
+
             # Handle relative URLs
             request = self.context.get('request')
             if request:
-                full_url = request.build_absolute_uri(image_url)
-                print(f"[DEBUG] Built full URL with request: {full_url}")
-                return full_url
-                
+                return request.build_absolute_uri(url)
+
             # Fallback: Try to construct URL from settings
             from django.conf import settings
             if hasattr(settings, 'SITE_URL'):
-                full_url = f"{settings.SITE_URL.rstrip('/')}/{image_url.lstrip('/')}"
-                print(f"[DEBUG] Using SITE_URL fallback: {full_url}")
-                return full_url
-                
-            # Last resort: Just return the relative URL
-            print("[DEBUG] No request context or SITE_URL setting found, returning relative URL")
-            return image_url
-            
+                return f"{settings.SITE_URL.rstrip('/')}/{url.lstrip('/')}"
+
+            # Last resort: Return relative URL
+            return url
+
         except Exception as e:
-            print(f"[ERROR] Error getting image URL for frame {obj.id}: {str(e)}")
-            import traceback
-            traceback.print_exc()
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting image URL: {str(e)}", exc_info=True)
             return None
 
     def handle_uploaded_url(self, uploaded_url: str) -> FrameImage:
