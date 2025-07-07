@@ -14,6 +14,6 @@ db.sqlite3
 # Ignore Django static and media files
 staticfiles/
 media/
-myapi/settings.py
+# myapi/settings.py
 get-pip.py
 
