@@ -42,7 +42,7 @@ class BankDeposit(models.Model):
     bank_account = models.ForeignKey(BankAccount, on_delete=models.CASCADE, related_name="deposits")
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField()
-    is_confirmed = models.BooleanField(default=False)  # ✅ For "ticking" confirmed deposits
+    is_confirmed = models.BooleanField(default=False)  # For "ticking" confirmed deposits
     note = models.TextField(blank=True, null=True)
 
 class CustomUser(AbstractUser):
@@ -258,24 +258,29 @@ class Code(models.Model):
         )    
 
 class FrameImage(models.Model):
-    image = models.ImageField(upload_to='frame_images/')
+    def get_upload_path(instance, filename):
+        # This will create a path like: frame_images/<uuid>/<filename>
+        return f'frame_images/{instance.uuid}/{filename}'
+        
+    image = models.ImageField(upload_to=get_upload_path)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     
     def __str__(self):
         return f"Image {self.id}"
+        
     def save(self, *args, **kwargs):
-        # //TODO: Convert and compress only if new image uploaded or changed
+        # Generate UUID first if it's a new instance
+        if not self.uuid:
+            self.uuid = uuid.uuid4()
+            
+        # Handle image conversion and compression
         if self.image and hasattr(self.image, 'file') and not str(self.image).endswith('.webp'):
             new_image = compress_image_to_webp(self.image)
             if new_image:
                 self.image.save(new_image.name, new_image, save=False)
         super().save(*args, **kwargs)
 
-def frame_image_upload_path(instance, filename):
-    # Use the instance UUID for the folder
-    return f"frames/{instance.uuid}/{filename}"
-    
 class Frame(models.Model):
     BRAND_CHOICES = (
         ('branded', 'Branded'),
@@ -1231,8 +1236,3 @@ class DailyCashInHandRecord(models.Model):
 
     def __str__(self):
         return f"Branch {self.branch_id} - {self.date}: {self.cash_in_hand}"
-
-
-
-
-    

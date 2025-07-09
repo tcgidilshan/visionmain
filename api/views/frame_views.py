@@ -173,11 +173,13 @@ class FrameRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         """
         Retrieve a frame along with its stock details.
         """
-        branch=BranchProtectionsService.validate_branch_id(request)
+        branch = BranchProtectionsService.validate_branch_id(request)
         frame = self.get_object()
         stock = frame.stocks.filter(branch_id=branch.id)
-        frame_data = FrameSerializer(frame).data
-        frame_data["stock"] = FrameStockSerializer(stock, many=True).data 
+        frame_serializer = self.get_serializer(frame)
+        frame_data = frame_serializer.data
+        frame_data["stock"] = FrameStockSerializer(stock, many=True).data
+        frame_data["image_url"] = frame_serializer.get_image_url(frame) if frame.image else None
         return Response(frame_data)
 
     @transaction.atomic
