@@ -1,9 +1,9 @@
 from django.utils import timezone
 from django.db.models import Sum
-from datetime import timedelta
-from datetime import date
+from datetime import timedelta, datetime, date
 from ..models import OrderPayment,ChannelPayment,OtherIncome,Expense,BankDeposit,SafeTransaction,SolderingPayment,DailyCashInHandRecord
 from decimal import Decimal
+from django.utils.timezone import is_naive, make_aware, localtime
 
 class DailyFinanceSummaryService:
 
@@ -41,12 +41,30 @@ class DailyFinanceSummaryService:
             date__in=[timezone.localdate(), timezone.localdate() - timedelta(days=1)]
         )
 
-        # Return historical data (excluding today and yesterday)
-        historical_data = [{'date': record.date, 'cash_in_hand': record.cash_in_hand} for record in records]
+        # Convert to timezone-aware ISO string
+        historical_data = []
+        for record in records:
+            dt = record.date
+            if isinstance(dt, datetime):
+                if is_naive(dt):
+                    dt = make_aware(dt)
+                dt = localtime(dt).isoformat()
+            else:
+                # Assume it's a `date` object (safe), just convert to ISO string
+                dt = dt.isoformat()
+
+            historical_data.append({
+                'date': dt,
+                'cash_in_hand': record.cash_in_hand
+            })
+
         print(f"Historical data (excluding today and yesterday): {historical_data}")
 
-        # Return full summary for today (including today and yesterday calculations)
-        return DailyFinanceSummaryService.calculate_for_day(branch_id, date)
+        # Optionally: return full report including historical
+        summary = DailyFinanceSummaryService.calculate_for_day(branch_id, date)
+        summary['historical_data'] = historical_data  # Include in response
+        return summary
+
 
     @staticmethod
     def calculate_for_day(branch_id, date):
