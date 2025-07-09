@@ -301,8 +301,6 @@ class Frame(models.Model):
     verbose_name = "Frame"
     verbose_name_plural = "Frames"
     
-
-    
 class FrameStock(models.Model):
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="frame_stocks", null=True, blank=True)
     frame = models.ForeignKey(Frame, related_name='stocks', on_delete=models.CASCADE)
