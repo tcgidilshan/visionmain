@@ -191,7 +191,12 @@ class FrameRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         frame = self.get_object()
         old_image = frame.image.path if frame.image and hasattr(frame.image, 'path') else None
         old_image_relative = str(frame.image) if frame.image else None
-        
+        frames_using_same_image = []
+        if "image" in request.data and request.data["image"] is not None and request.data["image"] != "":
+    # Get all frames that use the same image
+            frames_using_same_image = Frame.objects.filter(image_id=frame.image_id)
+            print(f"Found {frames_using_same_image.count()} frames using the same image")
+
         # Handle stock data which might be a JSON string
         stock_data = request.data.get("stock")
         if stock_data and isinstance(stock_data, str):
