@@ -158,21 +158,20 @@ class DailyOrderAuditReportView(generics.ListAPIView):
         start, end = self._parse_range()
         branch_id  = self.request.query_params.get("branch_id")
 
-        # -- 1️⃣ orders whose *refraction* changed in range ---------------- #
-        refraction_ids = RefractionDetailsAuditLog.objects.filter(
-            created_at__gte=start,
-            created_at__lt=end,
-        ).values_list(
-            "refraction_details__refraction_id", flat=True
-        )
+        # Start with all non-deleted invoices
+        qs = Invoice.objects.filter(is_deleted=False)
 
-        qs = Invoice.objects.filter(
-            order__refraction_id__in=refraction_ids,
-            is_deleted=False,
-        )
-
+        # Filter by branch if specified
         if branch_id:
             qs = qs.filter(order__branch_id=branch_id)
+
+        # -- 1️⃣ orders whose *refraction* changed in range ---------------- #
+        refraction_sq = RefractionDetailsAuditLog.objects.filter(
+            created_at__gte=start,
+            created_at__lt=end,
+            refraction_details__refraction_id=OuterRef("order__refraction_id")
+        )
+        qs = qs.annotate(has_refraction_change=Exists(refraction_sq))
 
         # -- 2️⃣ header-level OrderAuditLog -------------------------------- #
         header_sq = OrderAuditLog.objects.filter(
@@ -202,7 +201,14 @@ class DailyOrderAuditReportView(generics.ListAPIView):
         )
         qs = qs.annotate(order_payment=Exists(pay_sq))
 
-        # ------------------------------------------------------------------ #
+        # Filter to only include invoices with at least one type of change
+        qs = qs.filter(
+            Q(has_refraction_change=True) |
+            Q(order_details=True) |
+            Q(order_item=True) |
+            Q(order_payment=True)
+        )
+        
         return qs.order_by("-invoice_date").distinct()
 
     # --------------------------------------------------------------------- #

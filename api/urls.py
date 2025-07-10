@@ -69,7 +69,7 @@ from .views import (
     SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
     GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView,MntOrderReportView,
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
-    FrameHistoryReportView,FrameSaleReportView,LensSaleReportView
+    FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -285,5 +285,9 @@ urlpatterns = [
     path('banking-report/confirm/<int:deposit_id>/', ConfirmDepositView.as_view(), name='confirm-deposit'),
     path('reports/customer-location-statistics/', CustomerLocationStatisticsView.as_view(), name='customer-location-statistics-report'),
     path('reports/customer-location-table/', CustomerLocationTableView.as_view(), name='customer-location-table-report'),
+    path('orders/<int:order_id>/images/', OrderImageListCreateView.as_view(), name='order-image-list-create'),
+    path('orders/<int:order_id>/images/<int:pk>', OrderImageDetailView.as_view(), name='order-image-detail'),
+    path('orders/<int:order_id>/images/<int:pk>/', OrderImageDetailView.as_view(), name='order-image-detail-slash'),
+    
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),

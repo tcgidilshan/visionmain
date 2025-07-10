@@ -6,6 +6,7 @@ from ..services.pagination_service import PaginationService
 from django.db.models import Sum, Q, Min, Max
 from datetime import datetime
 from django.utils import timezone
+from django.conf import settings
 
 class FrameHistoryReportView(generics.ListAPIView):
     pagination_class = PaginationService
@@ -98,11 +99,12 @@ class FrameSaleReportView(generics.ListAPIView):
             # Make end_date include the entire day
             end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
             
-            # Make timezone aware if needed
-            if timezone.is_naive(start_date):
-                start_date = timezone.make_aware(start_date)
-            if timezone.is_naive(end_date):
-                end_date = timezone.make_aware(end_date)
+            # Only make timezone aware if USE_TZ is True in settings
+            if getattr(settings, 'USE_TZ', False):
+                if timezone.is_naive(start_date):
+                    start_date = timezone.make_aware(start_date)
+                if timezone.is_naive(end_date):
+                    end_date = timezone.make_aware(end_date)
                 
             print(f"DEBUG: Parsed date range - Start: {start_date}, End: {end_date}")
                 
