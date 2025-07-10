@@ -281,6 +281,31 @@ class FrameImage(models.Model):
                 self.image.save(new_image.name, new_image, save=False)
         super().save(*args, **kwargs)
 
+class OrderImage(models.Model):
+    def get_upload_path(instance, filename):
+        # This will create a path like: order_images/<uuid>/<filename>
+        return f'order_images/{instance.uuid}/{filename}'
+        
+    image = models.ImageField(upload_to=get_upload_path)
+    order = models.ForeignKey('Order', related_name='order_images', on_delete=models.CASCADE)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    
+    def __str__(self):
+        return f"Image {self.id}"
+        
+    def save(self, *args, **kwargs):
+        # Generate UUID first if it's a new instance
+        if not self.uuid:
+            self.uuid = uuid.uuid4()
+            
+        # Handle image conversion and compression
+        if self.image and hasattr(self.image, 'file') and not str(self.image).endswith('.webp'):
+            new_image = compress_image_to_webp(self.image)
+            if new_image:
+                self.image.save(new_image.name, new_image, save=False)
+        super().save(*args, **kwargs)
+
 class Frame(models.Model):
     BRAND_CHOICES = (
         ('branded', 'Branded'),

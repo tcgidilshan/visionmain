@@ -9,7 +9,7 @@ from .models import (
     FrameStock,
     LenseType,
     Coating,
-    Lens,
+    Lens,OrderImage,
     LensStock,FrameStockHistory,
     Power,
     LensPower,LensCleaner,
@@ -113,6 +113,10 @@ class CodeSerializer(serializers.ModelSerializer):
 class FrameImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = FrameImage
+        fields = ['id', 'image', 'uploaded_at']
+class OrderImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderImage
         fields = ['id', 'image', 'uploaded_at']
 class FrameSerializer(serializers.ModelSerializer):
     # Read-only display fields
