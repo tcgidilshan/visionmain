@@ -115,9 +115,18 @@ class FrameImageSerializer(serializers.ModelSerializer):
         model = FrameImage
         fields = ['id', 'image', 'uploaded_at']
 class OrderImageSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+    
     class Meta:
         model = OrderImage
-        fields = ['id', 'image', 'uploaded_at']
+        fields = ['id', 'order', 'image', 'image_url', 'uploaded_at', 'uuid']
+        read_only_fields = ['uploaded_at', 'uuid']
+    
+    def get_image_url(self, obj):
+        if obj.image:
+            return obj.image.url
+        return None
+
 class FrameSerializer(serializers.ModelSerializer):
     # Read-only display fields
     brand_name = serializers.CharField(source='brand.name', read_only=True)
