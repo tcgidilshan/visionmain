@@ -1,7 +1,7 @@
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from ..models import Frame, FrameStock, Branch, FrameStockHistory
+from ..models import Frame, FrameStock, Branch, FrameStockHistory,FrameImage
 from ..serializers import FrameSerializer, FrameStockSerializer
 from django.db import transaction
 from ..services.branch_protection_service import BranchProtectionsService
@@ -193,9 +193,23 @@ class FrameRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         old_image_relative = str(frame.image) if frame.image else None
         frames_using_same_image = []
         if "image" in request.data and request.data["image"] is not None and request.data["image"] != "":
-    # Get all frames that use the same image
-            frames_using_same_image = Frame.objects.filter(image_id=frame.image_id)
-            print(f"Found {frames_using_same_image.count()} frames using the same image")
+            # Get all frames that use the same image
+            frames_using_same_image = list(Frame.objects.filter(image_id=frame.image_id).exclude(id=frame.id))
+            old_image = frame.image  # Store reference to the old image
+
+            # Create a new image for the frame
+            new_image = request.data["image"]
+            create_new_image = FrameImage.objects.create(image=new_image)
+            # Update the current frame with the new image
+            frame.image = create_new_image
+            frame.save()
+            # Update all frames that were using the same image
+            if frames_using_same_image:
+                Frame.objects.filter(id__in=[f.id for f in frames_using_same_image]).update(image=create_new_image)
+
+            # Delete the old image if no other frames are using it
+            if old_image and not Frame.objects.filter(image=old_image).exists():
+                old_image.delete()  # This will delete the FrameImage row and the file
 
         # Handle stock data which might be a JSON string
         stock_data = request.data.get("stock")
