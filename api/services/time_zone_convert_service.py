@@ -30,7 +30,7 @@ class TimezoneConverterService:
                 end_datetime = timezone.make_aware(
                     datetime.combine(end_date_obj, time.max)
                 )
-
+ 
             elif start_date and not end_date:
                 # Use start_date for both start and end
                 start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
