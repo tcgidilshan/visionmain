@@ -25,10 +25,14 @@ class InvoiceReportService:
         # print(f"Querying OrderPayment for date: {payment_date}, branch_id: {branch_id}")
         
         # Using range to handle timezone issues
-        start_datetime = datetime.combine(payment_date, datetime.min.time())
-        end_datetime = datetime.combine(payment_date, datetime.max.time())
+        start_datetime = timezone.make_aware(
+            datetime.combine(payment_date, time.min)
+        )
+        end_datetime = timezone.make_aware(
+            datetime.combine(payment_date, time.max)
+        )
         
-        # print(f"Date range for query: {start_datetime} to {end_datetime}")
+        print(f"Date range for query: {start_datetime} to {end_datetime}")
         
         payments = OrderPayment.objects.select_related("order").filter(
             payment_date__range=(start_datetime, end_datetime),
