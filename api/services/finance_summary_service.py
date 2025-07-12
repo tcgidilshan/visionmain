@@ -12,6 +12,28 @@ class DailyFinanceSummaryService:
         return queryset.aggregate(total=Sum(field)).get('total') or Decimal("0.00")
 
     @staticmethod
+    def _ensure_timezone_aware(dt):
+        """Ensure datetime is timezone-aware"""
+        if isinstance(dt, datetime):
+            if is_naive(dt):
+                return make_aware(dt)
+            return dt
+        return dt
+
+    @staticmethod
+    def _get_date_range(date_obj):
+        """Get timezone-aware start and end of day for a date"""
+        if isinstance(date_obj, datetime):
+            # If it's already a datetime, convert to date first
+            date_obj = date_obj.date()
+        
+        # Create timezone-aware datetime for start of day
+        start_of_day = timezone.make_aware(datetime.combine(date_obj, datetime.min.time()))
+        end_of_day = start_of_day + timedelta(days=1) - timedelta(microseconds=1)
+        
+        return start_of_day, end_of_day
+
+    @staticmethod
     def get_previous_day_balance(branch_id, date):
         try:
             return DailyCashInHandRecord.objects.get(branch_id=branch_id, date=date).cash_in_hand
@@ -20,25 +42,33 @@ class DailyFinanceSummaryService:
 
     @staticmethod
     def get_safe_balance(branch_id, date):
+        start_of_day, end_of_day = DailyFinanceSummaryService._get_date_range(date)
+        
         result = SafeTransaction.objects.filter(
             branch_id=branch_id,
             transaction_type="income",
-            date=date
+            date__gte=start_of_day,
+            date__lte=end_of_day
         ).aggregate(total_amount=Sum('amount'))
 
-        return result["total_amount"] or Decimal("0.00")  # Default to 0 if no safe balance is set
+        return result["total_amount"] or Decimal("0.00")
 
     @staticmethod
     def get_summary(branch_id, date=None):
         if date is None:
             date = timezone.localdate()
+        elif isinstance(date, datetime):
+            date = date.date()
 
         # Calculate and store the cash_in_hand for today and yesterday
         DailyFinanceSummaryService.calculate_for_day(branch_id, date)
 
         # Fetch all records excluding today and yesterday
+        today = timezone.localdate()
+        yesterday = today - timedelta(days=1)
+        
         records = DailyCashInHandRecord.objects.filter(branch_id=branch_id).exclude(
-            date__in=[timezone.localdate(), timezone.localdate() - timedelta(days=1)]
+            date__in=[today, yesterday]
         )
 
         # Convert to timezone-aware ISO string
@@ -46,12 +76,11 @@ class DailyFinanceSummaryService:
         for record in records:
             dt = record.date
             if isinstance(dt, datetime):
-                if is_naive(dt):
-                    dt = make_aware(dt)
+                dt = DailyFinanceSummaryService._ensure_timezone_aware(dt)
                 dt = localtime(dt).isoformat()
             else:
-                # Assume it's a `date` object (safe), just convert to ISO string
-                dt = dt.isoformat()
+                # Assume it's a `date` object, convert to timezone-aware datetime
+                dt = timezone.make_aware(datetime.combine(dt, datetime.min.time())).isoformat()
 
             historical_data.append({
                 'date': dt,
@@ -65,35 +94,59 @@ class DailyFinanceSummaryService:
         summary['historical_data'] = historical_data  # Include in response
         return summary
 
-
     @staticmethod
     def calculate_for_day(branch_id, date):
+        if isinstance(date, datetime):
+            date = date.date()
+            
         yesterday = date - timedelta(days=1)
+        start_of_day, end_of_day = DailyFinanceSummaryService._get_date_range(date)
+        start_of_yesterday, end_of_yesterday = DailyFinanceSummaryService._get_date_range(yesterday)
 
         # Get previous day's balance (if any)
         previous_balance = DailyFinanceSummaryService.get_previous_day_balance(branch_id, yesterday)
-        yesterday_safe_income  = DailyFinanceSummaryService.get_safe_balance(branch_id, yesterday)
-        today_safe_balance      = DailyFinanceSummaryService.get_safe_balance(branch_id, date)
+        yesterday_safe_income = DailyFinanceSummaryService.get_safe_balance(branch_id, yesterday)
+        today_safe_balance = DailyFinanceSummaryService.get_safe_balance(branch_id, date)
 
         # ========== YESTERDAY
         yesterday_order_payments = DailyFinanceSummaryService._sum(
-            OrderPayment.objects.filter(order__branch_id=branch_id, payment_date__date=yesterday, payment_method="cash")
+            OrderPayment.objects.filter(
+                order__branch_id=branch_id, 
+                payment_date__gte=start_of_yesterday,
+                payment_date__lte=end_of_yesterday,
+                payment_method="cash"
+            )
         )
         yesterday_channel_payments = DailyFinanceSummaryService._sum(
-            ChannelPayment.objects.filter(appointment__branch_id=branch_id, payment_date__date=yesterday, payment_method="cash")
+            ChannelPayment.objects.filter(
+                appointment__branch_id=branch_id, 
+                payment_date__gte=start_of_yesterday,
+                payment_date__lte=end_of_yesterday,
+                payment_method="cash"
+            )
         )
         yesterday_other_income = DailyFinanceSummaryService._sum(
-            OtherIncome.objects.filter(branch_id=branch_id, date=yesterday)
+            OtherIncome.objects.filter(
+                branch_id=branch_id, 
+                date__gte=start_of_yesterday,
+                date__lte=end_of_yesterday
+            )
         )
         yesterday_soldering_income = DailyFinanceSummaryService._sum(
             SolderingPayment.objects.filter(
                 order__branch_id=branch_id,
-                payment_date__date=yesterday,
+                payment_date__gte=start_of_yesterday,
+                payment_date__lte=end_of_yesterday,
                 payment_method="cash"
             )
         )
         yesterday_expenses = DailyFinanceSummaryService._sum(
-            Expense.objects.filter(branch_id=branch_id, created_at__date=yesterday, paid_source="cash")
+            Expense.objects.filter(
+                branch_id=branch_id, 
+                created_at__gte=start_of_yesterday,
+                created_at__lte=end_of_yesterday,
+                paid_source="cash"
+            )
         )
 
         before_balance = (
@@ -105,30 +158,52 @@ class DailyFinanceSummaryService:
 
         # ========== TODAY
         today_order_payments = DailyFinanceSummaryService._sum(
-            OrderPayment.objects.filter(order__branch_id=branch_id, payment_date__date=date, payment_method="cash")
+            OrderPayment.objects.filter(
+                order__branch_id=branch_id, 
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="cash"
+            )
         )
         today_channel_payments = DailyFinanceSummaryService._sum(
-            ChannelPayment.objects.filter(appointment__branch_id=branch_id, payment_date__date=date, payment_method="cash")
+            ChannelPayment.objects.filter(
+                appointment__branch_id=branch_id, 
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="cash"
+            )
         )
         today_other_income = DailyFinanceSummaryService._sum(
-            OtherIncome.objects.filter(branch_id=branch_id, date=date)
+            OtherIncome.objects.filter(
+                branch_id=branch_id, 
+                date__gte=start_of_day,
+                date__lte=end_of_day
+            )
         )
         today_soldering_income = DailyFinanceSummaryService._sum(
             SolderingPayment.objects.filter(
                 order__branch_id=branch_id,
-                payment_date__date=date,
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
                 payment_method="cash"
             )
         )
         today_expenses = DailyFinanceSummaryService._sum(
-            Expense.objects.filter(branch_id=branch_id, created_at__date=date, paid_source="cash")
+            Expense.objects.filter(
+                branch_id=branch_id, 
+                created_at__gte=start_of_day,
+                created_at__lte=end_of_day,
+                paid_source="cash"
+            )
         )
         today_safe_expenses = DailyFinanceSummaryService._sum(
-            Expense.objects.filter(branch_id=branch_id, created_at__date=date, paid_source="safe")
+            Expense.objects.filter(
+                branch_id=branch_id, 
+                created_at__gte=start_of_day,
+                created_at__lte=end_of_day,
+                paid_source="safe"
+            )
         )
-
-        # Get today's safe balance from the SafeBalance model
-        
 
         # Today balance calculation with safe balance included
         today_balance = (
@@ -143,7 +218,8 @@ class DailyFinanceSummaryService:
         # Fetch banking details for today
         today_banking_qs = BankDeposit.objects.select_related('bank_account').filter(
             branch_id=branch_id,
-            date=date
+            date__gte=start_of_day,
+            date__lte=end_of_day
         )
         today_banking_total = DailyFinanceSummaryService._sum(today_banking_qs)
         today_banking_list = [

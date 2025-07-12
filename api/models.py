@@ -731,6 +731,8 @@ class Invoice(models.Model):
     objects = SoftDeleteManager()
     all_objects = models.Manager()
 
+    
+
     class Meta:
         unique_together = ['invoice_date', 'daily_invoice_no']  # Ensures daily numbering uniqueness
         constraints = [
@@ -766,7 +768,7 @@ class Invoice(models.Model):
                     if last_invoice and last_invoice.invoice_number and last_invoice.invoice_number.startswith(branch_prefix):
                         try:
                             # Extract the numeric part after branch prefix and increment
-                            number_part = last_invoice.invoice_number[3:]  # Skip the 3-letter branch prefix
+                            number_part = last_invoice.invoice_number[4:]  # Skip the 3-letter branch prefix
                             number = int(number_part) + 1
                         except (ValueError, IndexError):
                             number = 1
