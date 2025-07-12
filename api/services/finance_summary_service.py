@@ -107,8 +107,10 @@ class DailyFinanceSummaryService:
         previous_balance = DailyFinanceSummaryService.get_previous_day_balance(branch_id, yesterday)
         yesterday_safe_income = DailyFinanceSummaryService.get_safe_balance(branch_id, yesterday)
         today_safe_balance = DailyFinanceSummaryService.get_safe_balance(branch_id, date)
+        yesterday_safe_income = DailyFinanceSummaryService.get_safe_balance(branch_id, yesterday)
+        today_safe_balance = DailyFinanceSummaryService.get_safe_balance(branch_id, date)
 
-        # ========== YESTERDAY
+        # Yesterday calculations
         yesterday_order_payments = DailyFinanceSummaryService._sum(
             OrderPayment.objects.filter(
                 order__branch_id=branch_id, 
@@ -156,7 +158,7 @@ class DailyFinanceSummaryService:
             yesterday_soldering_income
         ) - (yesterday_expenses + yesterday_safe_income)
 
-        # ========== TODAY
+        # Today calculations
         today_order_payments = DailyFinanceSummaryService._sum(
             OrderPayment.objects.filter(
                 order__branch_id=branch_id, 
@@ -215,7 +217,6 @@ class DailyFinanceSummaryService:
 
         cash_in_hand = previous_balance + today_balance
 
-        # Fetch banking details for today
         today_banking_qs = BankDeposit.objects.select_related('bank_account').filter(
             branch_id=branch_id,
             date__gte=start_of_day,
@@ -232,7 +233,7 @@ class DailyFinanceSummaryService:
             for deposit in today_banking_qs
         ]
 
-        # Update or create a record for the current date
+        # ✅ Safe write to DB
         DailyCashInHandRecord.objects.update_or_create(
             branch_id=branch_id,
             date=date,
@@ -246,22 +247,15 @@ class DailyFinanceSummaryService:
         return {
             "branch": branch_id,
             "date": str(date),
-
-            # Income Sources
             "today_order_payments": today_order_payments,
             "today_channel_payments": today_channel_payments,
             "today_other_income": today_other_income,
-
-            # Expenses
             "today_expenses": today_expenses + today_safe_expenses,
-
-            # Summary
             "before_balance": previous_balance,
             "today_balance": today_balance,
             "cash_in_hand": cash_in_hand,
             "available_for_deposit": cash_in_hand,
-
-            # Bank
             "today_banking_total": today_banking_total,
             "today_banking": today_banking_list,
         }
+
