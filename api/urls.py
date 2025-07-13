@@ -69,7 +69,7 @@ from .views import (
     SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
     GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView,MntOrderReportView,
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
-    FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView
+    FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -100,6 +100,7 @@ urlpatterns = [
 
     path('other-incomes/', OtherIncomeListCreateView.as_view(), name='other-income-list'),
     path('other-incomes/<int:pk>/', OtherIncomeRetrieveUpdateDeleteView.as_view(), name='other-income-detail'),
+    path('other-incomes/report/', OtherIncomeReportView.as_view(), name='other-income-report'),
 
     path("safe/transactions/", SafeTransaction.as_view(), name="safe-transaction-create"),#safe
     path('safe/income-total/', SafeIncomeTotalView.as_view(), name='safe-income-total'),

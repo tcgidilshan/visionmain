@@ -298,24 +298,37 @@ class ChannelUpdateView(APIView):
             patient = PatientService.create_or_update_patient(patient_payload)
 
             # Step 3: Handle schedule (create or reassign)
-            new_schedule, created = Schedule.objects.get_or_create(
-                doctor_id=data['doctor_id'],
-                date=data['channel_date'],
-                start_time=data['time'],
-                branch_id=data['branch_id'],
-                defaults={'status': 'Available'}
+            # Check if schedule details are changing
+            schedule_changed = (
+                appointment.doctor_id != data['doctor_id'] or
+                appointment.date != data['channel_date'] or
+                appointment.time != data['time'] or
+                appointment.branch_id != data['branch_id']
             )
+            
+            if schedule_changed:
+                # Only try to get/create new schedule if details are actually changing
+                new_schedule, created = Schedule.objects.get_or_create(
+                    doctor_id=data['doctor_id'],
+                    date=data['channel_date'],
+                    start_time=data['time'],
+                    branch_id=data['branch_id'],
+                    defaults={'status': 'Available'}
+                )
 
-            if not created and new_schedule.status != 'Available' and appointment.schedule_id != new_schedule.id:
-                return Response({"error": "The selected schedule is not available."}, status=status.HTTP_400_BAD_REQUEST)
+                if not created and new_schedule.status != 'Available' and appointment.schedule_id != new_schedule.id:
+                    return Response({"error": "The selected schedule is not available."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # If the schedule changed, release old and book new
-            if appointment.schedule_id != new_schedule.id:
-                if appointment.schedule:
-                    appointment.schedule.status = 'Available'
-                    appointment.schedule.save()
-                new_schedule.status = 'Booked'
-                new_schedule.save()
+                # If the schedule changed, release old and book new
+                if appointment.schedule_id != new_schedule.id:
+                    if appointment.schedule:
+                        appointment.schedule.status = 'Available'
+                        appointment.schedule.save()
+                    new_schedule.status = 'Booked'
+                    new_schedule.save()
+            else:
+                # Schedule details are not changing, use existing schedule
+                new_schedule = appointment.schedule
 
             # Step 4: Recalculate channel number if branch/date changed
             is_same_date_branch = (
@@ -348,23 +361,72 @@ class ChannelUpdateView(APIView):
             serializer.is_valid(raise_exception=True)
             appointment = serializer.save()
 
-            # Step 6: Replace payments
-            existing_payments = ChannelPayment.objects.filter(appointment=appointment)
-            existing_payments.delete()
-
+            # Step 6: Handle payments with soft delete and edited tracking
+            existing_payments = ChannelPayment.objects.filter(appointment=appointment, is_deleted=False)
+            existing_payment_dict = {payment.id: payment for payment in existing_payments}
+            
             total_paid = 0
             payment_records = []
+            seen_payment_ids = set()
+            
             for payment in data['payments']:
-                payment_data = {
-                    "appointment": appointment.id,
-                    "amount": payment['amount'],
-                    "payment_method": payment['payment_method'],
-                    "is_final": False
-                }
-                total_paid += payment['amount']
-                payment_serializer = ChannelPaymentSerializer(data=payment_data)
-                payment_serializer.is_valid(raise_exception=True)
-                payment_records.append(payment_serializer.save())
+                payment_id = payment.get('id')
+                amount = payment['amount']
+                payment_method = payment['payment_method']
+                
+                if payment_id and payment_id in existing_payment_dict:
+                    # Existing payment - check if data changed
+                    existing_payment = existing_payment_dict[payment_id]
+                    seen_payment_ids.add(payment_id)
+                    
+                    # Compare payment data to detect changes
+                    payment_changed = (
+                        float(existing_payment.amount) != float(amount) or
+                        existing_payment.payment_method != payment_method
+                    )
+                    
+                    if payment_changed:
+                        # Soft delete the old payment and mark as edited
+                        existing_payment.is_edited = True
+                        existing_payment.save()
+                        existing_payment.delete()  # This will trigger soft delete
+                        
+                        # Create new payment with same data
+                        payment_data = {
+                            "appointment": appointment.id,
+                            "amount": amount,
+                            "payment_method": payment_method,
+                            "is_final": False
+                        }
+                        payment_serializer = ChannelPaymentSerializer(data=payment_data)
+                        payment_serializer.is_valid(raise_exception=True)
+                        new_payment = payment_serializer.save()
+                        payment_records.append(new_payment)
+                        total_paid += float(amount)
+                    else:
+                        # No change, keep existing payment
+                        payment_records.append(existing_payment)
+                        total_paid += float(existing_payment.amount)
+                else:
+                    # New payment - create
+                    payment_data = {
+                        "appointment": appointment.id,
+                        "amount": amount,
+                        "payment_method": payment_method,
+                        "is_final": False
+                    }
+                    payment_serializer = ChannelPaymentSerializer(data=payment_data)
+                    payment_serializer.is_valid(raise_exception=True)
+                    new_payment = payment_serializer.save()
+                    payment_records.append(new_payment)
+                    total_paid += float(amount)
+            
+            # Soft delete payments that are in DB but not in the new payload
+            for payment_id, existing_payment in existing_payment_dict.items():
+                if payment_id not in seen_payment_ids:
+                    existing_payment.is_edited = True
+                    existing_payment.save()
+                    existing_payment.delete()  # This will trigger soft delete
 
             # Step 7: Final payment logic
             if total_paid == data['channeling_fee']:

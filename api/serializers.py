@@ -1134,6 +1134,7 @@ class OtherIncomeCategorySerializer(serializers.ModelSerializer):
 
 class OtherIncomeSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
+    date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)  # Format with timezone
 
     class Meta:
         model = OtherIncome
@@ -1148,7 +1149,7 @@ class OtherIncomeSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'date']  # Make date read-only since it's auto-generated
 
 class BankDepositSerializer(serializers.ModelSerializer):
     bank_name = serializers.CharField(source='bank_account.bank_name', read_only=True)

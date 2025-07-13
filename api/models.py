@@ -1009,7 +1009,7 @@ class Appointment(models.Model):
         return self.payments.aggregate(total=Sum('amount'))['total'] or 0
 
     def get_remaining_amount(self):
-        return float(self.total_fee) - self.get_total_paid()
+        return float(self.amount) - self.get_total_paid()
 
 class ChannelPayment(models.Model):
     PAYMENT_METHOD_CHOICES = [
