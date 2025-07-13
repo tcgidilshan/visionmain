@@ -859,6 +859,7 @@ class ChannelPaymentSerializer(serializers.ModelSerializer):
             'is_final',  # Whether this is the final payment
             'created_at',  # Auto-generated timestamp for record creation
             'updated_at',  # Auto-generated timestamp for record updates
+            'is_edited',
         ]
 class ChannelListSerializer(serializers.ModelSerializer):
     doctor_name = serializers.CharField(source='doctor.name', read_only=True)

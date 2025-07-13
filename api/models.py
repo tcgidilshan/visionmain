@@ -1027,6 +1027,7 @@ class ChannelPayment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
+    is_edited = models.BooleanField(default=False)
 
     objects = SoftDeleteManager()      # Only active records
     all_objects = models.Manager() 
@@ -1103,7 +1104,7 @@ class OtherIncomeCategory(models.Model):
         return self.name
 
 class OtherIncome(models.Model):
-    date = models.DateField(auto_now_add=True)
+    date = models.DateTimeField(auto_now_add=True)
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE)
     category = models.ForeignKey(OtherIncomeCategory, on_delete=models.PROTECT, related_name="other_incomes")
     amount = models.DecimalField(max_digits=10, decimal_places=2)

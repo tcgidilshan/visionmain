@@ -30,6 +30,7 @@ class DailyFinanceSummaryService:
         # Create timezone-aware datetime for start of day
         start_of_day = timezone.make_aware(datetime.combine(date_obj, datetime.min.time()))
         end_of_day = start_of_day + timedelta(days=1) - timedelta(microseconds=1)
+      
         
         return start_of_day, end_of_day
 
@@ -112,11 +113,13 @@ class DailyFinanceSummaryService:
 
         # Yesterday calculations
         yesterday_order_payments = DailyFinanceSummaryService._sum(
-            OrderPayment.objects.filter(
+            OrderPayment.all_objects.filter(
                 order__branch_id=branch_id, 
                 payment_date__gte=start_of_yesterday,
                 payment_date__lte=end_of_yesterday,
                 payment_method="cash",
+                is_edited=False,
+                is_deleted=False
             
             )
         )
@@ -153,14 +156,15 @@ class DailyFinanceSummaryService:
             )
         )
 
-        before_balance = (
-            yesterday_order_payments +
-            yesterday_channel_payments +
-            yesterday_other_income +
-            yesterday_soldering_income
-        ) - (yesterday_expenses + yesterday_safe_income)
+        # before_balance = (
+        #     yesterday_order_payments +
+        #     yesterday_channel_payments +
+        #     yesterday_other_income +
+        #     yesterday_soldering_income
+        # ) - (yesterday_expenses + yesterday_safe_income)
         
-        
+        #get orderids softdeleted and refundeed also not soft deleted
+      
         # Today calculations
         today_order_payments = DailyFinanceSummaryService._sum(
             OrderPayment.all_objects.filter(
@@ -169,7 +173,6 @@ class DailyFinanceSummaryService:
                 payment_date__lte=end_of_day,
                 payment_method="cash",
                 is_edited=False,
-                is_deleted=False
             )
         )
 
@@ -222,10 +225,7 @@ class DailyFinanceSummaryService:
             today_other_income +
             today_soldering_income
         ) - (today_expenses + today_safe_balance)
-        print("today_expenses",today_expenses)
-        print("today_order_payments",today_order_payments)
-        print("today_balance",today_order_payments-today_expenses)
-
+      
         cash_in_hand = previous_balance + today_balance
 
         today_banking_qs = BankDeposit.objects.select_related('bank_account').filter(
@@ -244,7 +244,7 @@ class DailyFinanceSummaryService:
             for deposit in today_banking_qs
         ]
 
-        # ✅ Safe write to DB
+        # # ✅ Safe write to DB
         DailyCashInHandRecord.objects.update_or_create(
             branch_id=branch_id,
             date=date,

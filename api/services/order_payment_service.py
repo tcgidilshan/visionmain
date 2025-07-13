@@ -122,7 +122,7 @@ class OrderPaymentService:
         
     # Get total amount paid by customer
     #get all payments 
-        payments = OrderPayment.all_objects.filter(is_deleted=True,is_edited=False,order=order_id)
+        payments = OrderPayment.all_objects.filter(is_deleted=False,is_edited=False,order=order_id)
        
         total_paid = (
             OrderPayment.all_objects
@@ -132,7 +132,11 @@ class OrderPaymentService:
         
         if total_paid == 0:
             raise ValidationError("No successful payments found to refund.")
-
+        now = timezone.now()
+        for payment in payments:
+            payment.is_deleted = True
+            payment.deleted_at = now
+            payment.save()
         # Mark order as refunded
         order.is_refund = True
         order.refunded_at = timezone.now()

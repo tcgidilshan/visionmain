@@ -56,7 +56,10 @@ class ChannelPaymentService:
         appointment.refunded_at = timezone.now()
         appointment.refund_note = f"Refunded via expense #{timezone.now().isoformat()}"
         appointment.save()
-
+        ChannelPayment.objects.filter(appointment_id=appointment.id, is_deleted=False).update(
+            is_deleted=True,
+            deleted_at=timezone.now()
+        )
         # Step 2: Enrich expense data
         expense_data['amount'] = str(appointment.amount)
         expense_data['note'] = f"Refund for cancelled appointment #{appointment.id}"
