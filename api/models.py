@@ -1093,6 +1093,7 @@ class Expense(models.Model):
     note = models.TextField(blank=True)
     paid_from_safe = models.BooleanField(default=True) 
     created_at = models.DateTimeField(auto_now_add=True)
+    is_refund=models.BooleanField(default=False)
 
 class OtherIncomeCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)

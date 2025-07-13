@@ -147,6 +147,7 @@ class OrderPaymentService:
         expense_data['paid_source'] = 'cash'
         expense_data['paid_from_safe'] = False
         expense_data['note'] = note
+        expense_data['is_refund'] = True
 
         # Create expense
         serializer = ExpenseSerializer(data=expense_data)

@@ -1,7 +1,7 @@
 from django.utils import timezone
 from django.db.models import Sum
 from datetime import timedelta, datetime, date
-from ..models import OrderPayment,ChannelPayment,OtherIncome,Expense,BankDeposit,SafeTransaction,SolderingPayment,DailyCashInHandRecord
+from ..models import OrderPayment,ChannelPayment,OtherIncome,Expense,BankDeposit,SafeTransaction,SolderingPayment,DailyCashInHandRecord,Order
 from decimal import Decimal
 from django.utils.timezone import is_naive, make_aware, localtime
 
@@ -148,7 +148,8 @@ class DailyFinanceSummaryService:
                 branch_id=branch_id, 
                 created_at__gte=start_of_yesterday,
                 created_at__lte=end_of_yesterday,
-                paid_source="cash"
+                paid_source="cash",
+                is_refund=False
             )
         )
 
@@ -158,14 +159,22 @@ class DailyFinanceSummaryService:
             yesterday_other_income +
             yesterday_soldering_income
         ) - (yesterday_expenses + yesterday_safe_income)
-
+        
+        active_orders_today = Order.objects.filter(
+            branch_id=branch_id,
+            order_date__gte=start_of_day,
+            order_date__lte=end_of_day,
+            is_deleted=False,
+            is_refund=False  # Exclude refunded orders
+        )
         # Today calculations
         today_order_payments = DailyFinanceSummaryService._sum(
             OrderPayment.objects.filter(
-                order__branch_id=branch_id, 
+                order__in=active_orders_today,
                 payment_date__gte=start_of_day,
                 payment_date__lte=end_of_day,
-                payment_method="cash"
+                payment_method="cash",
+                is_deleted=False,
             )
         )
         today_channel_payments = DailyFinanceSummaryService._sum(
@@ -196,7 +205,8 @@ class DailyFinanceSummaryService:
                 branch_id=branch_id, 
                 created_at__gte=start_of_day,
                 created_at__lte=end_of_day,
-                paid_source="cash"
+                paid_source="cash",
+                is_refund=False
             )
         )
         today_safe_expenses = DailyFinanceSummaryService._sum(
@@ -204,7 +214,8 @@ class DailyFinanceSummaryService:
                 branch_id=branch_id, 
                 created_at__gte=start_of_day,
                 created_at__lte=end_of_day,
-                paid_source="safe"
+                paid_source="safe",
+                is_refund=False
             )
         )
 
