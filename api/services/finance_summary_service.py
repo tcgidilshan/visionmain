@@ -302,13 +302,54 @@ class DailyFinanceSummaryService:
             )
         )
         #total cash payment from channel
-     
-         
+        today_channel_payments_cash = DailyFinanceSummaryService._sum(
+            ChannelPayment.objects.filter(
+                appointment__branch_id=branch_id,
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="cash",
+            )
+        )
+        #total online_transfer payment from soldering
+        today_soldering_payments_online_transfer = DailyFinanceSummaryService._sum(
+            SolderingPayment.objects.filter(
+                order__branch_id=branch_id,
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="online_transfer",
+            )
+        )
+        #total credit card payment from soldering
+        today_soldering_payments_credit_card = DailyFinanceSummaryService._sum(
+            SolderingPayment.objects.filter(
+                order__branch_id=branch_id,
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="credit_card",
+            )
+        )
+        #total cash payment from soldering
+        today_soldering_payments_cash = DailyFinanceSummaryService._sum(
+            SolderingPayment.objects.filter(
+                order__branch_id=branch_id,
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="cash",
+            )
+        )
+        #grand total online payments from orders
+        today_total_online_payments = today_order_payments_online_transfer + today_channel_payments_online_transfer + today_soldering_payments_online_transfer
+        #grand total credit card payment from orders
+        today_total_credit_card_payments = today_order_payments_credit_card + today_channel_payments_credit_card + today_soldering_payments_credit_card
+        #grand total cash payment from orders
+        today_total_cash_payments = today_order_payments_cash + today_channel_payments_cash + today_soldering_payments_cash
+        
         return {
             "branch": branch_id,
             "date": str(date),
-            "today_order_payments": today_order_payments,
-            "today_channel_payments": today_channel_payments,
+            "today_order_payments": today_order_payments_online_transfer+today_order_payments_credit_card+today_order_payments_cash,
+            "today_channel_payments": today_channel_payments_online_transfer+today_channel_payments_credit_card+today_channel_payments_cash,
+            "today_soldering_payments": today_soldering_payments_online_transfer+today_soldering_payments_credit_card+today_soldering_payments_cash,
             "today_other_income": today_other_income,
             "today_expenses": today_expenses + today_safe_expenses,
             "before_balance": previous_balance,
@@ -317,5 +358,8 @@ class DailyFinanceSummaryService:
             "available_for_deposit": cash_in_hand,
             "today_banking_total": today_banking_total,
             "today_banking": today_banking_list,
+            "today_total_online_payments":today_total_online_payments,
+            "today_total_credit_card_payments":today_total_credit_card_payments,
+            "today_total_cash_payments":today_total_cash_payments,
         }
 

@@ -44,7 +44,7 @@ from .views import (
     AppointmentRetrieveUpdateDeleteView,
     LensStockListCreateView,CancelChannelView,
     LensStockRetrieveUpdateDeleteView,ChannelUpdateView,
-    LensTypeListCreateView,SafeTransaction,OrderSoftDeleteView,
+    LensTypeListCreateView,SafeTransactionView,OrderSoftDeleteView,
     LensTypeRetrieveUpdateDeleteView,ExternalLensCoatingListCreateView,
     ExternalLensCoatingRetrieveUpdateDeleteView,SafeAll,
     LensCoatingListCreateView,ExternalLensBrandListCreateView,
@@ -69,7 +69,7 @@ from .views import (
     SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
     GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView,MntOrderReportView,
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
-    FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView
+    FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -102,7 +102,8 @@ urlpatterns = [
     path('other-incomes/<int:pk>/', OtherIncomeRetrieveUpdateDeleteView.as_view(), name='other-income-detail'),
     path('other-incomes/report/', OtherIncomeReportView.as_view(), name='other-income-report'),
 
-    path("safe/transactions/", SafeTransaction.as_view(), name="safe-transaction-create"),#safe
+    path("safe/transactions/", SafeTransactionView.as_view(), name="safe-transaction-create"),#safe
+    path("safe/transactions/report/", SafeTransactionReportView.as_view(), name="safe-transaction-report"),#safe
     path('safe/income-total/', SafeIncomeTotalView.as_view(), name='safe-income-total'),
 
     path('safe/balance/', SafeAll.as_view(), name='safe-balance'),
