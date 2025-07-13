@@ -1,6 +1,7 @@
 from datetime import datetime
 from django.db.models import Sum, Q, F
 from api.models import Appointment, ChannelPayment
+from ..services.time_zone_convert_service import TimezoneConverterService
 
 class ChannelReportService:
 
@@ -12,10 +13,7 @@ class ChannelReportService:
 
         # Step 1: Filter ChannelPayments with timezone handling
         try:
-            payment_date_obj = datetime.strptime(payment_date, "%Y-%m-%d").date()
-            start_datetime = datetime.combine(payment_date_obj, datetime.min.time())
-            end_datetime = datetime.combine(payment_date_obj, datetime.max.time())
-            
+            start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(payment_date,None)
             payments = ChannelPayment.objects.filter(
                 payment_date__range=(start_datetime, end_datetime),
                 appointment__branch_id=branch_id
