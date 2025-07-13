@@ -119,13 +119,17 @@ class OrderPaymentService:
     
         if order.is_refund:
             raise ValidationError("This order has already been refunded.")
-        print(order.orderpayment_set.filter(is_deleted=True,is_edited=False,))
+        
     # Get total amount paid by customer
+    #get all payments 
+        payments = OrderPayment.all_objects.filter(is_deleted=True,is_edited=False,order=order_id)
+       
         total_paid = (
             OrderPayment.all_objects
             .filter(is_deleted=True,is_edited=False,order=order_id)
             .aggregate(total=Sum("amount"))["total"] or 0
         )
+        
         if total_paid == 0:
             raise ValidationError("No successful payments found to refund.")
 

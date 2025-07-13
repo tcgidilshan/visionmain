@@ -205,7 +205,7 @@ class DailyFinanceSummaryService:
                 created_at__gte=start_of_day,
                 created_at__lte=end_of_day,
                 paid_source="cash",
-                is_refund=False
+                # is_refund=False
             )
         )
         today_safe_expenses = DailyFinanceSummaryService._sum(
