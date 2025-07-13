@@ -51,7 +51,7 @@ from .views import (
     ExternalLensBrandRetrieveUpdateDeleteView,SafeIncomeTotalView,StockAdjustmentView,
     LensCoatingRetrieveUpdateDeleteView,FrameOnlyOrderCreateView,CreateSolderingOrderView,
    ChannelRepaymentView,ManualOrderCreateView,DoctorAppointmentTransferView,ChannelRepaymentView,AppointmentStatusListView,
-    InvoiceDetailView,BankDepositListCreateView,BankDepositRetrieveUpdateView,BankDepositConfirmView,
+    InvoiceDetailView,BankDepositListCreateView,BankDepositRetrieveUpdateView,
     OrderUpdateView,DailyFinanceSummaryView,FrameReportView,
     RefractionDetailRetrieveUpdateDeleteView,BusSystemSettingListCreateView,BusSystemSettingRetrieveUpdateDeleteView,
     LensSearchView,OtherIncomeListCreateView,OtherIncomeRetrieveUpdateDeleteView,OtherIncomeCategoryListCreateView,
@@ -109,7 +109,7 @@ urlpatterns = [
     #bank deposit
     path('bank-deposits/', BankDepositListCreateView.as_view(), name='bank-deposit-list'),
     path('bank-deposits/<int:pk>/', BankDepositRetrieveUpdateView.as_view(), name='bank-deposit-detail'),
-    path('bank-deposits/<int:pk>/confirm/', BankDepositConfirmView.as_view(), name='bank-deposit-confirm'),
+    # path('bank-deposits/<int:pk>/confirm/', BankDepositConfirmView.as_view(), name='bank-deposit-confirm'),
 
     path("users/create/", CreateUserView.as_view(), name="create-user"), 
     path("users/update/<int:user_id>/", UpdateUserView.as_view(), name="update-user"),
