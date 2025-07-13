@@ -886,6 +886,7 @@ class OrderPayment(models.Model):
     is_final_payment = models.BooleanField(default=False)
     is_partial = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
+    is_edited = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
     user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='user_order_payments')
     admin = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_order_payments')
@@ -1008,7 +1009,7 @@ class Appointment(models.Model):
         return self.payments.aggregate(total=Sum('amount'))['total'] or 0
 
     def get_remaining_amount(self):
-        return float(self.total_fee) - self.get_total_paid()
+        return float(self.amount) - self.get_total_paid()
 
 class ChannelPayment(models.Model):
     PAYMENT_METHOD_CHOICES = [
@@ -1026,6 +1027,7 @@ class ChannelPayment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
+    is_edited = models.BooleanField(default=False)
 
     objects = SoftDeleteManager()      # Only active records
     all_objects = models.Manager() 
@@ -1092,6 +1094,7 @@ class Expense(models.Model):
     note = models.TextField(blank=True)
     paid_from_safe = models.BooleanField(default=True) 
     created_at = models.DateTimeField(auto_now_add=True)
+    is_refund=models.BooleanField(default=False)
 
 class OtherIncomeCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -1101,7 +1104,7 @@ class OtherIncomeCategory(models.Model):
         return self.name
 
 class OtherIncome(models.Model):
-    date = models.DateField(auto_now_add=True)
+    date = models.DateTimeField(auto_now_add=True)
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE)
     category = models.ForeignKey(OtherIncomeCategory, on_delete=models.PROTECT, related_name="other_incomes")
     amount = models.DecimalField(max_digits=10, decimal_places=2)

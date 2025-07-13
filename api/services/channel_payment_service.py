@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from ..models import Appointment
 from ..models import Expense
 from ..serializers import ExpenseSerializer
-
+from django.db.models import Sum
 class ChannelPaymentService:
     @staticmethod
     def create_repayment(appointment, amount, method):
@@ -56,11 +56,17 @@ class ChannelPaymentService:
         appointment.refunded_at = timezone.now()
         appointment.refund_note = f"Refunded via expense #{timezone.now().isoformat()}"
         appointment.save()
-
+        #get total amount of payments
+        total_amount = ChannelPayment.objects.filter(appointment_id=appointment.id, is_deleted=False).aggregate(total_amount=Sum('amount'))['total_amount']
+        ChannelPayment.objects.filter(appointment_id=appointment.id, is_deleted=False).update(
+            is_deleted=True,
+            deleted_at=timezone.now()
+        )
         # Step 2: Enrich expense data
-        expense_data['amount'] = str(appointment.amount)
+        expense_data['amount'] = str(total_amount)
         expense_data['note'] = f"Refund for cancelled appointment #{appointment.id}"
         expense_data['paid_source'] = "cash"
+        expense_data['is_refund'] = True
 
         # Step 3: Create expense
         serializer = ExpenseSerializer(data=expense_data)

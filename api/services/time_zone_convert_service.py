@@ -1,8 +1,7 @@
 #TimezoneConverterService class 
-from datetime import datetime, timezone, time
+from datetime import datetime, time as datetime_time  # ✅ Fixed import
 from django.utils import timezone
-from django.conf import settings
-import pytz
+
 
 class TimezoneConverterService:
 
@@ -25,31 +24,31 @@ class TimezoneConverterService:
                 end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
                 
                 start_datetime = timezone.make_aware(
-                    datetime.combine(start_date_obj, time.min)
+                    datetime.combine(start_date_obj, datetime_time.min)
                 )
                 end_datetime = timezone.make_aware(
-                    datetime.combine(end_date_obj, time.max)
+                    datetime.combine(end_date_obj, datetime_time.max)
                 )
-
+ 
             elif start_date and not end_date:
                 # Use start_date for both start and end
                 start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
                 
                 start_datetime = timezone.make_aware(
-                    datetime.combine(start_date_obj, time.min)
+                    datetime.combine(start_date_obj, datetime_time.min)
                 )
                 end_datetime = timezone.make_aware(
-                    datetime.combine(start_date_obj, time.max)
+                    datetime.combine(start_date_obj, datetime_time.max)
                 )
                 
             elif not start_date and not end_date:
                 # Use today's date
                 today = timezone.localdate()
                 start_datetime = timezone.make_aware(
-                    datetime.combine(today, time.min)
+                    datetime.combine(today, datetime_time.min)
                 )
                 end_datetime = timezone.make_aware(
-                    datetime.combine(today, time.max)
+                    datetime.combine(today, datetime_time.max)
                 )
             else:
                 # No valid dates provided

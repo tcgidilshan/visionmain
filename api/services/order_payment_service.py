@@ -116,19 +116,27 @@ class OrderPaymentService:
             order = Order.all_objects.get(id=order_id)
         except Order.DoesNotExist:
             raise ValidationError("Order not found.")
-
+    
         if order.is_refund:
             raise ValidationError("This order has already been refunded.")
         
     # Get total amount paid by customer
+    #get all payments 
+        payments = OrderPayment.all_objects.filter(is_deleted=False,is_edited=False,order=order_id)
+       
         total_paid = (
-            order.orderpayment_set
-            .filter(is_deleted=False, transaction_status="success")
+            OrderPayment.all_objects
+            .filter(is_deleted=False,is_edited=False,order=order_id)
             .aggregate(total=Sum("amount"))["total"] or 0
         )
+        
         if total_paid == 0:
             raise ValidationError("No successful payments found to refund.")
-
+        now = timezone.now()
+        for payment in payments:
+            payment.is_deleted = True
+            payment.deleted_at = now
+            payment.save()
         # Mark order as refunded
         order.is_refund = True
         order.refunded_at = timezone.now()
@@ -147,6 +155,7 @@ class OrderPaymentService:
         expense_data['paid_source'] = 'cash'
         expense_data['paid_from_safe'] = False
         expense_data['note'] = note
+        expense_data['is_refund'] = True
 
         # Create expense
         serializer = ExpenseSerializer(data=expense_data)
@@ -201,6 +210,7 @@ class OrderPaymentService:
                         # Soft-delete old, create new (keep date)
                         old_payment.user_id = user_id
                         old_payment.admin_id = admin_id
+                        old_payment.is_edited = True
                         old_payment.save(update_fields=['user', 'admin'])
                         old_payment.delete()
                         payment_data = {

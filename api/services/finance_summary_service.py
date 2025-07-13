@@ -1,7 +1,7 @@
 from django.utils import timezone
 from django.db.models import Sum
 from datetime import timedelta, datetime, date
-from ..models import OrderPayment,ChannelPayment,OtherIncome,Expense,BankDeposit,SafeTransaction,SolderingPayment,DailyCashInHandRecord
+from ..models import OrderPayment,ChannelPayment,OtherIncome,Expense,BankDeposit,SafeTransaction,SolderingPayment,DailyCashInHandRecord,Order
 from decimal import Decimal
 from django.utils.timezone import is_naive, make_aware, localtime
 
@@ -30,6 +30,7 @@ class DailyFinanceSummaryService:
         # Create timezone-aware datetime for start of day
         start_of_day = timezone.make_aware(datetime.combine(date_obj, datetime.min.time()))
         end_of_day = start_of_day + timedelta(days=1) - timedelta(microseconds=1)
+      
         
         return start_of_day, end_of_day
 
@@ -112,19 +113,23 @@ class DailyFinanceSummaryService:
 
         # Yesterday calculations
         yesterday_order_payments = DailyFinanceSummaryService._sum(
-            OrderPayment.objects.filter(
+            OrderPayment.all_objects.filter(
                 order__branch_id=branch_id, 
                 payment_date__gte=start_of_yesterday,
                 payment_date__lte=end_of_yesterday,
-                payment_method="cash"
+                payment_method="cash",
+                is_edited=False,
+          
             )
         )
         yesterday_channel_payments = DailyFinanceSummaryService._sum(
-            ChannelPayment.objects.filter(
+            ChannelPayment.all_objects.filter(
                 appointment__branch_id=branch_id, 
                 payment_date__gte=start_of_yesterday,
                 payment_date__lte=end_of_yesterday,
-                payment_method="cash"
+                payment_method="cash",
+             
+                is_edited=False
             )
         )
         yesterday_other_income = DailyFinanceSummaryService._sum(
@@ -147,34 +152,41 @@ class DailyFinanceSummaryService:
                 branch_id=branch_id, 
                 created_at__gte=start_of_yesterday,
                 created_at__lte=end_of_yesterday,
-                paid_source="cash"
+                paid_source="cash",
+                is_refund=False
             )
         )
 
-        before_balance = (
-            yesterday_order_payments +
-            yesterday_channel_payments +
-            yesterday_other_income +
-            yesterday_soldering_income
-        ) - (yesterday_expenses + yesterday_safe_income)
-
+        # before_balance = (
+        #     yesterday_order_payments +
+        #     yesterday_channel_payments +
+        #     yesterday_other_income +
+        #     yesterday_soldering_income
+        # ) - (yesterday_expenses + yesterday_safe_income)
+        
+        #get orderids softdeleted and refundeed also not soft deleted
+      
         # Today calculations
         today_order_payments = DailyFinanceSummaryService._sum(
-            OrderPayment.objects.filter(
-                order__branch_id=branch_id, 
+            OrderPayment.all_objects.filter(
+                order__branch_id=branch_id,
                 payment_date__gte=start_of_day,
                 payment_date__lte=end_of_day,
-                payment_method="cash"
+                payment_method="cash",
+                is_edited=False,
             )
         )
+ 
         today_channel_payments = DailyFinanceSummaryService._sum(
-            ChannelPayment.objects.filter(
+            ChannelPayment.all_objects.filter(
                 appointment__branch_id=branch_id, 
                 payment_date__gte=start_of_day,
                 payment_date__lte=end_of_day,
-                payment_method="cash"
+                payment_method="cash",
+                is_edited=False,
             )
         )
+       
         today_other_income = DailyFinanceSummaryService._sum(
             OtherIncome.objects.filter(
                 branch_id=branch_id, 
@@ -195,7 +207,8 @@ class DailyFinanceSummaryService:
                 branch_id=branch_id, 
                 created_at__gte=start_of_day,
                 created_at__lte=end_of_day,
-                paid_source="cash"
+                paid_source="cash",
+                # is_refund=False
             )
         )
         today_safe_expenses = DailyFinanceSummaryService._sum(
@@ -203,7 +216,8 @@ class DailyFinanceSummaryService:
                 branch_id=branch_id, 
                 created_at__gte=start_of_day,
                 created_at__lte=end_of_day,
-                paid_source="safe"
+                paid_source="safe",
+                is_refund=False
             )
         )
 
@@ -214,7 +228,7 @@ class DailyFinanceSummaryService:
             today_other_income +
             today_soldering_income
         ) - (today_expenses + today_safe_balance)
-
+      
         cash_in_hand = previous_balance + today_balance
 
         today_banking_qs = BankDeposit.objects.select_related('bank_account').filter(
@@ -233,7 +247,7 @@ class DailyFinanceSummaryService:
             for deposit in today_banking_qs
         ]
 
-        # ✅ Safe write to DB
+        # # ✅ Safe write to DB
         DailyCashInHandRecord.objects.update_or_create(
             branch_id=branch_id,
             date=date,
@@ -243,12 +257,99 @@ class DailyFinanceSummaryService:
                 'today_balance': today_balance,
             }
         )
-
+        #total online_transfer payment from orders
+        today_order_payments_online_transfer = DailyFinanceSummaryService._sum(
+            OrderPayment.objects.filter(
+                order__branch_id=branch_id,
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="online_transfer",
+            )
+        )
+        #credit card payment from orders
+        today_order_payments_credit_card = DailyFinanceSummaryService._sum(
+            OrderPayment.objects.filter(
+                order__branch_id=branch_id,
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="credit_card",
+            )
+        )
+        today_order_payments_cash = DailyFinanceSummaryService._sum(
+            OrderPayment.objects.filter(
+                order__branch_id=branch_id,
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="cash",
+            )
+        )
+        #total online_transfer payment from channel
+        today_channel_payments_online_transfer = DailyFinanceSummaryService._sum(
+            ChannelPayment.objects.filter(
+                appointment__branch_id=branch_id,
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="online_transfer",
+            )
+        )
+        #total credit card payment from channel
+        today_channel_payments_credit_card = DailyFinanceSummaryService._sum(
+            ChannelPayment.objects.filter(
+                appointment__branch_id=branch_id,
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="credit_card",
+            )
+        )
+        #total cash payment from channel
+        today_channel_payments_cash = DailyFinanceSummaryService._sum(
+            ChannelPayment.objects.filter(
+                appointment__branch_id=branch_id,
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="cash",
+            )
+        )
+        #total online_transfer payment from soldering
+        today_soldering_payments_online_transfer = DailyFinanceSummaryService._sum(
+            SolderingPayment.objects.filter(
+                order__branch_id=branch_id,
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="online_transfer",
+            )
+        )
+        #total credit card payment from soldering
+        today_soldering_payments_credit_card = DailyFinanceSummaryService._sum(
+            SolderingPayment.objects.filter(
+                order__branch_id=branch_id,
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="credit_card",
+            )
+        )
+        #total cash payment from soldering
+        today_soldering_payments_cash = DailyFinanceSummaryService._sum(
+            SolderingPayment.objects.filter(
+                order__branch_id=branch_id,
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="cash",
+            )
+        )
+        #grand total online payments from orders
+        today_total_online_payments = today_order_payments_online_transfer + today_channel_payments_online_transfer + today_soldering_payments_online_transfer
+        #grand total credit card payment from orders
+        today_total_credit_card_payments = today_order_payments_credit_card + today_channel_payments_credit_card + today_soldering_payments_credit_card
+        #grand total cash payment from orders
+        today_total_cash_payments = today_order_payments_cash + today_channel_payments_cash + today_soldering_payments_cash
+        
         return {
             "branch": branch_id,
             "date": str(date),
-            "today_order_payments": today_order_payments,
-            "today_channel_payments": today_channel_payments,
+            "today_order_payments": today_order_payments_online_transfer+today_order_payments_credit_card+today_order_payments_cash,
+            "today_channel_payments": today_channel_payments_online_transfer+today_channel_payments_credit_card+today_channel_payments_cash,
+            "today_soldering_payments": today_soldering_payments_online_transfer+today_soldering_payments_credit_card+today_soldering_payments_cash,
             "today_other_income": today_other_income,
             "today_expenses": today_expenses + today_safe_expenses,
             "before_balance": previous_balance,
@@ -257,5 +358,8 @@ class DailyFinanceSummaryService:
             "available_for_deposit": cash_in_hand,
             "today_banking_total": today_banking_total,
             "today_banking": today_banking_list,
+            "today_total_online_payments":today_total_online_payments,
+            "today_total_credit_card_payments":today_total_credit_card_payments,
+            "today_total_cash_payments":today_total_cash_payments,
         }
 

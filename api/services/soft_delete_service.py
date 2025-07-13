@@ -82,10 +82,10 @@ class ChannelSoftDeleteService:
         appointment.save()
 
         # Step 2: Soft delete related payments
-        ChannelPayment.objects.filter(appointment_id=appointment.id, is_deleted=False).update(
-            is_deleted=True,
-            deleted_at=timezone.now()
-        )
+        # ChannelPayment.objects.filter(appointment_id=appointment.id, is_deleted=False).update(
+        #     is_deleted=True,
+        #     deleted_at=timezone.now()
+        # )
 
         # Step 3: Optionally free up Schedule (if still valid)
         if appointment.schedule and not appointment.schedule.is_deleted:

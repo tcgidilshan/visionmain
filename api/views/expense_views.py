@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
 from decimal import Decimal
+from ..services.time_zone_convert_service import TimezoneConverterService
 
 # ---------- Main Category Views ----------
 class ExpenseMainCategoryListCreateView(generics.ListCreateAPIView):
@@ -71,18 +72,16 @@ class ExpenseReportView(APIView):
         end_date = request.query_params.get('end_date')
         branch_id = request.query_params.get('branch_id')
 
-        if not start_date or not end_date or not branch_id:
+        if not start_date or not branch_id:
             return Response({
                 "error": "start_date, end_date, and branch_id are required."
             }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Convert to date objects
-            start_date_obj = parse_date(start_date)
-            end_date_obj = parse_date(end_date)
-
+            start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
+            
             queryset = Expense.objects.select_related('main_category', 'sub_category').filter(
-                created_at__date__range=[start_date_obj, end_date_obj],
+                created_at__range=[start_datetime, end_datetime],
                 branch_id=branch_id
             ).order_by('-created_at')
 

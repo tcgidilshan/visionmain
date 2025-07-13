@@ -49,8 +49,8 @@ class OrderDeleteRefundListView(ListAPIView):
         # Date filtering - Fixed to use proper datetime range filtering
         if start_datetime and end_datetime:
             if start_datetime.date() == end_datetime.date():
-                # Same day - use exact date match
-                filter_kwargs = {f"{date_field}__date": start_datetime.date()}
+                # Same day - use datetime range for timezone-aware fields
+                filter_kwargs = {f"{date_field}__range": [start_datetime, end_datetime]}
                 queryset = queryset.filter(**filter_kwargs)
             else:
                 # Different days - use datetime range

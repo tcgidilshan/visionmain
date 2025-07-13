@@ -34,9 +34,11 @@ class InvoiceReportService:
         
         print(f"Date range for query: {start_datetime} to {end_datetime}")
         
-        payments = OrderPayment.objects.select_related("order").filter(
+        payments = OrderPayment.all_objects.select_related("order").filter(
             payment_date__range=(start_datetime, end_datetime),
-            order__branch_id=branch_id
+            order__branch_id=branch_id,
+            is_edited=False
+
         )
         # print(f"Found {payments.count()} payments")
 
@@ -63,11 +65,12 @@ class InvoiceReportService:
         # print(f"\nOrders with payments: {list(payments_by_order.keys())}")
         
         # Get all invoices where related order has at least 1 payment on that date
-        invoice_qs = Invoice.objects.select_related("order").filter(
+        invoice_qs = Invoice.all_objects.select_related("order").filter(
             order_id__in=payments_by_order.keys(),
             order__branch_id=branch_id,
-            is_deleted=False,
-            order__is_deleted=False
+            order__is_refund=False
+            # is_deleted=False,
+            # order__is_deleted=False
         )
         
         # print(f"Found {invoice_qs.count()} invoices for these orders")
@@ -87,9 +90,11 @@ class InvoiceReportService:
                 "total_invoice_price": float(invoice.order.total_price),
                 "total_cash_payment": payment_data.get("cash", 0),
                 "total_credit_card_payment": payment_data.get("credit_card", 0),
-                "total_online_payment": payment_data.get("online", 0),
+                "total_online_payment": payment_data.get("online_transfer", 0),
                 "total_payment": payment_data.get("total", 0),
-                "balance": float(invoice.order.total_price) - payment_data.get("total", 0)
+                "balance": float(invoice.order.total_price) - payment_data.get("total", 0),
+                "is_deleted": invoice.is_deleted,
+                "is_refund": invoice.order.is_refund
             }
 
             results.append(data)
