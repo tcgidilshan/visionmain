@@ -160,22 +160,19 @@ class DailyFinanceSummaryService:
             yesterday_soldering_income
         ) - (yesterday_expenses + yesterday_safe_income)
         
-        active_orders_today = Order.all_objects.filter(
-            branch_id=branch_id,
-            order_date__gte=start_of_day,
-            order_date__lte=end_of_day,
-            is_refund=False  # Exclude refunded orders
-        )
+        
         # Today calculations
         today_order_payments = DailyFinanceSummaryService._sum(
             OrderPayment.all_objects.filter(
-                order__in=active_orders_today,
+                order__branch_id=branch_id,
                 payment_date__gte=start_of_day,
                 payment_date__lte=end_of_day,
                 payment_method="cash",
                 is_edited=False,
+                is_deleted=False
             )
         )
+
         today_channel_payments = DailyFinanceSummaryService._sum(
             ChannelPayment.objects.filter(
                 appointment__branch_id=branch_id, 
@@ -225,6 +222,9 @@ class DailyFinanceSummaryService:
             today_other_income +
             today_soldering_income
         ) - (today_expenses + today_safe_balance)
+        print("today_expenses",today_expenses)
+        print("today_order_payments",today_order_payments)
+        print("today_balance",today_order_payments-today_expenses)
 
         cash_in_hand = previous_balance + today_balance
 

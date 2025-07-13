@@ -126,7 +126,7 @@ class OrderPaymentService:
        
         total_paid = (
             OrderPayment.all_objects
-            .filter(is_deleted=True,is_edited=False,order=order_id)
+            .filter(is_deleted=False,is_edited=False,order=order_id)
             .aggregate(total=Sum("amount"))["total"] or 0
         )
         
