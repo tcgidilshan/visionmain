@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime
 from ..models import Invoice, Appointment
+from ..services.time_zone_convert_service import TimezoneConverterService
 
 class DailySummaryView(APIView):
     """
@@ -18,33 +19,38 @@ class DailySummaryView(APIView):
         date_str = request.data.get("date")
         branch_id = request.data.get("branch_id")
 
-        if not date_str or not branch_id:
+        if not branch_id:
             return Response(
-                {"error": "Both 'date' and 'branch_id' are required."},
+                {"error": "branch_id is required."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        try:
-            given_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-        except ValueError:
+        # Use TimezoneConverterService for consistent date handling
+        start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(date_str, date_str)
+        
+        if start_datetime is None:
             return Response(
                 {"error": "Invalid date format. Please use YYYY-MM-DD."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        given_date = start_datetime.date()
+
         try:
-            # 🔹 Step 2: Query Counts
+            # 🔹 Step 2: Query Counts using timezone-aware datetime range
 
             # Factory orders
             factory_order_count = Invoice.objects.filter(
-                invoice_date__date=given_date,
+                invoice_date__gte=start_datetime,
+                invoice_date__lte=end_datetime,
                 order__branch_id=branch_id,
                 invoice_type='factory'
             ).count()
 
             # Normal orders
             normal_order_count = Invoice.objects.filter(
-                invoice_date__date=given_date,
+                invoice_date__gte=start_datetime,
+                invoice_date__lte=end_datetime,
                 order__branch_id=branch_id,
                 invoice_type='normal'
             ).count()
