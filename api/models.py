@@ -886,6 +886,7 @@ class OrderPayment(models.Model):
     is_final_payment = models.BooleanField(default=False)
     is_partial = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
+    is_edited = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
     user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='user_order_payments')
     admin = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_order_payments')

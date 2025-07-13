@@ -43,10 +43,10 @@ class OrderSoftDeleteService:
                 pass  # No invoice exists — safe to ignore
 
             # Payments
-            # for payment in order.orderpayment_set.all():
-            #     payment.is_deleted = True
-            #     payment.deleted_at = now
-            #     payment.save()
+            for payment in order.orderpayment_set.all():
+                payment.is_deleted = True
+                payment.deleted_at = now
+                payment.save()
 
             # 🧾 Update order fields
             order.is_deleted = True

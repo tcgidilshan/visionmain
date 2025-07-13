@@ -116,7 +116,8 @@ class DailyFinanceSummaryService:
                 order__branch_id=branch_id, 
                 payment_date__gte=start_of_yesterday,
                 payment_date__lte=end_of_yesterday,
-                payment_method="cash"
+                payment_method="cash",
+            
             )
         )
         yesterday_channel_payments = DailyFinanceSummaryService._sum(
