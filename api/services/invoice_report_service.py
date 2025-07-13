@@ -87,7 +87,7 @@ class InvoiceReportService:
                 "total_invoice_price": float(invoice.order.total_price),
                 "total_cash_payment": payment_data.get("cash", 0),
                 "total_credit_card_payment": payment_data.get("credit_card", 0),
-                "total_online_payment": payment_data.get("online", 0),
+                "total_online_payment": payment_data.get("online_transfer", 0),
                 "total_payment": payment_data.get("total", 0),
                 "balance": float(invoice.order.total_price) - payment_data.get("total", 0)
             }
