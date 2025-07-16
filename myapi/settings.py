@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-kcu5_435$20fw^btdzjpe%=h+6ztvlgcq&vk8ddq1ifn7_^le_
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['visionmain-a9804.web.app', '127.0.0.1', 'localhost', 'www.lahiru.store','lahiru.store']
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 
 # Application definition
 
@@ -71,12 +71,7 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware', 
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5174", 
-    "http://localhost:5173", 
-    "https://visionmain-a9804.web.app", 
-    "https://visionmain-a9804.firebaseapp.com",
-]
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='localhost,127.0.0.1').split(',')
 
 CORS_ALLOW_ALL_ORIGINS = False
 
