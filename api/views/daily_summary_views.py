@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime
-from ..models import Invoice, Appointment
+from ..models import ChannelPayment, Invoice, Appointment, Order
 from ..services.time_zone_convert_service import TimezoneConverterService
 
 class DailySummaryView(APIView):
@@ -40,27 +40,29 @@ class DailySummaryView(APIView):
             # 🔹 Step 2: Query Counts using timezone-aware datetime range
 
             # Factory orders
-            factory_order_count = Invoice.objects.filter(
-                invoice_date__gte=start_datetime,
-                invoice_date__lte=end_datetime,
-                order__branch_id=branch_id,
-                invoice_type='factory'
+            factory_order_count = Order.objects.filter(
+                order_date__gte=start_datetime,
+                order_date__lte=end_datetime,
+                branch_id=branch_id,
+                invoice__invoice_type='factory'
             ).count()
 
             # Normal orders
-            normal_order_count = Invoice.objects.filter(
-                invoice_date__gte=start_datetime,
-                invoice_date__lte=end_datetime,
-                order__branch_id=branch_id,
-                invoice_type='normal'
+            normal_order_count = Order.objects.filter(
+                order_date__gte=start_datetime,
+                order_date__lte=end_datetime,
+                branch_id=branch_id,
+                invoice__invoice_type='normal'
             ).count()
 
-            # Channel Appointments
-            channel_count = Appointment.objects.filter(
-                date=given_date,
+            # Channel Appointments with payment received on the given date
+            channel_payment_count = Appointment.objects.filter(
                 branch_id=branch_id,
-                channel_no__isnull=False
+                created_at__lte=end_datetime,
+                created_at__gte=start_datetime,
+          
             ).count()
+        
 
             # 🔹 Step 3: Return the Response
             return Response({
@@ -68,7 +70,7 @@ class DailySummaryView(APIView):
                 "branch_id": branch_id,
                 "factory_order_count": factory_order_count,
                 "normal_order_count": normal_order_count,
-                "channel_count": channel_count
+                "channel_count": channel_payment_count
             }, status=status.HTTP_200_OK)
 
         except Exception as e:

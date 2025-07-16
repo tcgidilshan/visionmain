@@ -24,16 +24,17 @@ class DoctorScheduleService:
         return schedule, created
 
     @staticmethod
-    def get_upcoming_arrival_days(doctor_id, branch=None,status=None):
+    def get_upcoming_arrival_days(doctor_id, branch=None, status=None):
         """
-        Get all upcoming arrival days for a doctor. Optionally filtered by branch.
+        Get all upcoming arrival days for a doctor. Optionally filtered by branch and status.
+        Status matching is case-insensitive.
         """
         qs = Schedule.objects.filter(doctor_id=doctor_id, date__gte=timezone.now().date())
-
         if branch:
             qs = qs.filter(branch=branch)
         if status:
-            qs = qs.filter(status=status)
+            # Case-insensitive status matching
+            qs = qs.filter(status__iexact=status)
 
         return qs.order_by('date')
     
@@ -93,7 +94,3 @@ class DoctorScheduleService:
             updated.append(appt)
 
         return updated
-
-
-    
-
