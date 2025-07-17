@@ -916,6 +916,7 @@ class Schedule(models.Model):
         AVAILABLE = 'Available', _('Available')
         BOOKED = 'Booked', _('Booked')
         UNAVAILABLE = 'Unavailable', _('Unavailable')
+        DOCOTR='DOCTOR'
 
     doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE, related_name='schedules')
     branch = models.ForeignKey('Branch', on_delete=models.CASCADE, related_name='schedules')
@@ -940,7 +941,7 @@ class Schedule(models.Model):
         self.save()
 
     class Meta:
-        unique_together = ('doctor', 'branch', 'date', 'start_time') 
+        unique_together = ('doctor', 'branch', 'date', 'start_time','status') 
 
     def __str__(self):
         return f"{self.doctor} - {self.date} ({self.start_time}) - {self.status}"
