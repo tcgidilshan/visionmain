@@ -18,7 +18,7 @@ class DoctorScheduleService:
             date=date,
             start_time=start_time,
             branch=branch,
-            defaults={"status": "Available"}
+            status=Schedule.StatusChoices.DOCOTR,
         )
 
         return schedule, created
