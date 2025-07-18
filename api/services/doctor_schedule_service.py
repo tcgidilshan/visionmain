@@ -18,7 +18,7 @@ class DoctorScheduleService:
             date=date,
             start_time=start_time,
             branch=branch,
-            status=Schedule.StatusChoices.DOCOTR,
+            status=Schedule.StatusChoices.DOCTOR,
         )
 
         return schedule, created
