@@ -916,7 +916,7 @@ class Schedule(models.Model):
         AVAILABLE = 'Available', _('Available')
         BOOKED = 'Booked', _('Booked')
         UNAVAILABLE = 'Unavailable', _('Unavailable')
-        DOCOTR='DOCTOR'
+        DOCTOR = 'DOCTOR', _('Doctor')
 
     doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE, related_name='schedules')
     branch = models.ForeignKey('Branch', on_delete=models.CASCADE, related_name='schedules')
