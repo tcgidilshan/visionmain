@@ -46,7 +46,7 @@ class ChannelAppointmentView(APIView):
                 date=data['channel_date'],
                 start_time=data['time'],
                 branch_id=data['branch_id'],
-                defaults={'status': 'Available'}
+                status='Available'
             )
 
             if not created and schedule.status != 'Available':
