@@ -941,7 +941,7 @@ class Schedule(models.Model):
         self.save()
 
     class Meta:
-        unique_together = ('doctor', 'branch', 'date', 'start_time','status') 
+        unique_together = ('doctor', 'branch', 'date', 'start_time',) 
 
     def __str__(self):
         return f"{self.doctor} - {self.date} ({self.start_time}) - {self.status}"

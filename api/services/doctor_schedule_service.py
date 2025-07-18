@@ -20,7 +20,7 @@ class DoctorScheduleService:
             branch=branch,
             status=Schedule.StatusChoices.DOCTOR,
         )
-
+        
         return schedule, created
 
     @staticmethod
@@ -48,6 +48,7 @@ class DoctorScheduleService:
         original_schedules = Schedule.objects.filter(
             doctor=doctor,
             date=from_date,
+            status='DOCTOR'
         )
 
         if not original_schedules.exists():
@@ -66,7 +67,7 @@ class DoctorScheduleService:
                 date=to_date,
                 start_time=schedule.start_time,
                 branch=branch,
-                defaults={"status": "Available"}
+                status='DOCTOR'
             )
 
             if created:
