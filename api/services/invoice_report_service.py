@@ -538,7 +538,7 @@ class InvoiceReportService:
             
             # Add appointment to results
             orders.append({
-                'channel_id': appointment.id,
+                'channel_id': appointment.invoice_number,
                 'channel_number': str(appointment.channel_no or ''),
                 'date': appointment.date.strftime("%Y-%m-%d") if appointment.date else '',
                 'time': appointment.time.strftime("%H:%M:%S") if appointment.time else '',
