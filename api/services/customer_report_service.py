@@ -57,17 +57,14 @@ class CustomerReportService:
             List of dictionaries containing customer information and order statistics
         """
         
-        # Filter factory orders within the date range
-        # Assuming factory orders are identified by specific criteria
-        # You may need to adjust this based on your business logic
+        # Filter ONLY factory orders within the date range
         factory_orders = Order.objects.filter(
             order_date__range=[start_date, end_date],
             is_deleted=False,
-            # Add any specific criteria that identifies factory orders
-            # For example: is_factory_order=True or specific status
-        )
+            invoice__invoice_type='factory'  # Only factory orders
+        ).select_related('customer', 'invoice')
         
-        # Get customer aggregated data
+        # Get customer aggregated data for factory orders only
         customer_data = factory_orders.values(
             'customer__id',
             'customer__name',
@@ -84,14 +81,40 @@ class CustomerReportService:
         # Format the results
         result = []
         for customer in customer_data:
+            customer_id = customer['customer__id']
+            
+            # Get factory orders for this customer
+            customer_factory_orders = factory_orders.filter(
+                customer_id=customer_id
+            ).select_related('invoice')
+            
+            # Collect invoice details for factory orders
+            invoices = []
+            for order in customer_factory_orders:
+                if hasattr(order, 'invoice') and order.invoice:
+                    invoice_info = {
+                        'order_id': order.id,
+                        'invoice_number': order.invoice.invoice_number or f"Order-{order.id}",
+                        'invoice_type': order.invoice.invoice_type,
+                        'order_date': order.order_date.strftime('%Y-%m-%d'),
+                        'total_price': float(order.total_price),
+                        'sub_total': float(order.sub_total),
+                        'discount': float(order.discount or 0),
+                        'status': order.status
+                    }
+                    invoices.append(invoice_info)
+            
             result.append({
-                'customer_id': customer['customer__id'],
+                'customer_id': customer_id,
                 'customer_name': customer['customer__name'],
                 'nic': customer['customer__nic'] or 'N/A',
                 'address': customer['customer__address'] or 'N/A',
                 'mobile_number': customer['customer__phone_number'] or 'N/A',
                 'total_factory_order_amount': float(customer['total_amount']),
-                'number_of_orders': customer['order_count']
+                'number_of_orders': customer['order_count'],
+                'total_factory_order_count': customer['order_count'],  # Same as order_count since we filtered
+                'invoices': invoices,
+                'invoice_count': len(invoices)
             })
         
         return result
