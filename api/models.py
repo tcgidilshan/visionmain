@@ -12,6 +12,7 @@ from django.db import IntegrityError
 from django.utils.timezone import now
 from .services.image_uploard_service import compress_image_to_webp
 import uuid
+from django.db.models.functions import TruncDate
 
 class Item(models.Model):
     name = models.CharField(max_length=100)
@@ -719,7 +720,8 @@ class ExternalLens(models.Model):
 class Invoice(models.Model):
     INVOICE_TYPES = [
         ('factory', 'Factory Invoice'),  # Linked to an order with refraction
-        ('manual', 'Manual Invoice')  # Linked to an order without refraction
+        ('manual', 'Manual Invoice'),  # Linked to an order without refraction
+        ('normal', 'Normal Invoice')  # Linked to an order without refraction
     ]   
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="invoice")
     invoice_type = models.CharField(max_length=10, choices=INVOICE_TYPES)  #  Identifies invoice type
