@@ -61,16 +61,28 @@ class DoctorScheduleService:
             schedule.status = "Unavailable"
             schedule.save()
 
-            # 🔸 3. Create new schedule for to_date if not exists
-            new_schedule, created = Schedule.objects.get_or_create(
+            # 🔸 3. Check if a schedule already exists for to_date with same time
+            existing_schedule = Schedule.objects.filter(
                 doctor=doctor,
                 date=to_date,
                 start_time=schedule.start_time,
-                branch=branch,
-                status='DOCTOR'
-            )
+                branch=branch
+            ).first()
 
-            if created:
+            if existing_schedule:
+                # Update existing schedule to DOCTOR status
+                existing_schedule.status = 'DOCTOR'
+                existing_schedule.save()
+                new_schedules.append(existing_schedule)
+            else:
+                # Create new schedule for to_date
+                new_schedule = Schedule.objects.create(
+                    doctor=doctor,
+                    date=to_date,
+                    start_time=schedule.start_time,
+                    branch=branch,
+                    status='DOCTOR'
+                )
                 new_schedules.append(new_schedule)
 
         return new_schedules
