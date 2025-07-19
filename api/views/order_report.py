@@ -9,6 +9,7 @@ from ..models import MntOrder
 from django.db.models import Count, Sum
 from decimal import Decimal
 from rest_framework import status
+from ..services.time_zone_convert_service import TimezoneConverterService
 
 class FittingStatusReportView(APIView):
     permission_classes = [IsAuthenticated]
@@ -113,17 +114,19 @@ class MntOrderReportView(APIView):
         # --- Optional date range filter -------------------------------------
         if start_date or end_date:
             try:
-                if start_date:
-                    start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
-                if end_date:
-                    end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+                # Use TimezoneConverterService to handle timezone conversion
+                start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
                 
-                if start_date and end_date:
-                    qs = qs.filter(created_at__date__range=(start_date, end_date))
-                elif start_date:
-                    qs = qs.filter(created_at__date__gte=start_date)
-                elif end_date:
-                    qs = qs.filter(created_at__date__lte=end_date)
+                if start_datetime and end_datetime:
+                    # Filter by datetime range (timezone-aware)
+                    qs = qs.filter(created_at__range=(start_datetime, end_datetime))
+                elif start_datetime:
+                    # Only start date provided
+                    qs = qs.filter(created_at__gte=start_datetime)
+                elif end_datetime:
+                    # Only end date provided
+                    qs = qs.filter(created_at__lte=end_datetime)
+                    
             except ValueError:
                 return Response(
                     {"error": "Invalid date format, use YYYY-MM-DD"},

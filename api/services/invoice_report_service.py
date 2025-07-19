@@ -2,6 +2,8 @@ from datetime import datetime, time
 from django.db.models import Sum, Q
 from api.models import Invoice, OrderPayment,Appointment, ChannelPayment, SolderingPayment, SolderingOrder,SolderingInvoice
 from django.utils import timezone
+from api.services.time_zone_convert_service import TimezoneConverterService
+from django.db.models.functions import TruncDate
 
 class InvoiceReportService:
 
@@ -207,25 +209,41 @@ class InvoiceReportService:
             }
         """
         try:
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+            start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date_str, end_date_str)
+            
         except ValueError:
             raise ValueError("Invalid date format. Use YYYY-MM-DD.")
             
-        if start_date > end_date:
+        if start_datetime > end_datetime:
             raise ValueError("Start date cannot be after end date.")
+        
+        for inv in Invoice.objects.all():
+            print(f"id={inv.id}, invoice_type={inv.invoice_type}, invoice_date={inv.invoice_date}, branch_id={inv.order.branch_id}, is_deleted={inv.is_deleted}, order_is_deleted={inv.order.is_deleted}")
             
+        print(f"start_date: {start_datetime}, end_date: {end_datetime}")
         # Get all factory invoices in the date range for the branch
         invoices = Invoice.objects.select_related(
             'order', 'order__customer', 'order__refraction'
+        ).annotate(
+            invoice_date_only=TruncDate('invoice_date')
         ).filter(
             invoice_type='factory',
-            invoice_date__date__range=(start_date, end_date),
+            invoice_date__range=(start_datetime, end_datetime),
             order__branch_id=branch_id,
             is_deleted=False,
             order__is_deleted=False
         ).order_by('invoice_date')
         
+        
+        # Get all payments for these orders
+        order_ids = invoices.values_list('order_id', flat=True)
+        payments = OrderPayment.objects.filter(
+            order_id__in=order_ids
+        ).values('order_id').annotate(
+            total_paid=Sum('amount')
+        )
+
+        print(f"invoices: {invoices}")
         # Get all payments for these orders
         order_ids = invoices.values_list('order_id', flat=True)
         payments = OrderPayment.objects.filter(
@@ -337,20 +355,26 @@ class InvoiceReportService:
             }
         """
         try:
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+            start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date_str, end_date_str)
+
+             
+            print(f"Normal Order Report start_date: {start_datetime}, end_date: {end_datetime}")
         except ValueError:
             raise ValueError("Invalid date format. Use YYYY-MM-DD.")
             
-        if start_date > end_date:
+        if start_datetime > end_datetime:
             raise ValueError("Start date cannot be after end date.")
             
+        
+        for inv in Invoice.objects.all():
+            print(f"id={inv.id}, invoice_type={inv.invoice_type}, invoice_date={inv.invoice_date}, branch_id={inv.order.branch_id}, is_deleted={inv.is_deleted}, order_is_deleted={inv.order.is_deleted}")
+        
         # Get all normal invoices in the date range for the branch
         invoices = Invoice.objects.select_related(
             'order', 'order__customer', 'order__refraction'
         ).filter(
             invoice_type='normal',  # Changed from 'factory' to 'manual' for normal orders
-            invoice_date__date__range=(start_date, end_date),
+            invoice_date__range=(start_datetime, end_datetime),
             order__branch_id=branch_id,
             is_deleted=False,
             order__is_deleted=False
@@ -466,17 +490,16 @@ class InvoiceReportService:
             }
         """
         try:
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+            start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date_str, end_date_str)
         except ValueError:
             raise ValueError("Invalid date format. Use YYYY-MM-DD.")
             
-        if start_date > end_date:
+        if start_datetime > end_datetime:
             raise ValueError("Start date cannot be after end date.")
             
         # Get all appointments in the date range for the branch
         appointments = Appointment.objects.select_related('patient').filter(
-            date__range=(start_date, end_date),
+            date__range=(start_datetime, end_datetime),
             branch_id=branch_id,
             is_deleted=False
         ).order_by('date', 'time')
@@ -515,7 +538,7 @@ class InvoiceReportService:
             
             # Add appointment to results
             orders.append({
-                'channel_id': appointment.id,
+                'channel_id': appointment.invoice_number,
                 'channel_number': str(appointment.channel_no or ''),
                 'date': appointment.date.strftime("%Y-%m-%d") if appointment.date else '',
                 'time': appointment.time.strftime("%H:%M:%S") if appointment.time else '',
@@ -540,9 +563,7 @@ class InvoiceReportService:
     
     @staticmethod
     def get_soldering_order_report(start_date_str, end_date_str, branch_id):
-        
         """
-
         Generate a detailed soldering order report filtered by date range and branch.
         
         Args:
@@ -555,6 +576,7 @@ class InvoiceReportService:
                 'orders': [
                     {
                         'order_id': int,
+                        'invoice_number': str,
                         'date': str (YYYY-MM-DD),
                         'time': str (HH:MM:SS),
                         'customer_name': str,
@@ -577,30 +599,21 @@ class InvoiceReportService:
                 }
             }
         """
-
         try:
-            #add time zone to the date
-           # Parse dates
-            start = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-            end = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-
-            # Convert to timezone-aware datetimes for the start and end of the day
-            start_date = timezone.make_aware(
-                datetime.combine(start, time.min)
-            )
-            end_date = timezone.make_aware(
-                datetime.combine(end, time.max)
-            )
-            print(f"Soldering Order start_date: {start_date}, end_date: {end_date}")
+            # Parse dates properly
+            start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date_str, end_date_str)
+            
+            print(f"Soldering Order start_date: {start_date_str}, end_date: {end_date_str}")
         except ValueError:
             raise ValueError("Invalid date format. Use YYYY-MM-DD.")
             
-        if start_date > end_date:
+        if start_datetime > end_datetime:
             raise ValueError("Start date cannot be after end date.")
             
         # Get all soldering orders in the date range for the branch
-        soldering_orders = SolderingOrder.objects.select_related('patient').filter(
-            order_date__date__range=(start_date, end_date),
+        # Fix: Use order_date__range instead of order_date__date__range since order_date is a DateField
+        soldering_orders = SolderingOrder.objects.select_related('patient').prefetch_related('invoices').filter(
+            order_date__range=(start_date_str, end_date_str),
             branch_id=branch_id,
             is_deleted=False
         ).order_by('order_date')
@@ -614,6 +627,7 @@ class InvoiceReportService:
             total_paid=Sum('amount')
         )
         print(f"SolderingPayment: {payments}")
+        
         # Create a dictionary of order_id to total_paid
         payments_dict = {p['order_id']: float(p['total_paid'] or 0) for p in payments}
         
@@ -626,6 +640,12 @@ class InvoiceReportService:
         
         for soldering_order in soldering_orders:
             patient = soldering_order.patient
+            
+            # Get invoice number from the first invoice (if exists)
+            invoice_number = ''
+            if soldering_order.invoices.exists():
+                first_invoice = soldering_order.invoices.first()
+                invoice_number = first_invoice.invoice_number if first_invoice else ''
             
             # Calculate payment totals
             total_amount = float(soldering_order.price or 0)
@@ -640,6 +660,7 @@ class InvoiceReportService:
             # Add soldering order to results
             orders.append({
                 'order_id': soldering_order.id,
+                'invoice_number': invoice_number,
                 'date': soldering_order.order_date.strftime("%Y-%m-%d") if soldering_order.order_date else '',
                 'time': soldering_order.order_updated_date.strftime("%H:%M:%S") if soldering_order.order_updated_date else '',
                 'customer_name': patient.name if patient else '',

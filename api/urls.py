@@ -69,7 +69,7 @@ from .views import (
     SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
     GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView,MntOrderReportView,
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
-    FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView
+    FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView,SolderingOrderReportView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -280,6 +280,7 @@ urlpatterns = [
     path('reports/factory-orders/', FactoryOrderReportView.as_view(), name='factory-order-report'),
     path('reports/normal-orders/', NormalOrderReportView.as_view(), name='normal-order-report'),
     path('reports/channel-orders/', ChannelOrderReportView.as_view(), name='channel-order-report'),
+    path('reports/soldering-orders/', SolderingOrderReportView.as_view(), name='soldering-order-report'),
     path('reports/best-customers/', BestCustomersReportView.as_view(), name='best-customers-report'),
     path('reports/employee-history/', EmployeeHistoryReportView.as_view(), name='employee-history-report'),
     path('banking-report/', BankingReportView.as_view(), name='banking-report'),

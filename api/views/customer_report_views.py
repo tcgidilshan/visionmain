@@ -29,9 +29,10 @@ class BestCustomersReportView(APIView):
             end_date (str): End date in YYYY-MM-DD format
             min_budget (float): Minimum budget amount to filter customers
             include_summary (bool): Whether to include summary statistics
+            include_invoices (bool): Whether to include detailed invoice information
             
         Returns:
-            JSON response with customer report data
+            JSON response with customer report data including invoice details
         """
         
         try:
@@ -40,6 +41,7 @@ class BestCustomersReportView(APIView):
             end_date = request.GET.get('end_date')
             min_budget = request.GET.get('min_budget')
             include_summary = request.GET.get('include_summary', 'false').lower() == 'true'
+            include_invoices = request.GET.get('include_invoices', 'true').lower() == 'true'
             
             # Validate required parameters
             if not all([start_date, end_date, min_budget]):
@@ -75,6 +77,12 @@ class BestCustomersReportView(APIView):
                 start_dt, end_dt, float(min_budget_decimal)
             )
             
+            # Remove invoice details if not requested
+            if not include_invoices:
+                for customer in customers_data:
+                    customer.pop('invoices', None)
+                    customer.pop('invoice_count', None)
+            
             # Prepare response
             response_data = {
                 'success': True,
@@ -83,7 +91,8 @@ class BestCustomersReportView(APIView):
                     'criteria': {
                         'start_date': start_date,
                         'end_date': end_date,
-                        'min_budget': float(min_budget_decimal)
+                        'min_budget': float(min_budget_decimal),
+                        'include_invoices': include_invoices
                     },
                     'count': len(customers_data),
                     'generated_at': timezone.now().isoformat()
