@@ -18,6 +18,7 @@ from rest_framework import status
 from ..services.channel_payment_service import ChannelPaymentService  # Update path as per your structure
 from rest_framework.exceptions import ValidationError
 from django.db.models import Count
+from ..services.time_zone_convert_service import TimezoneConverterService
 from django.utils import timezone
 class ChannelAppointmentView(APIView):
     @transaction.atomic
@@ -477,7 +478,7 @@ class AppointmentStatusListView(ListAPIView):
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
         queryset = Appointment.all_objects.prefetch_related('payments').select_related('doctor', 'patient', 'branch')
-
+        start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
         # Decide status and which date field to filter on
         if status_filter == "deactivated":
             queryset = queryset.filter(is_deleted=True, is_refund=False)
@@ -493,18 +494,18 @@ class AppointmentStatusListView(ListAPIView):
             date_field = "date"
 
         # Date filtering (on the selected field)
-        if start_date and end_date:
-            if start_date == end_date:
-                filter_kwargs = {f"{date_field}__date": start_date}
+        if start_datetime and end_datetime:
+            if start_datetime.date() == end_datetime.date():
+                filter_kwargs = {f"{date_field}__range": [start_datetime, end_datetime]}
                 queryset = queryset.filter(**filter_kwargs)
             else:
-                filter_kwargs = {f"{date_field}__date__range": [start_date, end_date]}
+                filter_kwargs = {f"{date_field}__range": [start_datetime, end_datetime]}
                 queryset = queryset.filter(**filter_kwargs)
         elif start_date:
-            filter_kwargs = {f"{date_field}__date__gte": start_date}
+            filter_kwargs = {f"{date_field}__gte": start_datetime}
             queryset = queryset.filter(**filter_kwargs)
         elif end_date:
-            filter_kwargs = {f"{date_field}__date__lte": end_date}
+            filter_kwargs = {f"{date_field}__lte": end_datetime}
             queryset = queryset.filter(**filter_kwargs)
 
         return queryset

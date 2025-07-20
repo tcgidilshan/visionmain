@@ -79,8 +79,8 @@ class OrderCreateView(APIView):
 
                 # 🔹 Step 7: Create Payments
                 payments_data = request.data.get('order_payments', [])
-                if not payments_data:
-                    raise ValueError("At least one order payment is required.")
+                #//! if not payments_data:
+                #     raise ValueError("At least one order payment is required.")
 
                 total_payment = OrderPaymentService.process_payments(order, payments_data)
 
