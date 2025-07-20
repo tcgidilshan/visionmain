@@ -20,6 +20,8 @@ from rest_framework.exceptions import ValidationError
 from django.db.models import Count
 from ..services.time_zone_convert_service import TimezoneConverterService
 from django.utils import timezone
+from datetime import datetime, time
+
 class ChannelAppointmentView(APIView):
     @transaction.atomic
     def post(self, request, *args, **kwargs):
@@ -233,7 +235,7 @@ class DoctorAppointmentTimeListView(APIView):
                 date=date,
                 status__in=[Schedule.StatusChoices.AVAILABLE, Schedule.StatusChoices.BOOKED]
             ).select_related('doctor', 'branch').first()
-
+            
             if not schedule:
                 return Response({
                     "total_appointments": 0,
@@ -297,16 +299,25 @@ class ChannelUpdateView(APIView):
                 "address": data.get("address", "")
             }
             patient = PatientService.create_or_update_patient(patient_payload)
-
+           
             # Step 3: Handle schedule (create or reassign)
             # Check if schedule details are changing
             schedule_changed = (
-                appointment.doctor_id != data['doctor_id'] or
-                appointment.date != data['channel_date'] or
-                appointment.time != data['time'] or
-                appointment.branch_id != data['branch_id']
+                appointment.doctor_id != int(data['doctor_id']) or
+                str(appointment.date) != str(data['channel_date']) or
+                appointment.time.strftime("%H:%M:%S") != data['time'] or
+                appointment.branch_id != int(data['branch_id'])
             )
-            
+            print({
+                "appointment.doctor_id": appointment.doctor_id,
+                "data['doctor_id']": data['doctor_id'],
+                "appointment.date": appointment.date,
+                "data['channel_date']": data['channel_date'],
+                "appointment.time": appointment.time,
+                "data['time']": data['time'],
+                "appointment.branch_id": appointment.branch_id,
+            })
+            print("schedule_changed",schedule_changed)
             if schedule_changed:
                 # Only try to get/create new schedule if details are actually changing
                 new_schedule, created = Schedule.objects.get_or_create(
