@@ -68,14 +68,17 @@ class InvoiceReportService:
         
         # Get all invoices where related order has at least 1 payment on that date
         invoice_qs = Invoice.all_objects.select_related("order").filter(
-            order_id__in=payments_by_order.keys(),
+            Q(order_id__in=payments_by_order.keys()) |
+            Q(invoice_date__range=(start_datetime, end_datetime))
+        ).filter(
             order__branch_id=branch_id,
             order__is_refund=False
             # is_deleted=False,
             # order__is_deleted=False
         )
         
-        # print(f"Found {invoice_qs.count()} invoices for these orders")
+        for i in invoice_qs:
+            print(f"invoice_id={i.id}, invoice_number={i.invoice_number}, invoice_date={i.invoice_date}, order_id={i.order_id}, order_is_deleted={i.order.is_deleted}")
 
         results = []
 
