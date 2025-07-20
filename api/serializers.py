@@ -922,7 +922,7 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'doctor', 'doctor_name', 'patient', 'patient_name',
             'address', 'contact_number', 'schedule', 'date', 'time',
-            'status', 'amount', 'channel_no', 'payments','invoice_number','note',
+            'status', 'amount', 'channel_no', 'payments','invoice_number','note','created_at'
         ]
     def get_payments(self, obj):
         """Fetch all related payments for this appointment."""

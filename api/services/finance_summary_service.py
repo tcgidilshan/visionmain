@@ -88,7 +88,7 @@ class DailyFinanceSummaryService:
                 'cash_in_hand': record.cash_in_hand
             })
 
-        print(f"Historical data (excluding today and yesterday): {historical_data}")
+        # print(f"Historical data (excluding today and yesterday): {historical_data}")
 
         # Optionally: return full report including historical
         summary = DailyFinanceSummaryService.calculate_for_day(branch_id, date)
@@ -176,7 +176,14 @@ class DailyFinanceSummaryService:
                 is_edited=False,
             )
         )
- 
+        data=  OrderPayment.all_objects.filter(
+                order__branch_id=branch_id,
+                payment_date__gte=start_of_day,
+                payment_date__lte=end_of_day,
+                payment_method="cash",
+                is_edited=False,
+            )
+
         today_channel_payments = DailyFinanceSummaryService._sum(
             ChannelPayment.all_objects.filter(
                 appointment__branch_id=branch_id, 
@@ -259,37 +266,41 @@ class DailyFinanceSummaryService:
         )
         #total online_transfer payment from orders
         today_order_payments_online_transfer = DailyFinanceSummaryService._sum(
-            OrderPayment.objects.filter(
+            OrderPayment.all_objects.filter(
                 order__branch_id=branch_id,
                 payment_date__gte=start_of_day,
                 payment_date__lte=end_of_day,
                 payment_method="online_transfer",
+                is_edited=False,
             )
         )
         #credit card payment from orders
         today_order_payments_credit_card = DailyFinanceSummaryService._sum(
-            OrderPayment.objects.filter(
+            OrderPayment.all_objects.filter(
                 order__branch_id=branch_id,
                 payment_date__gte=start_of_day,
                 payment_date__lte=end_of_day,
                 payment_method="credit_card",
+                is_edited=False,
             )
         )
         today_order_payments_cash = DailyFinanceSummaryService._sum(
-            OrderPayment.objects.filter(
+            OrderPayment.all_objects.filter(
                 order__branch_id=branch_id,
                 payment_date__gte=start_of_day,
                 payment_date__lte=end_of_day,
                 payment_method="cash",
+                is_edited=False,
             )
         )
         #total online_transfer payment from channel
         today_channel_payments_online_transfer = DailyFinanceSummaryService._sum(
-            ChannelPayment.objects.filter(
+            ChannelPayment.all_objects.filter(
                 appointment__branch_id=branch_id,
                 payment_date__gte=start_of_day,
                 payment_date__lte=end_of_day,
                 payment_method="online_transfer",
+                is_edited=False,
             )
         )
         #total credit card payment from channel
@@ -299,6 +310,7 @@ class DailyFinanceSummaryService:
                 payment_date__gte=start_of_day,
                 payment_date__lte=end_of_day,
                 payment_method="credit_card",
+                is_edited=False,
             )
         )
         #total cash payment from channel
@@ -308,6 +320,7 @@ class DailyFinanceSummaryService:
                 payment_date__gte=start_of_day,
                 payment_date__lte=end_of_day,
                 payment_method="cash",
+                is_edited=False,
             )
         )
         #total online_transfer payment from soldering
@@ -317,6 +330,7 @@ class DailyFinanceSummaryService:
                 payment_date__gte=start_of_day,
                 payment_date__lte=end_of_day,
                 payment_method="online_transfer",
+                # is_edited=False,
             )
         )
         #total credit card payment from soldering
