@@ -106,8 +106,8 @@ class EmployeeReportService:
             
             # Count branded lenses sold
             branded_lenses_count = order_items.filter(
-                lens__isnull=False,
-                lens__brand__isnull=False
+                external_lens__isnull=False,
+                external_lens__branded='branded'
             ).aggregate(
                 total=Sum('quantity')
             )['total'] or 0
