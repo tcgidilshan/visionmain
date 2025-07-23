@@ -58,3 +58,4 @@ from .inventory_transfer import FrameTransferView
 from .frame_store__report import FrameHistoryReportView,FrameSaleReportView
 from .lens_store_report_view import LensSaleReportView
 from .order_image_view import OrderImageListCreateView,OrderImageDetailView
+from .payment_report import PaymentSummaryReportView
