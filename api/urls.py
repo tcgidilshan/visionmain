@@ -69,7 +69,8 @@ from .views import (
     SolderingOrderProgressUpdateView,SolderingInvoiceSearchView,SolderingOrderEditView,InvoiceNumberSearchView,OrderUpdateFitStatusView,FittingStatusReportView,OrderDeliveryMarkView,
     GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView,MntOrderReportView,
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
-    FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView,SolderingOrderReportView
+    FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView,SolderingOrderReportView,
+    PaymentSummaryReportView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -283,6 +284,7 @@ urlpatterns = [
     path('reports/soldering-orders/', SolderingOrderReportView.as_view(), name='soldering-order-report'),
     path('reports/best-customers/', BestCustomersReportView.as_view(), name='best-customers-report'),
     path('reports/employee-history/', EmployeeHistoryReportView.as_view(), name='employee-history-report'),
+    path('reports/payment-method/', PaymentSummaryReportView.as_view(), name='payment-summary-report'),
     path('banking-report/', BankingReportView.as_view(), name='banking-report'),
     # 2. Banking confirm action endpoint
     path('banking-report/confirm/<int:deposit_id>/', ConfirmDepositView.as_view(), name='confirm-deposit'),
@@ -291,6 +293,7 @@ urlpatterns = [
     path('orders/<int:order_id>/images/', OrderImageListCreateView.as_view(), name='order-image-list-create'),
     path('orders/<int:order_id>/images/<int:pk>', OrderImageDetailView.as_view(), name='order-image-detail'),
     path('orders/<int:order_id>/images/<int:pk>/', OrderImageDetailView.as_view(), name='order-image-detail-slash'),
+
     
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
