@@ -895,7 +895,8 @@ class ChannelListSerializer(serializers.ModelSerializer):
             'is_deleted',
             'is_refund',
             'deleted_at',
-            'refunded_at'
+            'refunded_at',
+            'created_at'
         ]
 
     def get_first_payment(self, obj):
