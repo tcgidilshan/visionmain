@@ -200,16 +200,18 @@ class OrderService:
             lens_stock_updates = []
             if transitioning_off_hold:
                 # Get only the lens-related items (not frames) for validation
+                # Skip external_lens since they don't maintain stock
                 lens_items = []
                 for item_data in order_items_data:
                     if (item_data.get('lens') or item_data.get('lens_cleaner') or 
                         item_data.get('other_item')) and not item_data.get('is_non_stock', False):
                         lens_items.append(item_data)
                 
-                # Validate lens stock separately
-                _, lens_stock_updates = StockValidationService.validate_stocks(
-                    lens_items, branch_id, on_hold=False, existing_items=existing_items
-                )
+                # Only validate if there are actual stock items to validate
+                if lens_items:
+                    _, lens_stock_updates = StockValidationService.validate_stocks(
+                        lens_items, branch_id, on_hold=False, existing_items=existing_items
+                    )
 
 
             # 🔹 Update order fields

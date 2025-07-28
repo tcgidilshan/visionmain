@@ -37,10 +37,9 @@ class InvoiceReportService:
         print(f"Date range for query: {start_datetime} to {end_datetime}")
         
         payments = OrderPayment.all_objects.select_related("order").filter(
-            payment_date__range=(start_datetime, end_datetime),
+            (Q(payment_date__range=(start_datetime, end_datetime)) |  Q(order__deleted_at__range=(start_datetime, end_datetime))),
             order__branch_id=branch_id,
             is_edited=False
-
         )
         # print(f"Found {payments.count()} payments")
 
