@@ -15,7 +15,7 @@ class ChannelReportService:
         try:
             start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(payment_date,None)
             payments = ChannelPayment.objects.filter(
-                payment_date__range=(start_datetime, end_datetime),
+                (Q(payment_date__range=(start_datetime, end_datetime)) |  Q(appointment__deleted_at__range=(start_datetime, end_datetime))),
                 appointment__branch_id=branch_id
             ).select_related('appointment')
         except (ValueError, TypeError) as e:
