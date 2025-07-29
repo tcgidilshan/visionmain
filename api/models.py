@@ -837,7 +837,7 @@ class OrderItem(models.Model):
     admin = models.ForeignKey(
         CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_order_items'
     )
-
+    created_at = models.DateTimeField(default=timezone.now)
     objects = SoftDeleteManager()
     all_objects = models.Manager()
 

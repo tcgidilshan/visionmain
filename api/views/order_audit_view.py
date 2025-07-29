@@ -17,6 +17,7 @@ from django.db.models import (
     OuterRef,
     Q,
     Value,
+    F,
 )
 from rest_framework.exceptions import ValidationError
 from ..services.time_zone_convert_service import TimezoneConverterService
@@ -136,30 +137,25 @@ class DailyOrderAuditReportView(generics.ListAPIView):
     def _parse_range(self):
         """
         Convert ?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD to timezone-aware
-        datetimes covering **[start, end_of_day]**.  Defaults to “today”.
+        datetimes covering **[start, end_of_day]**.  Defaults to "today".
         """
         start_str = self.request.query_params.get("start_date")
         end_str   = self.request.query_params.get("end_date")
 
-        if not start_str or not end_str:
-            today  = timezone.localdate()
-            start  = datetime.combine(today, datetime.min.time())
-            end    = start + timedelta(days=1)
-            return timezone.make_aware(start), timezone.make_aware(end)
-
-        try:
-            start = datetime.strptime(start_str, "%Y-%m-%d")
-            end   = datetime.strptime(end_str,   "%Y-%m-%d") + timedelta(days=1)
-            return timezone.make_aware(start), timezone.make_aware(end)
-        except ValueError:
-            raise ValidationError("start_date and end_date must be YYYY-MM-DD")
-
+        start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_str, end_str)
+        print(f"start_datetime: {start_datetime}, end_datetime: {end_datetime}")
+        return start_datetime, end_datetime
     # --------------------------------------------------------------------- #
     # main queryset
     # --------------------------------------------------------------------- #
     def get_queryset(self):
-        start, end = self._parse_range()
-        branch_id  = self.request.query_params.get("branch_id")
+        start_datetime, end_datetime = self._parse_range()
+        
+        # Add validation for None values
+        if start_datetime is None or end_datetime is None:
+            return Invoice.objects.none()
+        
+        branch_id = self.request.query_params.get("branch_id")
 
         # Start with all non-deleted invoices
         qs = Invoice.objects.filter(is_deleted=False)
@@ -170,8 +166,8 @@ class DailyOrderAuditReportView(generics.ListAPIView):
 
         # -- 1️⃣ orders whose *refraction* changed in range ---------------- #
         refraction_sq = RefractionDetailsAuditLog.objects.filter(
-            created_at__gte=start,
-            created_at__lt=end,
+            created_at__gte=start_datetime,
+            created_at__lte=end_datetime,  # Changed from __lt to __lte
             refraction_details__refraction_id=OuterRef("order__refraction_id")
         )
         qs = qs.annotate(has_refraction_change=Exists(refraction_sq))
@@ -179,16 +175,16 @@ class DailyOrderAuditReportView(generics.ListAPIView):
         # -- 2️⃣ header-level OrderAuditLog -------------------------------- #
         header_sq = OrderAuditLog.objects.filter(
             order_id=OuterRef("order_id"),
-            created_at__gte=start,
-            created_at__lt=end,
+            created_at__gte=start_datetime,
+            created_at__lte=end_datetime,  # Changed from __lt to __lte
         )
         qs = qs.annotate(order_details=Exists(header_sq))
-
+        print(f"qs: {qs}")
         # -- 3️⃣ item-level changes (added OR soft-deleted) ---------------- #
         # New rows → rely on `created_at` if you have it; otherwise only deletions
-        item_filter = Q(deleted_at__gte=start, deleted_at__lt=end)
+        item_filter = Q(deleted_at__gte=start_datetime, deleted_at__lte=end_datetime)  # Changed from __lt to __lte
         if hasattr(OrderItem, "created_at"):
-            item_filter |= Q(created_at__gte=start, created_at__lt=end)
+            item_filter |= Q(created_at__gte=start_datetime, created_at__lte=end_datetime)  # Changed from __lt to __lte
 
         item_sq = OrderItem.all_objects.filter(
             order_id=OuterRef("order_id")
@@ -199,8 +195,8 @@ class DailyOrderAuditReportView(generics.ListAPIView):
         pay_sq = OrderPayment.all_objects.filter(
             order_id=OuterRef("order_id")
         ).filter(
-            Q(payment_date__gte=start, payment_date__lt=end) |
-            Q(deleted_at__gte=start,  deleted_at__lt=end)
+            Q(payment_date__gte=start_datetime, payment_date__lte=end_datetime) |  # Changed from __lt to __lte
+            Q(deleted_at__gte=start_datetime, deleted_at__lte=end_datetime)  # Changed from __lt to __lte
         )
         qs = qs.annotate(order_payment=Exists(pay_sq))
 
@@ -224,8 +220,9 @@ class DailyOrderAuditReportView(generics.ListAPIView):
             "order_details",
             "order_item",
             "order_payment",
+            "has_refraction_change",  # Include the actual refraction change value
         ).annotate(
-            refraction_details=Value(True, output_field=BooleanField())
+            refraction_details=F("has_refraction_change")  # Use the actual value instead of always True
         )
 
         # pagination works on list-of-dicts just fine
