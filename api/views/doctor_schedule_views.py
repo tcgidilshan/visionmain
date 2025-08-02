@@ -30,7 +30,7 @@ class DoctorScheduleCreateView(APIView):
 
 class DoctorUpcomingScheduleView(APIView):
     def get(self, request, doctor_id):
-        branch_id = request.query_params.get("branch_id")
+        branch_id = request.query_params.get("branch")
         status = request.query_params.get("status")  # New status parameter
         schedules = DoctorScheduleService.get_upcoming_arrival_days(doctor_id, branch_id,status)
         return Response(ScheduleSerializer(schedules, many=True).data)

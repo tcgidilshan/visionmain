@@ -21,7 +21,8 @@ from .models import (
     OtherItem,BankAccount,BankDeposit,
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
     UserBranch,ExpenseMainCategory, ExpenseSubCategory,LensStockHistory,
-    DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus,FrameImage
+    DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus,FrameImage,
+    DoctorBranchChannelFees
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -789,6 +790,12 @@ class DoctorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Doctor
         fields = ['id', 'name', 'contact_info', 'status', 'specialization']
+class DoctorBranchChannelFeesSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source='doctor.name', read_only=True)
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
+    class Meta:
+        model = DoctorBranchChannelFees
+        fields = ['id', 'doctor', 'branch', 'doctor_name', 'branch_name', 'doctor_fees', 'branch_fees']
         
 class ScheduleSerializer(serializers.ModelSerializer):
     doctor_name = serializers.CharField(source='doctor.name', read_only=True)  # Include doctor name if needed
@@ -837,7 +844,9 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'updated_at',  # Record update timestamp
             'branch_name',
             'invoice_number',
-            'note'
+            'note',
+            'doctor_fees',
+            'branch_fees'
         ]
 
 class ChannelPaymentSerializer(serializers.ModelSerializer):
@@ -923,7 +932,7 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'doctor', 'doctor_name', 'patient', 'patient_name',
             'address', 'contact_number', 'schedule', 'date', 'time',
-            'status', 'amount', 'channel_no', 'payments','invoice_number','note','created_at'
+            'status', 'amount', 'channel_no', 'payments','invoice_number','note','created_at','doctor_fees','branch_fees'
         ]
     def get_payments(self, obj):
         """Fetch all related payments for this appointment."""
