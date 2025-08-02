@@ -28,7 +28,7 @@ class ChannelAppointmentView(APIView):
         data = request.data
 
         # Step 1: Validate Input
-        required_fields = ['doctor_id', 'name', 'address', 'contact_number', 'channel_date', 'time', 'channeling_fee', 'branch_id', 'payments']
+        required_fields = ['doctor_id', 'name', 'address', 'contact_number', 'channel_date', 'time', 'channeling_fee','doctor_fees','branch_fees','branch_id', 'payments']
         for field in required_fields:
             if field not in data:
                 return Response({"error": f"{field} is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -42,7 +42,6 @@ class ChannelAppointmentView(APIView):
                 "address": data.get("address", "")
             }
             patient = PatientService.create_or_update_patient(patient_payload)
-
             # Step 3: Handle Schedule (Create If Not Exists)
             schedule, created = Schedule.objects.get_or_create(
                 doctor_id=data['doctor_id'],
@@ -72,7 +71,10 @@ class ChannelAppointmentView(APIView):
                 "note": data.get('note', ''),
                 "amount": data['channeling_fee'],
                 "channel_no": channel_no,
-                "branch": branch_id
+                "branch": branch_id,
+                "doctor_fees": data['doctor_fees'],
+                "branch_fees": data['branch_fees']
+
             }
 
             appointment_serializer = AppointmentSerializer(data=appointment_data)
@@ -281,8 +283,10 @@ class ChannelUpdateView(APIView):
         data = request.data
 
         # Step 1: Validate required fields
-        required_fields = ['doctor_id', 'name', 'address', 'contact_number', 'channel_date',
-                           'time', 'channeling_fee', 'branch_id', 'payments']
+        required_fields = [
+            'doctor_id', 'name', 'address', 'contact_number', 'channel_date',
+            'branch_fees', 'doctor_fees', 'time', 'channeling_fee', 'branch_id', 'payments'
+        ]
         for field in required_fields:
             if field not in data:
                 return Response({"error": f"{field} is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -367,7 +371,9 @@ class ChannelUpdateView(APIView):
                 "note": data.get('note', ''),
                 "amount": data['channeling_fee'],
                 "channel_no": channel_no,
-                "branch": data['branch_id']
+                "branch": data['branch_id'],
+                "doctor_fees": data['doctor_fees'],
+                "branch_fees": data['branch_fees'],
             }
             serializer = AppointmentSerializer(appointment, data=appointment_data)
             serializer.is_valid(raise_exception=True)
@@ -488,6 +494,7 @@ class AppointmentStatusListView(ListAPIView):
         status_filter = self.request.query_params.get("status")
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
+        branch_id = self.request.query_params.get("branch_id")
         queryset = Appointment.all_objects.prefetch_related('payments').select_related('doctor', 'patient', 'branch')
         start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
         # Decide status and which date field to filter on
@@ -518,8 +525,9 @@ class AppointmentStatusListView(ListAPIView):
         elif end_date:
             filter_kwargs = {f"{date_field}__lte": end_datetime}
             queryset = queryset.filter(**filter_kwargs)
-
-        return queryset
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+        return queryset.order_by("-" + date_field)
 
 class BranchAppointmentCountView(APIView):
     """

@@ -70,7 +70,7 @@ from .views import (
     GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView,MntOrderReportView,
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
     FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView,SolderingOrderReportView,
-    PaymentSummaryReportView
+    PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -219,7 +219,10 @@ urlpatterns = [
     path('channel/<int:pk>/cancel/', CancelChannelView.as_view(), name='cancel-channel'), #soft delete
     path('channel/<int:pk>/refund/', RefundChannelView.as_view(), name='refund-channel'),
     path('channels/status/', AppointmentStatusListView.as_view(), name='channel-status-list'),#deleted refunded filter
-
+    path('channels/fees/', DoctorBranchChannelFeesCreateView.as_view(), name='doctor-branch-channel-fees-create'),
+    path('channels/fees/<int:pk>/update/', DoctorBranchChannelFeesUpdateView.as_view(), name='doctor-branch-channel-fees-list'),
+    path('channels/fees/list/', DoctorBranchChannelFeesListView.as_view(), name='doctor-branch-channel-fees-list'),
+    
     #channel repayment
     path('channel/repayments/', ChannelRepaymentView.as_view(), name='channel-repayments'),
     path('doctor/transfer-appointments/', DoctorAppointmentTransferView.as_view(), name='doctor-appointment-transfer'), #appointment trans

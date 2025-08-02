@@ -837,7 +837,7 @@ class OrderItem(models.Model):
     admin = models.ForeignKey(
         CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_order_items'
     )
-
+    created_at = models.DateTimeField(default=timezone.now)
     objects = SoftDeleteManager()
     all_objects = models.Manager()
 
@@ -913,6 +913,13 @@ class Doctor(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available')
     def __str__(self):
         return f"{self.name} ({self.specialization}) - {self.status}"
+class DoctorBranchChannelFees(models.Model):
+    doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE, related_name='doctor_branch_channel_fees')
+    branch = models.ForeignKey('Branch', on_delete=models.CASCADE, related_name='doctor_branch_channel_fees')
+    doctor_fees = models.DecimalField(max_digits=10, decimal_places=2)
+    branch_fees = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
 class Schedule(models.Model):
     class StatusChoices(models.TextChoices):
@@ -978,7 +985,8 @@ class Appointment(models.Model):
     is_refund = models.BooleanField(default=False)
     refunded_at = models.DateTimeField(null=True, blank=True)
     refund_note = models.TextField(blank=True, null=True)
-
+    doctor_fees = models.DecimalField(max_digits=10, decimal_places=2,default=0)
+    branch_fees = models.DecimalField(max_digits=10, decimal_places=2,default=0)
     objects = SoftDeleteManager()      # Only active records
     all_objects = models.Manager() 
     class Meta:
