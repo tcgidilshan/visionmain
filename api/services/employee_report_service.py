@@ -96,6 +96,18 @@ class EmployeeReportService:
                 is_deleted=False
             )
             
+            # Get feedback counts by rating for this employee's orders
+            feedback_counts = employee.orders.filter(
+                order_feedback__isnull=False,
+                order_date__range=[start_date, end_date]
+            ).aggregate(
+                rating_1=Count('order_feedback', filter=Q(order_feedback__rating=1)),
+                rating_2=Count('order_feedback', filter=Q(order_feedback__rating=2)),
+                rating_3=Count('order_feedback', filter=Q(order_feedback__rating=3)),
+                rating_4=Count('order_feedback', filter=Q(order_feedback__rating=4)),
+                total_feedback=Count('order_feedback')
+            )
+            
             # Count branded frames sold
             branded_frames_count = order_items.filter(
                 frame__isnull=False,
@@ -127,8 +139,8 @@ class EmployeeReportService:
                 is_frame_only=True  # Adjust this based on your normal order logic
             ).count()
             
-            # Customer feedback count (placeholder for future implementation)
-            customer_feedback_count = 0  # Will be implemented later
+            # Customer feedback count
+            customer_feedback_count = feedback_counts['total_feedback']
             
             # Calculate total count
             total_count = (
@@ -165,6 +177,12 @@ class EmployeeReportService:
                 'factory_order_count': factory_orders_count,
                 'normal_order_count': normal_orders_count,
                 'customer_feedback_count': customer_feedback_count,
+                'feedback_ratings': {
+                    'rating_1': feedback_counts['rating_1'],
+                    'rating_2': feedback_counts['rating_2'],
+                    'rating_3': feedback_counts['rating_3'],
+                    'rating_4': feedback_counts['rating_4']
+                },
                 'total_count': int(total_count),
                 'total_sales_amount': float(total_sales),
                 'total_orders': employee_orders.count(),

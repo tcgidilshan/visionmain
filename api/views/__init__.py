@@ -60,3 +60,4 @@ from .lens_store_report_view import LensSaleReportView
 from .order_image_view import OrderImageListCreateView,OrderImageDetailView
 from .payment_report import PaymentSummaryReportView
 from .doctor_branch_fees import DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView
+from .order_feedback import OrderFeedbackCreateView
