@@ -22,7 +22,7 @@ from .models import (
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
     UserBranch,ExpenseMainCategory, ExpenseSubCategory,LensStockHistory,
     DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus,FrameImage,
-    DoctorBranchChannelFees
+    DoctorBranchChannelFees,OrderFeedback
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -1499,6 +1499,14 @@ class OrderLiteSerializer(serializers.ModelSerializer):
         if last_status:
             return OrderProgressSerializer(last_status).data
         return None
+class OrderFeedbackSerializer(serializers.ModelSerializer):
+    invoice_number = serializers.CharField(source='order.invoice.invoice_number', read_only=True)
+    
+    class Meta:
+        model = OrderFeedback
+        fields = ['id', 'order', 'user', 'comment', 'rating', 'created_at', 'updated_at','invoice_number']
+        read_only_fields = ['created_at', 'updated_at', 'invoice_number']
+
 class MntOrderSerializer(serializers.ModelSerializer):
     order_id = serializers.PrimaryKeyRelatedField(source='order', queryset=Order.objects.all())
     branch_id = serializers.PrimaryKeyRelatedField(source='branch', queryset=Branch.objects.all())

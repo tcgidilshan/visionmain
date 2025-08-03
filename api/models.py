@@ -571,6 +571,14 @@ class Order(models.Model):
                 self.issued_date = timezone.now()   
         super().save(*args, **kwargs)
 
+class OrderFeedback(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_feedback')
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='order_feedback',null=True,blank=True)
+    comment = models.TextField(null=True, blank=True)
+    rating = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
 class OrderAuditLog(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_audit_logs')
     field_name = models.CharField(max_length=100)
@@ -920,6 +928,8 @@ class DoctorBranchChannelFees(models.Model):
     branch_fees = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        unique_together = ('doctor', 'branch')
 
 class Schedule(models.Model):
     class StatusChoices(models.TextChoices):

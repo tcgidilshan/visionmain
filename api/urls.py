@@ -70,12 +70,13 @@ from .views import (
     GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView,MntOrderReportView,
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
     FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView,SolderingOrderReportView,
-    PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView
+    PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
 from .views.banking_views import BankingReportView,ConfirmDepositView
 from .views.customer_report_views import CustomerLocationStatisticsView,CustomerLocationTableView
+from .views.order_feedback import OrderFeedbackCreateView, OrderFeedbackByInvoiceView
 
 # from .views import CustomAuthToken
 
@@ -296,6 +297,9 @@ urlpatterns = [
     path('orders/<int:order_id>/images/', OrderImageListCreateView.as_view(), name='order-image-list-create'),
     path('orders/<int:order_id>/images/<int:pk>', OrderImageDetailView.as_view(), name='order-image-detail'),
     path('orders/<int:order_id>/images/<int:pk>/', OrderImageDetailView.as_view(), name='order-image-detail-slash'),
+    path('order-feedback/by-invoice/', OrderFeedbackByInvoiceView.as_view(), name='order-feedback-by-invoice'),
+    path('order-feedback/', OrderFeedbackCreateView.as_view(), name='order-feedback-create'),
+    
 
     
     ]

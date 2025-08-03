@@ -34,4 +34,5 @@ class InvoiceDetailView(RetrieveAPIView):
         )
 
 
+
     

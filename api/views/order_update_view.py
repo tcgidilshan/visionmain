@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-from ..models import Order,ExternalLens,Invoice, CustomUser,OrderItemWhatsAppLog,OrderProgress,ArrivalStatus
+from ..models import Order,ExternalLens,Invoice, CustomUser,OrderItemWhatsAppLog,OrderProgress,ArrivalStatus, OrderFeedback
 from ..serializers import OrderSerializer,ExternalLensSerializer
 from ..services.order_service import OrderService
 from ..services.audit_log_service import OrderAuditLogService
@@ -25,20 +25,20 @@ class OrderUpdateView(APIView):
             user_id = request.data.get("user_id")
             if not admin_id:
                return Response({"error": "Admin ID is required to perform an MNT operation."}, status=status.HTTP_400_BAD_REQUEST)
-            # ✅ Step 1: Update Patient Details (if provided)
+            # Step 1: Update Patient Details (if provided)
 
             patient_data = request.data.get("patient")
             if patient_data:
                 PatientService.create_or_update_patient(patient_data)
 
 
-            # ✅ Step 2: Extract Order Data (check if on_hold status is changing)
+            # Step 2: Extract Order Data (check if on_hold status is changing)
             order_data = request.data.get("order", {})
             order_items_data = request.data.get("order_items", [])
             payments_data = request.data.get("order_payments", [])
             
 
-            # ✅ Check if we're changing on_hold status
+            # Check if we're changing on_hold status
             current_on_hold = order.on_hold
             new_on_hold = order_data.get("on_hold", current_on_hold)
             original_order_data = {
@@ -49,11 +49,11 @@ class OrderUpdateView(APIView):
             if current_on_hold != new_on_hold:
                 print(f"Order {order.id} on_hold status changing: {current_on_hold} → {new_on_hold}")
             
-            # ✅ Step 3: Update Order 
+            # Step 3: Update Order 
             # The updated update_order method now handles different stock behavior based on on_hold status
             updated_order = OrderService.update_order(order, order_data, order_items_data, payments_data,admin_id,user_id)
             
-            # ✅ Now log only if update succeeded
+            # Now log only if update succeeded
             OrderAuditLogService.log_order_changes(
             order_instance=updated_order,
             updated_data=order_data,
@@ -107,7 +107,7 @@ class OrderUpdateView(APIView):
                 # Optionally: return mnt_order info in response or audit log
 
 
-            # ✅ Step 5: Return Updated Order Response
+            # Step 5: Return Updated Order Response
             response_serializer = OrderSerializer(updated_order)
             return Response(response_serializer.data, status=status.HTTP_200_OK)
 
@@ -187,6 +187,12 @@ class OrderDeliveryMarkView(APIView):
         order.issued_by = user
         order.issued_date = timezone.now()
         order.save()
+
+        # Check if feedback exists for this order with null user and update it
+        feedback = OrderFeedback.objects.filter(order=order, user__isnull=True).first()
+        if feedback:
+            feedback.user = user
+            feedback.save(update_fields=['user'])
 
         return Response({'detail': 'Order marked as delivered.', 'order_id': order.id}, status=status.HTTP_200_OK)
 
