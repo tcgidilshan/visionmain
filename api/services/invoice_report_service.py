@@ -501,10 +501,10 @@ class InvoiceReportService:
             
         # Get all appointments in the date range for the branch
         appointments = Appointment.objects.select_related('patient').filter(
-            date__range=(start_datetime, end_datetime),
+            created_at__range=(start_datetime, end_datetime),
             branch_id=branch_id,
             is_deleted=False
-        ).order_by('date', 'time')
+        ).order_by('created_at', 'time')
         
         # Get all payments for these appointments
         appointment_ids = list(appointments.values_list('id', flat=True))
