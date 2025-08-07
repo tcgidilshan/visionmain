@@ -134,6 +134,9 @@ class FrameSerializer(serializers.ModelSerializer):
     code_name = serializers.CharField(source='code.name', read_only=True)
     color_name = serializers.CharField(source='color.name', read_only=True)
     brand_type_display = serializers.CharField(source='get_brand_type_display', read_only=True)
+    initial_branch = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(),required=False
+    )
 
     # For API consumers
     image_url = serializers.SerializerMethodField()
@@ -156,6 +159,7 @@ class FrameSerializer(serializers.ModelSerializer):
             'is_active',
             'image_file', 'uploaded_url', 'image_id',  # image input options
             'image_url',  # read-only image access
+            'initial_branch',
         ]
 
     def validate(self, data):
@@ -352,10 +356,13 @@ class LensSerializer(serializers.ModelSerializer):
     brand_name = serializers.CharField(source='brand.name', read_only=True)  # Get brand name  
     type_name = serializers.CharField(source='type.name', read_only=True)  # Get brand name 
     coating_name = serializers.CharField(source='coating.name', read_only=True)  # Get brand name 
+    initial_branch = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(),required=False
+    )
 
     class Meta:
         model = Lens
-        fields = ['id', 'type', 'coating', 'price','brand','brand_name','type_name','coating_name','is_active']
+        fields = ['id', 'type', 'coating', 'price','brand','brand_name','type_name','coating_name','is_active','initial_branch']
 
     def validate(self, data):
         if 'brand' not in data:
