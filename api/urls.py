@@ -71,7 +71,7 @@ from .views import (
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
     FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView,SolderingOrderReportView,
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
-    LensHistoryReportView
+    LensHistoryReportView,FrameBrandReportView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -144,6 +144,7 @@ urlpatterns = [
     path("frames/colors/", FrameColorListView.as_view(), name="frame-colors"),
     path("frames/stocks/adjust", StockAdjustmentView.as_view(), name="frame-stock-adjustment"),
     path("frames/filter", FrameFilterView.as_view(), name="frame-stock-filter"),
+    path("report/frames/brand/", FrameBrandReportView.as_view(), name="frame-brand-report"),
 
     path('frames/report/', FrameReportView.as_view(), name='frames-report'), #frame reports
 
@@ -301,8 +302,6 @@ urlpatterns = [
     path('orders/<int:order_id>/images/<int:pk>/', OrderImageDetailView.as_view(), name='order-image-detail-slash'),
     path('order-feedback/by-invoice/', OrderFeedbackByInvoiceView.as_view(), name='order-feedback-by-invoice'),
     path('order-feedback/', OrderFeedbackCreateView.as_view(), name='order-feedback-create'),
-    
-
     
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),

@@ -42,7 +42,7 @@ class ExpenseCreateView(APIView):
             paid_source = serializer.validated_data.get("paid_source", "safe")
 
             try:
-                # 🛡️ Validate safe balance if paid from safe
+                # Validate safe balance if paid from safe
                 if paid_source == "safe":
                     SafeService.validate_sufficient_balance(branch_id, amount)
                 else:
@@ -50,7 +50,7 @@ class ExpenseCreateView(APIView):
 
                 expense = serializer.save()
 
-                # 💾 Record safe transaction if needed
+                # Record safe transaction if needed
                 if paid_source == "safe":
                     SafeService.record_transaction(
                         branch=expense.branch,
@@ -86,9 +86,16 @@ class ExpenseReportView(APIView):
             ).order_by('-created_at')
 
             total = queryset.aggregate(total_expense=Sum('amount'))['total_expense'] or 0
-
+            cash_total = queryset.filter(paid_source='cash').aggregate(cash_total=Sum('amount'))['cash_total'] or 0
+            safe_total = queryset.filter(paid_source='safe').aggregate(safe_total=Sum('amount'))['safe_total'] or 0
+            bank_total = queryset.filter(paid_source='bank').aggregate(bank_total=Sum('amount'))['bank_total'] or 0
+            
             return Response({
                 "total_expense": total,
+                "cash_expense_total": cash_total,
+                "safe_expense_total": safe_total,
+                "bank_expense_total": bank_total,
+                "subtotal_expense": total,  
                 "expenses": ExpenseReportSerializer(queryset, many=True).data
             })
 
@@ -168,4 +175,3 @@ class ExpenseUpdateView(APIView):
 class ExpenseRetrieveView(generics.RetrieveAPIView):
     queryset = Expense.objects.all()
     serializer_class = ExpenseSerializer
-
