@@ -70,7 +70,8 @@ from .views import (
     GlassSenderReportView,OrderDeleteRefundListView,OrderProgressStatusListView,OrderAuditHistoryView,MntOrderReportView,
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
     FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView,SolderingOrderReportView,
-    PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView
+    PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
+    LensHistoryReportView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -278,6 +279,7 @@ urlpatterns = [
 
     #store report
     path('report/frame-history/',FrameHistoryReportView.as_view(), name='report-frame-history'),
+    path('report/lens-history/',LensHistoryReportView.as_view(), name='report-lens-history'),
     #sale report
     path('report/frame-sale/',FrameSaleReportView.as_view(), name='report-frame-sale'),
     path('report/lens-sale/',LensSaleReportView.as_view(), name='report-lens-sale'),
