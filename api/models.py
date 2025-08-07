@@ -321,6 +321,7 @@ class Frame(models.Model):
     species = models.CharField(max_length=100)
     is_active = models.BooleanField(default=True) 
     image = models.ForeignKey(FrameImage, on_delete=models.SET_NULL, null=True, blank=True)
+    initial_branch = models.ForeignKey(Branch, related_name='initial_frames', on_delete=models.CASCADE, null=True, blank=True)
     def __str__(self):
         return f"{self.brand.name} - {self.code.name} - {self.color.name} - {self.get_brand_type_display()}"
     class Meta:
@@ -358,6 +359,7 @@ class FrameStockHistory(models.Model):
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
     quantity_changed = models.PositiveIntegerField()
     timestamp = models.DateTimeField(auto_now_add=True)
+
     # performed_by = models.ForeignKey(CustomUser,related_name='stock_histories',on_delete=models.CASCADE, null=True, blank=True)
     # note = models.TextField(blank=True, null=True)
 
@@ -409,7 +411,8 @@ class Lens(models.Model):
     coating = models.ForeignKey(Coating, related_name='lenses', on_delete=models.CASCADE)
     brand = models.ForeignKey(Brand, related_name='lenses', on_delete=models.CASCADE)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    is_active = models.BooleanField(default=True) 
+    is_active = models.BooleanField(default=True)
+    initial_branch = models.ForeignKey(Branch, related_name='initial_lense', on_delete=models.CASCADE, null=True, blank=True) 
 
     def __str__(self):
         return f"{self.type.name} - {self.coating.name} - ${self.price}"

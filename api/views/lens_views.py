@@ -291,17 +291,26 @@ class LensRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
             updated_stock = stock_serializer.save()
             updated_stocks.append(updated_stock)
             
-            # Create stock history record if quantity changed
-            if 'qty' in stock_data and stock_instance:
-                qty_difference = int(stock_data['qty']) - old_qty
-                if qty_difference != 0:
-                    action = LensStockHistory.ADD if qty_difference > 0 else LensStockHistory.REMOVE
-                    LensStockHistory.objects.create(
-                        lens=lens,
-                        branch_id=branch_id,
-                        action=action,
-                        quantity_changed=abs(qty_difference)
-                    )
+            # Create stock history record if quantity changed or it's a new stock
+            if 'qty' in stock_data:
+                if not stock_instance:  # New stock record
+                    if int(stock_data['qty']) > 0:  # Only create history if initial qty > 0
+                        LensStockHistory.objects.create(
+                            lens=lens,
+                            branch_id=branch_id,
+                            action=LensStockHistory.ADD,
+                            quantity_changed=int(stock_data['qty'])
+                        )
+                elif stock_instance:  # Existing stock record
+                    qty_difference = int(stock_data['qty']) - old_qty
+                    if qty_difference != 0:
+                        action = LensStockHistory.ADD if qty_difference > 0 else LensStockHistory.REMOVE
+                        LensStockHistory.objects.create(
+                            lens=lens,
+                            branch_id=branch_id,
+                            action=action,
+                            quantity_changed=abs(qty_difference)
+                        )
 
         # ✅ Update Powers if powers data is provided
         if powers_data:

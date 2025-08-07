@@ -71,6 +71,25 @@ class FrameTransferView(APIView):
 
             # Get or create destination stock
             to_branch = Branch.objects.get(id=to_branch_id)
+            
+            # Prevent transfers to Frame & Lens store (branch_id=4) if initial_branch is not set
+            if to_branch_id == 4 and not frame.initial_branch_id:
+                return Response(
+                    {"error": "This item does not belong to Frame & Lens store"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if the destination branch is the initial branch and if stock exists there
+            if frame.initial_branch_id and to_branch_id == frame.initial_branch_id and not FrameStock.objects.filter(
+                frame=frame, 
+                branch_id=to_branch_id,
+                qty__gt=0
+            ).exists():
+                return Response(
+                    {"error": "Cannot transfer to frame store there is no stock available"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
             to_stock, created = FrameStock.objects.get_or_create(
                 frame=frame,
                 branch=to_branch,
@@ -388,6 +407,18 @@ class LensTransferView(APIView):
             branch=to_branch,
             defaults={'qty': 0, 'initial_count': 0}
         )
+        
+        # Prevent transfers to Frame & Lens store (branch_id=4) if initial_branch is not set
+        if to_branch_id == 4 and not lens.initial_branch_id:
+            raise ValueError("This item does not belong to Frame & Lens store")
+            
+        # Check if the destination branch is the initial branch and if stock exists there
+        if lens.initial_branch_id and to_branch_id == lens.initial_branch_id and not LensStock.objects.filter(
+            lens=lens, 
+            branch_id=to_branch_id,
+            qty__gt=0
+        ).exists():
+            raise ValueError("Cannot transfer to frame store as there is no stock available")
         
         # Update quantities
         from_stock.qty -= quantity
