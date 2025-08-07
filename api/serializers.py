@@ -312,7 +312,7 @@ class FrameStockHistorySerializer(serializers.ModelSerializer):
 
 class LensStockHistorySerializer(serializers.ModelSerializer):
     lens_id = serializers.IntegerField(source='lens.id', read_only=True)
-    brand = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all())
+    # brand = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all())
     brand_name = serializers.CharField(source='brand.name', read_only=True)  # Get brand name  
     type_name = serializers.CharField(source='type.name', read_only=True)  # Get brand name 
     coating_name = serializers.CharField(source='coating.name', read_only=True)  # Get brand name 
@@ -327,9 +327,9 @@ class LensStockHistorySerializer(serializers.ModelSerializer):
         model = LensStockHistory
         fields = [
             'id', 
-            'lens_id', 'brand_name', 'type_name', 'coating_name', 'size', 'species',
+            'lens_id', 'brand_name', 'type_name', 'coating_name',
             'action', 'quantity_changed', 'timestamp',
-            'branch', 'transfer_to'
+            'branch', 'transfer_to',
         ]
 
 
