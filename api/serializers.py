@@ -22,7 +22,7 @@ from .models import (
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
     UserBranch,ExpenseMainCategory, ExpenseSubCategory,LensStockHistory,
     DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus,FrameImage,
-    DoctorBranchChannelFees,OrderFeedback
+    DoctorBranchChannelFees,OrderFeedback,HearingItem,HearingItemStock
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -455,6 +455,26 @@ class OtherItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OtherItem
         fields = ['id', 'name', 'price', 'is_active']
+#//! HEARING
+
+class HearingItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HearingItem
+        fields = ['id', 'name', 'price', 'is_active', 'warranty', 'code']
+
+class HearingItemStockSerializer(serializers.ModelSerializer):
+    hearing_item_id = serializers.PrimaryKeyRelatedField(
+        queryset=HearingItem.objects.all(), source='hearing_item', write_only=True
+    )
+    branch_id = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(),  # Ensures valid branch selection
+        source="branch",  # Maps to `branch` field in the model
+        required=False  # Makes it optional in requests
+    )
+    class Meta:
+        model = HearingItemStock
+        fields = ['id', 'hearing_item_id', 'initial_count', 'qty', 'branch_id', 'limit']
+
         
 class OrderItemSerializer(serializers.ModelSerializer):
     # External Lens Info
@@ -470,7 +490,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
     lens_detail        = LensSerializer(source="lens", read_only=True)
     frame_detail       = FrameSerializer(source="frame", read_only=True)
     other_item_detail  = OtherItemSerializer(source="other_item", read_only=True)
-
+    hearing_item_detail= HearingItemSerializer(source="hearing_item", read_only=True)
     # Other fields
     lens_powers   = serializers.SerializerMethodField()  # Optional/custom field
     is_non_stock  = serializers.BooleanField(default=False)
@@ -510,7 +530,10 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'user',
             'admin',
             'deleted_at',
-            'ex_branded_type'
+            'ex_branded_type',
+            'battery',
+            'serial_no',
+            'hearing_item_detail'
         ]
 
 
@@ -1542,3 +1565,4 @@ class MntOrderSerializer(serializers.ModelSerializer):
             'order_total_price'
         ]
         read_only_fields = ['mnt_number', 'created_at', 'branch_name', 'user_username', 'admin_username']
+
