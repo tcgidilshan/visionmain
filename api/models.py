@@ -733,7 +733,8 @@ class Invoice(models.Model):
     INVOICE_TYPES = [
         ('factory', 'Factory Invoice'),  # Linked to an order with refraction
         ('manual', 'Manual Invoice'),  # Linked to an order without refraction
-        ('normal', 'Normal Invoice')  # Linked to an order without refraction
+        ('normal', 'Normal Invoice') , # Linked to an order without refraction
+        ('hearing', 'Hearing')  # Linked to an order without refraction
     ]   
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="invoice")
     invoice_type = models.CharField(max_length=10, choices=INVOICE_TYPES)  #  Identifies invoice type
@@ -791,6 +792,29 @@ class Invoice(models.Model):
 
                     # Format as {BRANCH_PREFIX}N{number} (e.g., COMN001, COMN002)
                     self.invoice_number = f"{branch_prefix}N{number:03d}"
+            elif self.invoice_type == 'hearing':
+                with transaction.atomic():
+                    # Get the first 3 letters of branch name in uppercase
+                    branch_prefix = self.order.branch.branch_name[:3].upper()
+                    
+                    # Get the last invoice with 'normal' type for this branch
+                    last_invoice = Invoice.all_objects.select_for_update().filter(
+                        invoice_type='hearing',
+                        order__branch=self.order.branch
+                    ).order_by('-id').first()
+
+                    if last_invoice and last_invoice.invoice_number and last_invoice.invoice_number.startswith(branch_prefix):
+                        try:
+                            # Extract the numeric part after branch prefix and increment
+                            number_part = last_invoice.invoice_number[4:]  # Skip the 3-letter branch prefix
+                            number = int(number_part) + 1
+                        except (ValueError, IndexError):
+                            number = 1
+                    else:
+                        number = 1
+
+                    # Format as {BRANCH_PREFIX}N{number} (e.g., COMN001, COMN002)
+                    self.invoice_number = f"{branch_prefix}H{number:03d}"
             else:
                 # Original logic for other invoice types
                 branch_code = self.order.branch.branch_name[:3].upper()
@@ -834,6 +858,9 @@ class OrderItem(models.Model):
     lens_cleaner = models.ForeignKey(LensCleaner, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
     other_item = models.ForeignKey(OtherItem, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
     frame = models.ForeignKey(Frame, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
+    hearing_item = models.ForeignKey('HearingItem', null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
+    serial_no = models.CharField(max_length=100, null=True, blank=True)
+    battery = models.CharField(max_length=100, null=True, blank=True)
     quantity = models.PositiveIntegerField(default=1)
     price_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)

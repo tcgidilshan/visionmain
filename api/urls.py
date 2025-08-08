@@ -71,7 +71,7 @@ from .views import (
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
     FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView,SolderingOrderReportView,
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
-    LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView
+    LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -177,6 +177,8 @@ urlpatterns = [
     #//!headring
     path('hearing-items/', HearingItemListCreateView.as_view(), name='hearing-item-list-create'),
     path('hearing-items/<int:pk>/', HearingItemRetrieveUpdateDeleteView.as_view(), name='hearing-item-detail'),
+    path('hearing-orders/', HearingOrderCreateView.as_view(), name='hearing-order-create'),
+
 
     #feature fitting on collection
     path('orders/<int:pk>/update-fit-status/', OrderUpdateFitStatusView.as_view(), name='order-update-fit-status'),
