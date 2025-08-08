@@ -1291,3 +1291,23 @@ class DailyCashInHandRecord(models.Model):
 
     def __str__(self):
         return f"Branch {self.branch_id} - {self.date}: {self.cash_in_hand}"
+
+#//! HEARING
+class HearingItem(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    is_active = models.BooleanField(default=True)
+    warranty = models.CharField(max_length=30)
+    code = models.CharField(max_length=30,null=True,blank=True)
+
+    def __str__(self):
+        return f"{self.name} - ${self.price} - {'Active' if self.is_active else 'Inactive'}"
+class HearingItemStock(models.Model):
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="hearing_item_stocks", null=True, blank=True)
+    hearing_item = models.ForeignKey(HearingItem, on_delete=models.CASCADE, related_name="stocks")
+    initial_count = models.PositiveIntegerField()
+    qty = models.PositiveIntegerField()
+    limit = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.hearing_item.name} - Initial: {self.initial_count}, Current: {self.qty} "
