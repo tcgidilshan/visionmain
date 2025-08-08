@@ -62,3 +62,4 @@ from .payment_report import PaymentSummaryReportView
 from .doctor_branch_fees import DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView
 from .order_feedback import OrderFeedbackCreateView
 from .lens_history_report_view import LensHistoryReportView
+from .hearing_view import HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView

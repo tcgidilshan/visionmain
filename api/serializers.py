@@ -22,7 +22,7 @@ from .models import (
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
     UserBranch,ExpenseMainCategory, ExpenseSubCategory,LensStockHistory,
     DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus,FrameImage,
-    DoctorBranchChannelFees,OrderFeedback
+    DoctorBranchChannelFees,OrderFeedback,HearingItem,HearingItemStock
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -1542,3 +1542,23 @@ class MntOrderSerializer(serializers.ModelSerializer):
             'order_total_price'
         ]
         read_only_fields = ['mnt_number', 'created_at', 'branch_name', 'user_username', 'admin_username']
+
+#//! HEARING
+
+class HearingItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HearingItem
+        fields = ['id', 'name', 'price', 'is_active', 'warranty', 'code']
+
+class HearingItemStockSerializer(serializers.ModelSerializer):
+    hearing_item_id = serializers.PrimaryKeyRelatedField(
+        queryset=HearingItem.objects.all(), source='hearing_item', write_only=True
+    )
+    branch_id = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(),  # Ensures valid branch selection
+        source="branch",  # Maps to `branch` field in the model
+        required=False  # Makes it optional in requests
+    )
+    class Meta:
+        model = HearingItemStock
+        fields = ['id', 'hearing_item_id', 'initial_count', 'qty', 'branch_id', 'limit']
