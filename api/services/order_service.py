@@ -1,4 +1,4 @@
-from ..models import Order,Frame,OrderProgress, OtherItem,OrderItem, LensStock, LensCleanerStock, FrameStock,Lens,LensCleaner,Frame,ExternalLens,OtherItemStock,BusSystemSetting
+from ..models import Order,Frame,OrderProgress, OtherItem,OrderItem, LensStock, LensCleanerStock, FrameStock,Lens,LensCleaner,Frame,ExternalLens,OtherItemStock,BusSystemSetting, HearingItem, HearingItemStock
 from ..serializers import OrderSerializer, OrderItemSerializer, ExternalLensSerializer
 from django.db import transaction
 from ..services.order_payment_service import OrderPaymentService
@@ -80,7 +80,7 @@ class OrderService:
         """
         TRACKED_FIELDS = [
             "price_per_unit", "subtotal", "external_lens", "lens", "frame",
-            "lens_cleaner", "other_item", "note", "quantity"
+            "lens_cleaner", "other_item", "note", "quantity", "hearing_item","serial_no","battery"
         ]
         FK_FIELDS = {
             'frame': Frame,
@@ -88,6 +88,7 @@ class OrderService:
             'external_lens': ExternalLens,
             'lens_cleaner': LensCleaner,
             'other_item': OtherItem,
+            'hearing_item': HearingItem,
         }
 
         # Always recalculate subtotal using Decimal (ignore frontend subtotal)
@@ -187,7 +188,7 @@ class OrderService:
             if not branch_id:
                 raise ValueError("Order is not associated with a branch.")
 
-            # 🔹 Track on_hold flag changes
+            # Track on_hold flag changes
             was_on_hold = order.on_hold
             will_be_on_hold = order_data.get("on_hold", was_on_hold)
             # Detect transition from on-hold to active
@@ -196,7 +197,7 @@ class OrderService:
             # Track existing items for later comparison
             existing_items = {item.id: item for item in order.order_items.all()}
 
-            # 🔹 If transitioning from on-hold to active, validate lens stock
+            # If transitioning from on-hold to active, validate lens stock
             lens_stock_updates = []
             if transitioning_off_hold:
                 # Get only the lens-related items (not frames) for validation
@@ -214,7 +215,7 @@ class OrderService:
                     )
 
 
-            # 🔹 Update order fields
+            # Update order fields
             order.sub_total = order_data.get('sub_total', order.sub_total)
             order.discount = order_data.get('discount', order.discount)
             order.total_price = order_data.get('total_price', order.total_price)
@@ -222,8 +223,8 @@ class OrderService:
             order.sales_staff_code_id = order_data.get('sales_staff_code', order.sales_staff_code_id)
             order.order_remark = order_data.get('order_remark', order.order_remark)
             order.user_date = order_data.get('user_date', order.user_date)
-            order.on_hold = will_be_on_hold  # ✅ Update hold status
-            order.fitting_on_collection = order_data.get('fitting_on_collection', order.fitting_on_collection)  # ✅ Update hold status
+            order.on_hold = will_be_on_hold  # Update hold status
+            order.fitting_on_collection = order_data.get('fitting_on_collection', order.fitting_on_collection)  # Update hold status
             bus_title_id = order_data.get('bus_title')
             #urgent
             order.urgent = order_data.get('urgent', order.urgent)
@@ -249,7 +250,7 @@ class OrderService:
                     setattr(order, field, order_data.get(field))
             order.save()
             updated_item_ids = set()
-            # 🔹 Create/Update order items
+            # Create/Update order items
             for item_data in order_items_data:
                 item_id = item_data.get('id')
                 is_non_stock = item_data.get('is_non_stock', False)
@@ -274,21 +275,41 @@ class OrderService:
                         
                     else:
                         # Create new item
-                        OrderItem.objects.create(
-                            order=order,
-                            quantity=quantity,
-                            price_per_unit=item_data['price_per_unit'],
-                            subtotal=item_data['subtotal'],
-                            external_lens_id=external_lens_id,
-                            lens_id=item_data.get("lens"),
-                            frame_id=item_data.get("frame"),
-                            lens_cleaner_id=item_data.get("lens_cleaner"),
-                            other_item_id=item_data.get("other_item"),
-                            is_non_stock=is_non_stock,
-                            note=item_data.get("note"),
-                            admin_id=None,
-                            user_id=None
-                        )
+                        hearing_item_id = item_data.get("hearing_item")
+                        if hearing_item_id:
+                            hearing_item = HearingItem.objects.get(pk=hearing_item_id)
+                            OrderItem.objects.create(
+                                order=order,
+                                quantity=quantity,
+                                price_per_unit=item_data['price_per_unit'],
+                                subtotal=item_data['subtotal'],
+                                external_lens_id=external_lens_id,
+                                lens_id=item_data.get("lens"),
+                                frame_id=item_data.get("frame"),
+                                lens_cleaner_id=item_data.get("lens_cleaner"),
+                                other_item_id=item_data.get("other_item"),
+                                hearing_item=hearing_item,
+                                is_non_stock=is_non_stock,
+                                note=item_data.get("note"),
+                                admin_id=None,
+                                user_id=None
+                            )
+                        else:
+                            OrderItem.objects.create(
+                                order=order,
+                                quantity=quantity,
+                                price_per_unit=item_data['price_per_unit'],
+                                subtotal=item_data['subtotal'],
+                                external_lens_id=external_lens_id,
+                                lens_id=item_data.get("lens"),
+                                frame_id=item_data.get("frame"),
+                                lens_cleaner_id=item_data.get("lens_cleaner"),
+                                other_item_id=item_data.get("other_item"),
+                                is_non_stock=is_non_stock,
+                                note=item_data.get("note"),
+                                admin_id=None,
+                                user_id=None
+                            )
                     continue
 
                 # Handle stock for items (frame vs lens-related differently)
@@ -310,6 +331,9 @@ class OrderService:
                 elif item_data.get("lens_cleaner"):
                     stock = LensCleanerStock.objects.select_for_update().filter(lens_cleaner_id=item_data["lens_cleaner"], branch_id=branch_id).first()
                     stock_type = "lens_cleaner"
+                elif item_data.get("hearing_item"):
+                    stock = HearingItemStock.objects.select_for_update().filter(hearing_item_id=item_data["hearing_item"], branch_id=branch_id).first()
+                    stock_type = "hearing_item"
 
                 if not stock:
                     raise ValueError(f"{stock_type.capitalize()} stock not found for branch {branch_id}.")
@@ -341,23 +365,43 @@ class OrderService:
                     result_item = OrderService.on_change_append(old_item, item_data, admin_id, user_id)
                     updated_item_ids.add(result_item.id)
                 else:
-                    OrderItem.objects.create(
-                        order=order,
-                        quantity=quantity,
-                        price_per_unit=item_data['price_per_unit'],
-                        subtotal=item_data['subtotal'],
-                        external_lens_id=external_lens_id,
-                        lens_id=item_data.get("lens"),
-                        frame_id=item_data.get("frame"),
-                        lens_cleaner_id=item_data.get("lens_cleaner"),
-                        other_item_id=item_data.get("other_item"),
-                        is_non_stock=is_non_stock,
-                        note=item_data.get("note"),
-                        admin_id=None,
-                        user_id=None
-                    )
+                    hearing_item_id = item_data.get("hearing_item")
+                    if hearing_item_id:
+                        hearing_item = HearingItem.objects.get(pk=hearing_item_id)
+                        OrderItem.objects.create(
+                            order=order,
+                            quantity=quantity,
+                            price_per_unit=item_data['price_per_unit'],
+                            subtotal=item_data['subtotal'],
+                            external_lens_id=external_lens_id,
+                            lens_id=item_data.get("lens"),
+                            frame_id=item_data.get("frame"),
+                            lens_cleaner_id=item_data.get("lens_cleaner"),
+                            other_item_id=item_data.get("other_item"),
+                            hearing_item=hearing_item,
+                            is_non_stock=is_non_stock,
+                            note=item_data.get("note"),
+                            admin_id=None,
+                            user_id=None
+                        )
+                    else:
+                        OrderItem.objects.create(
+                            order=order,
+                            quantity=quantity,
+                            price_per_unit=item_data['price_per_unit'],
+                            subtotal=item_data['subtotal'],
+                            external_lens_id=external_lens_id,
+                            lens_id=item_data.get("lens"),
+                            frame_id=item_data.get("frame"),
+                            lens_cleaner_id=item_data.get("lens_cleaner"),
+                            other_item_id=item_data.get("other_item"),
+                            is_non_stock=is_non_stock,
+                            note=item_data.get("note"),
+                            admin_id=None,
+                            user_id=None
+                        )
 
-            # 🔹 Handle deleted items and restock
+            # Handle deleted items and restock
             # //TODO: CLEANUP DELETED ORDER ITEMS (soft delete and restock if needed)
             for item_id, deleted_item in existing_items.items():
                 if item_id not in updated_item_ids:
@@ -401,11 +445,11 @@ class OrderService:
                     deleted_item.delete()
 
 
-            # 🔹 Final: Deduct lens stock if on_hold → False
+            # Final: Deduct lens stock if on_hold → False
             if transitioning_off_hold:
                 StockValidationService.adjust_stocks(lens_stock_updates)
 
-            # 🔹 Process Payments
+            # Process Payments
             total_payment = OrderPaymentService.append_on_change_payments_for_order(order, payments_data,admin_id,user_id)
             if total_payment > order.total_price:
                 raise ValueError("Total payments exceed the order total price.")

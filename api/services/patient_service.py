@@ -17,6 +17,7 @@ class PatientService:
 
         name = patient_data.get("name")
         phone_number = patient_data.get("phone_number")
+        extra_phone_number = patient_data.get("extra_phone_number")
         nic = patient_data.get("nic")
         refraction_id = patient_data.get("refraction_id")
 
@@ -36,7 +37,7 @@ class PatientService:
 
         if patient:
             # ✅ Update existing patient
-            for field in ["name", "phone_number", "address", "date_of_birth", "refraction_id", "patient_note", "nic"]:
+            for field in ["name", "phone_number", "address", "date_of_birth", "refraction_id", "patient_note", "nic","extra_phone_number"]:
                 if field in patient_data and patient_data[field] is not None:
                     setattr(patient, field, patient_data[field])
             patient.save()
@@ -46,6 +47,7 @@ class PatientService:
         return Patient.objects.create(
             name=name,
             phone_number=phone_number,
+            extra_phone_number=extra_phone_number,
             address=patient_data.get("address"),
             date_of_birth=patient_data.get("date_of_birth"),
             refraction_id=refraction_id,
