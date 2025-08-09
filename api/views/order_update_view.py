@@ -24,7 +24,7 @@ class OrderUpdateView(APIView):
             admin_id = request.data.get("admin_id")
             user_id = request.data.get("user_id")
             if not admin_id:
-               return Response({"error": "Admin ID is required to perform an MNT operation."}, status=status.HTTP_400_BAD_REQUEST)
+               return Response({"error": "Admin ID is required to perform an Edit operation."}, status=status.HTTP_400_BAD_REQUEST)
             # Step 1: Update Patient Details (if provided)
 
             patient_data = request.data.get("patient")

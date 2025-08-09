@@ -775,7 +775,7 @@ class PatientSerializer(serializers.ModelSerializer):
     refraction_number = serializers.SerializerMethodField()
     class Meta:
         model = Patient
-        fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic','patient_note','refraction_id','refraction_number']
+        fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic','patient_note','refraction_id','refraction_number','extra_phone_number']
     def get_refraction_number(self, obj):
         # Fetch the related Refraction instance using refraction_id
         refraction = Refraction.objects.filter(id=obj.refraction_id).first()
@@ -819,7 +819,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
 class DoctorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Doctor
-        fields = ['id', 'name', 'contact_info', 'status', 'specialization']
+        fields = ['id', 'name', 'contact_info', 'status', 'specialization' , 'is_deleted', 'deleted_at']
 class DoctorBranchChannelFeesSerializer(serializers.ModelSerializer):
     doctor_name = serializers.CharField(source='doctor.name', read_only=True)
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True)

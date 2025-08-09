@@ -2,11 +2,12 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-from decimal import Decimal
-
+from ..services.patient_service import PatientService
 from ..services.hearing_order_service import HearingOrderService
 from ..services.order_payment_service import OrderPaymentService
-from ..models import HearingItem, CustomUser
+from ..models import HearingItem, CustomUser,Order
+from ..services.audit_log_service import OrderAuditLogService
+from ..services.order_service import OrderService
 
 class HearingOrderCreateView(APIView):
     """
@@ -108,3 +109,54 @@ class HearingOrderCreateView(APIView):
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+class HearingOrderUpdateView (APIView):
+    def put(self, request, pk):
+        try:
+            order = Order.objects.get(pk=pk)
+            admin_id = request.data.get("admin_id")
+            user_id = request.data.get("user_id")
+            if not admin_id:
+               return Response({"error": "Admin ID is required to perform an Edit operation."}, status=status.HTTP_400_BAD_REQUEST)
+            # Step 1: Update Patient Details (if provided)
+
+            patient_data = request.data.get("patient")
+            if patient_data:
+                PatientService.create_or_update_patient(patient_data)
+
+                # Step 2: Extract Order Data (check if on_hold status is changing)
+                order_data = request.data.get("order", {})
+                order_items_data = request.data.get("order_items", [])
+                payments_data = request.data.get("order_payments", [])
+
+                # Check if we're changing on_hold status
+                current_on_hold = order.on_hold
+                new_on_hold = order_data.get("on_hold", current_on_hold)
+                original_order_data = {
+                field: getattr(order, field)
+                for field in OrderAuditLogService.TRACKED_FIELDS
+                }
+                # Log the on-hold transition if it's happening (can be helpful for debugging)
+                if current_on_hold != new_on_hold:
+                    print(f"Order {order.id} on_hold status changing: {current_on_hold} → {new_on_hold}")
+                
+                # Step 3: Update Order 
+                # The updated update_order method now handles different stock behavior based on on_hold status
+                updated_order = OrderService.update_order(order, order_data, order_items_data, payments_data,admin_id,user_id)
+                
+                # Now log only if update succeeded
+                OrderAuditLogService.log_order_changes(
+                order_instance=updated_order,
+                updated_data=order_data,
+                original_data=original_order_data,
+                raw_data={
+                    "admin_id": admin_id,
+                    "user_id": user_id
+                }
+                )
+                
+                
+
+
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
