@@ -533,7 +533,8 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'ex_branded_type',
             'battery',
             'serial_no',
-            'hearing_item_detail'
+            'hearing_item_detail',
+            'hearing_item',
         ]
 
 
