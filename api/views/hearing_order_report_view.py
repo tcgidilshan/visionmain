@@ -17,6 +17,9 @@ class HearingOrderReportView(APIView):
         branch_id = request.query_params.get("branch_id")
         start_date = request.query_params.get("start_date")  # Format: YYYY-MM-DD
         end_date = request.query_params.get("end_date")  # Format: YYYY-MM-DD
+        invoice_number = request.query_params.get('invoice_number')
+        mobile = request.query_params.get('mobile')
+        nic = request.query_params.get('nic')
         
         if not branch_id:
             return Response({"error": "branch parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -34,9 +37,25 @@ class HearingOrderReportView(APIView):
             # Base query for hearing invoices
             invoices = Invoice.objects.filter(
                 invoice_type='hearing',
-                order__branch_id=branch_id,
                 is_deleted=False
             )
+            
+            # Apply branch filter if provided
+            if branch_id:
+                invoices = invoices.filter(order__branch_id=branch_id)
+                
+            # Apply search filters
+            search_filters = Q()
+            if invoice_number:
+                search_filters |= Q(invoice_number__icontains=invoice_number)
+            if mobile:
+                search_filters |= Q(order__customer__phone_number__icontains=mobile)
+                search_filters |= Q(order__customer__extra_phone_number__icontains=mobile)
+            if nic:
+                search_filters |= Q(order__customer__nic__icontains=nic)
+                
+            if search_filters:
+                invoices = invoices.filter(search_filters)
             
             # Create a Q object for the next_service_date filter
             date_filters = Q()
