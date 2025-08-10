@@ -66,3 +66,4 @@ from .hearing_view import HearingItemListCreateView,HearingItemRetrieveUpdateDel
 from .order_hearing_view import HearingOrderCreateView,HearingOrderUpdateView
 from .hearing_order_report_view import HearingOrderReportView
 from .order_item_view import OrderItemUpdateView
+from .hearing_order_service_view import HearingOrderServiceView

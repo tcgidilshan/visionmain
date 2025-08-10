@@ -1343,3 +1343,11 @@ class HearingItemStock(models.Model):
 
     def __str__(self):
         return f"{self.hearing_item.name} - Initial: {self.initial_count}, Current: {self.qty} "
+class HearingOrderItemService(models.Model):
+    order= models.ForeignKey(Order, related_name='hearing_order_services', on_delete=models.CASCADE)
+    last_service_date = models.DateField()
+    scheduled_service_date = models.DateField()
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+ 
+    

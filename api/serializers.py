@@ -22,7 +22,7 @@ from .models import (
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
     UserBranch,ExpenseMainCategory, ExpenseSubCategory,LensStockHistory,
     DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus,FrameImage,
-    DoctorBranchChannelFees,OrderFeedback,HearingItem,HearingItemStock
+    DoctorBranchChannelFees,OrderFeedback,HearingItem,HearingItemStock,HearingOrderItemService
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -1568,4 +1568,11 @@ class MntOrderSerializer(serializers.ModelSerializer):
             'order_total_price'
         ]
         read_only_fields = ['mnt_number', 'created_at', 'branch_name', 'user_username', 'admin_username']
+
+
+class HearingOrderItemServiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HearingOrderItemService
+        fields = ['id', 'order', 'last_service_date', 'scheduled_service_date', 'price','created_at']
+
 
