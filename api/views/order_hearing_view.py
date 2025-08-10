@@ -36,7 +36,7 @@ class HearingOrderCreateView(APIView):
                     hearing_item = HearingItem.objects.get(id=item_data.get('hearing_item'))
                 except HearingItem.DoesNotExist:
                     return Response(
-                        {"error": "Hearing item not found"},
+                        {"error": f"Hearing item with ID {item_data.get('hearing_item')} not found"},
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 
@@ -63,7 +63,8 @@ class HearingOrderCreateView(APIView):
                     "battery": item_data.get('battery', ''),
                     "discount": order_data.get('discount', 0),
                     "status": order_data.get('status', 'pending'),
-                    "order_remark": order_data.get('order_remark', '')
+                    "order_remark": order_data.get('order_remark', ''),
+                    "next_service_date": item_data.get('next_service_date'),
                 }
 
                 # Create the order using the service

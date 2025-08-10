@@ -332,7 +332,7 @@ class DailyFinanceSummaryService:
                 payment_method="online_transfer",
                 # is_edited=False,
             )
-        )
+        ) 
         #total credit card payment from soldering
         today_soldering_payments_credit_card = DailyFinanceSummaryService._sum(
             SolderingPayment.objects.filter(

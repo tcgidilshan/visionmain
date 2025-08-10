@@ -535,6 +535,8 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'serial_no',
             'hearing_item_detail',
             'hearing_item',
+            'next_service_date',
+            'last_reminder_at',
         ]
 
 
