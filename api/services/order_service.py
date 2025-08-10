@@ -80,7 +80,7 @@ class OrderService:
         """
         TRACKED_FIELDS = [
             "price_per_unit", "subtotal", "external_lens", "lens", "frame",
-            "lens_cleaner", "other_item", "note", "quantity", "hearing_item","serial_no","battery"
+            "lens_cleaner", "other_item", "note", "quantity", "hearing_item","serial_no","battery","next_service_date"
         ]
         FK_FIELDS = {
             'frame': Frame,
@@ -123,6 +123,13 @@ class OrderService:
                     if old != new:
                         changed = True
                         break
+            elif field == "next_service_date":
+                # Handle date comparison properly
+                old_date = old.isoformat() if old else None
+                new_date = new.isoformat() if hasattr(new, 'isoformat') else new
+                if old_date != new_date:
+                    changed = True
+                    break
             elif field == "quantity":
                 try:
                     if int(old) != int(new):
@@ -288,6 +295,9 @@ class OrderService:
                                 frame_id=item_data.get("frame"),
                                 lens_cleaner_id=item_data.get("lens_cleaner"),
                                 other_item_id=item_data.get("other_item"),
+                                next_service_date=item_data.get("next_service_date"),
+                                serial_no=item_data.get("serial_no"),
+                                battery=item_data.get("battery"),
                                 hearing_item=hearing_item,
                                 is_non_stock=is_non_stock,
                                 note=item_data.get("note"),
@@ -378,6 +388,9 @@ class OrderService:
                             frame_id=item_data.get("frame"),
                             lens_cleaner_id=item_data.get("lens_cleaner"),
                             other_item_id=item_data.get("other_item"),
+                            next_service_date=item_data.get("next_service_date"),
+                            serial_no=item_data.get("serial_no"),
+                            battery=item_data.get("battery"),
                             hearing_item=hearing_item,
                             is_non_stock=is_non_stock,
                             note=item_data.get("note"),

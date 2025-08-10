@@ -15,6 +15,7 @@ class HearingOrderService:
         """
         Creates a new hearing item order with the provided data.
         """
+        print(data)
         patient_data = data.get("patient")
         hearing_item = data["hearing_item"]
         quantity = data["quantity"]
@@ -23,6 +24,7 @@ class HearingOrderService:
         sales_staff_code = data.get("sales_staff_code")
         serial_no = data.get("serial_no")
         battery = data.get("battery")
+        next_service_date = data.get("next_service_date")
 
         # Get or create patient
         customer = None
@@ -35,7 +37,8 @@ class HearingOrderService:
             "quantity": quantity,
             "is_non_stock": False,
             "serial_no": serial_no,
-            "battery": battery
+            "battery": battery,
+            "next_service_date": next_service_date
         }]
 
         # Validate stock
@@ -69,7 +72,8 @@ class HearingOrderService:
             is_non_stock=False,
             subtotal=subtotal,
             serial_no=serial_no,
-            battery=battery
+            battery=battery,
+            next_service_date=next_service_date
         )
 
         # Adjust stock

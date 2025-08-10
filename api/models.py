@@ -860,6 +860,8 @@ class OrderItem(models.Model):
     other_item = models.ForeignKey(OtherItem, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
     frame = models.ForeignKey(Frame, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
     hearing_item = models.ForeignKey('HearingItem', null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
+    last_reminder_at=models.DateTimeField(null=True, blank=True)
+    next_service_date=models.DateField(null=True, blank=True)
     serial_no = models.CharField(max_length=100, null=True, blank=True)
     battery = models.CharField(max_length=100, null=True, blank=True)
     quantity = models.PositiveIntegerField(default=1)

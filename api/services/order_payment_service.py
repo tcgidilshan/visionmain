@@ -260,6 +260,7 @@ class OrderPaymentService:
             if db_id not in seen_payment_ids:
                 db_pmt.user_id = user_id
                 db_pmt.admin_id = admin_id
+                db_pmt.is_edited = True
                 db_pmt.save(update_fields=['user', 'admin'])
                 db_pmt.delete()
 
