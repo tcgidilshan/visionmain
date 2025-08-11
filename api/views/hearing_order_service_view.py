@@ -7,6 +7,55 @@ from ..models import Order, OrderItem, HearingOrderItemService
 from ..serializers import HearingOrderItemServiceSerializer
 
 class HearingOrderServiceView(APIView):
+    def get(self, request):
+        order_id = request.query_params.get('order_id')
+        
+        if not order_id:
+            return Response(
+                {"error": "order_id parameter is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get all service records for the order, ordered by creation date (newest first)
+            services = HearingOrderItemService.objects.filter(
+                order_id=order_id
+            ).order_by('-created_at')
+            
+            if not services.exists():
+                return Response(
+                    {"message": "No service records found for this order"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Serialize the data
+            serializer = HearingOrderItemServiceSerializer(services, many=True)
+            
+            # Get the order item details if available
+            order_item = OrderItem.objects.filter(
+                order_id=order_id,
+                hearing_item__isnull=False
+            ).select_related('hearing_item').first()
+            
+            response_data = {
+                "order_id": order_id,
+                "total_services": services.count(),
+                "services": serializer.data,
+                "order_item": {
+                    "id": order_item.id if order_item else None,
+                    "item_name": order_item.hearing_item.name if (order_item and order_item.hearing_item) else None,
+                    "next_service_date": order_item.next_service_date.isoformat() if (order_item and order_item.next_service_date) else None
+                } if order_item else None
+            }
+            
+            return Response(response_data)
+            
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
     def post(self, request):
         try:
             required_fields = [
