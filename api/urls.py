@@ -71,7 +71,7 @@ from .views import (
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
     FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView,SolderingOrderReportView,
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
-    LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView
+    LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -181,6 +181,7 @@ urlpatterns = [
     path('hearing-orders/', HearingOrderCreateView.as_view(), name='hearing-order-create'),
     path('hearing-orders/<int:pk>/', HearingOrderUpdateView.as_view(), name='hearing-order-update'),
     path('hearing-report/invoice/', HearingOrderReportView.as_view(), name='hearing-order-report'),
+    path('hearing-report/reminder/', HearingOrderReminderReportView.as_view(), name='hearing-reminder-report'),
     path('hearing-orders/service/', HearingOrderServiceView.as_view(), name='hearing-order-service'),
 
     #feature fitting on collection
