@@ -182,7 +182,7 @@ class RefractionDetails(models.Model):
         choices=PrescriptionType.choices,
         default=PrescriptionType.INTERNAL
     )
-    
+    created_at = models.DateTimeField(auto_now_add=True)
     def __str__(self):
         if self.is_manual:
             return f"Manual Refraction Details - ID {self.id}"

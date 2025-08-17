@@ -97,7 +97,8 @@ class RefractionDetailsSerializer(serializers.ModelSerializer):
             'prescription_type',        
             'prescription_type_display',  
             'username', 
-            'blepharitis'
+            'blepharitis',
+            'created_at'
         ]
   
 class BrandSerializer(serializers.ModelSerializer):
@@ -1579,5 +1580,28 @@ class HearingOrderItemServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = HearingOrderItemService
         fields = ['id', 'order', 'last_service_date', 'scheduled_service_date', 'price','created_at']
+class PatientRefractionDetailOrderSerializer(serializers.ModelSerializer):
+    """
+    Serializer for patient refraction detail orders with minimal order information.
+    Includes detailed refraction data and patient information.
+    """
+    refraction_details = RefractionDetailsSerializer(source='refraction.refraction_details', read_only=True)
+    refraction = RefractionSerializer(read_only=True)  # Removed redundant source='refraction'
+    patient = PatientSerializer(source='customer', read_only=True)
+    invoice_number = serializers.SerializerMethodField()
 
+    class Meta:
+        model = Order
+        fields = [
+            'id', 
+            'invoice_number',
+            'refraction_details', 
+            'patient',
+            'total_price',
+            'order_date',
+            'refraction'	
+        ]
 
+    def get_invoice_number(self, obj):
+        """Get invoice number if it exists."""
+        return obj.invoice.invoice_number if hasattr(obj, 'invoice') and obj.invoice else None

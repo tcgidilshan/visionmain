@@ -1,8 +1,9 @@
 from rest_framework import generics, permissions, status, filters
 from rest_framework.response import Response
-from ..models import Refraction, Patient
-from ..serializers import RefractionSerializer
+from ..models import Refraction, Patient, Order
+from ..serializers import RefractionSerializer, PatientRefractionDetailOrderSerializer
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.views import APIView
 
 class RefractionCreateAPIView(generics.CreateAPIView):
     """
@@ -130,3 +131,42 @@ class RefractionDeleteAPIView(generics.DestroyAPIView):
             {"message": "Refraction deleted successfully"},
             status=status.HTTP_204_NO_CONTENT
         )
+
+class RefractionOrderView(APIView):
+    """
+    API endpoint that returns all orders with refraction details for a specific patient.
+    Requires patient_id as a query parameter.
+    """
+    
+    def get(self, request):
+        patient_id = request.query_params.get('patient_id')
+        if not patient_id:
+            return Response(
+                {"error": "patient_id is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            # Get orders with refraction for the specified patient
+            orders = Order.objects.filter(
+                refraction__isnull=False,
+                customer_id=patient_id
+            ).select_related(
+                'refraction', 
+                'customer', 
+                'invoice',
+                'refraction__refraction_details',
+                'refraction__refraction_details__user'
+            ).order_by('-order_date')  # Order by most recent first
+            
+            # Use the new serializer
+            serializer = PatientRefractionDetailOrderSerializer(orders, many=True)
+            return Response(serializer.data)
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {"error": "An error occurred while processing your request"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
