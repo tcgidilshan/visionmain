@@ -49,6 +49,8 @@ class BankDeposit(models.Model):
 class CustomUser(AbstractUser):
     mobile = models.CharField(max_length=15, blank=True, null=True)
     user_code = models.CharField(max_length=10, null=True, blank=True) 
+    reset_token = models.CharField(max_length=100, blank=True, null=True)
+    reset_token_expiry = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.username} ({self.user_code})"
@@ -180,7 +182,7 @@ class RefractionDetails(models.Model):
         choices=PrescriptionType.choices,
         default=PrescriptionType.INTERNAL
     )
-    
+    created_at = models.DateTimeField(auto_now_add=True)
     def __str__(self):
         if self.is_manual:
             return f"Manual Refraction Details - ID {self.id}"

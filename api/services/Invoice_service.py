@@ -81,7 +81,7 @@ class InvoiceService:
             raise NotFound("Invoice not found.")
         
     @staticmethod
-    def search_factory_invoices(user, invoice_number=None, mobile=None, nic=None, branch_id=None, progress_status=None):
+    def search_factory_invoices(user, invoice_number=None, mobile=None, nic=None, branch_id=None, progress_status=None, patient_id=None):
         qs = Invoice.objects.filter(invoice_type='factory', is_deleted=False)  # exclude deleted invoices
 
         # Handle invoice_number filtering by user branch
@@ -99,6 +99,10 @@ class InvoiceService:
 
         if nic:
             qs = qs.filter(order__customer__nic=nic)
+            
+        if patient_id:  # Add patient_id filtering
+            qs = qs.filter(order__customer_id=patient_id)
+
         if progress_status:
             status_list = [s.strip() for s in progress_status.split(",") if s.strip()]
             from api.models import OrderProgress
@@ -134,7 +138,3 @@ class InvoiceService:
 
         except Invoice.DoesNotExist:
             raise NotFound("Invoice not found with the given type and number.")
-
-
-
-
