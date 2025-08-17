@@ -41,9 +41,14 @@ class RefractionSerializer(serializers.ModelSerializer):
         queryset=Branch.objects.all(), source='branch', required=False
     )
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
+    patient_id = serializers.PrimaryKeyRelatedField(
+        queryset=Patient.objects.all(), source='patient', required=False, allow_null=True
+    )
+    
     class Meta:
         model = Refraction
-        fields = ['id', 'customer_full_name', 'customer_mobile', 'refraction_number', 'nic', 'branch_id', 'branch_name','created_at']
+        fields = ['id', 'customer_full_name', 'customer_mobile', 'refraction_number', 
+                 'nic', 'branch_id', 'branch_name', 'patient_id', 'created_at']
         read_only_fields = ['refraction_number']  # Auto-generated
 
 class RefractionDetailsSerializer(serializers.ModelSerializer):
