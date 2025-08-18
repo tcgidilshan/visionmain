@@ -4,6 +4,7 @@ from ..models import Refraction, Patient, Order
 from ..serializers import RefractionSerializer, PatientRefractionDetailOrderSerializer
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
+from django.db.models import Q
 
 class RefractionCreateAPIView(generics.CreateAPIView):
     """
@@ -15,36 +16,71 @@ class RefractionCreateAPIView(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         """
-        Override the default create method to handle automatic refraction number generation
-        and patient association.
+        Handle creation of refraction with optional patient creation.
+        If patient_id is not provided, creates a new patient with the given details.
         """
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        # Get patient_id from request data if it exists
-        patient_id = request.data.get('patient_id')
+        data = request.data.copy()
+        patient_id = data.get('patient_id')
         
-        # Save the refraction with the patient if provided
-        if patient_id is not None:
-            try:
-                patient = Patient.objects.get(id=patient_id)
-                refraction = serializer.save(patient=patient)
-            except Patient.DoesNotExist:
+        # If no patient_id is provided, create a new patient
+        if not patient_id:
+            name = data.get('customer_full_name')
+            phone_number = data.get('customer_mobile')
+            nic = data.get('nic')
+            
+            if not name:
                 return Response(
-                    {"error": "Patient with the provided ID does not exist"}, 
+                    {"error": "Customer name is required when creating a new patient"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-        else:
-            refraction = serializer.save()
-
-        return Response(
-            {
-                "message": "Refraction created successfully",
-                "refraction_number": refraction.refraction_number,
-                "data": RefractionSerializer(refraction).data,
-            },
-            status=status.HTTP_201_CREATED,
-        )
+                
+            # Create new patient
+            try:
+                patient = Patient.objects.create(
+                    name=name,
+                    phone_number=phone_number if phone_number else None,
+                    nic=nic if nic else None
+                )
+                data['patient_id'] = patient.id
+            except Exception as e:
+                return Response(
+                    {"error": f"Failed to create patient: {str(e)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Now handle the refraction creation
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        
+        try:
+            # Get the patient instance if it exists
+            patient = None
+            if 'patient_id' in data:
+                try:
+                    patient = Patient.objects.get(id=data['patient_id'])
+                except Patient.DoesNotExist:
+                    return Response(
+                        {"error": f"Patient with ID {data['patient_id']} does not exist"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Save the refraction with the patient if provided
+            refraction = serializer.save(patient=patient)
+            
+            return Response(
+                {
+                    "message": "Refraction created successfully",
+                    "refraction_number": refraction.refraction_number,
+                    "data": RefractionSerializer(refraction).data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to create refraction: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 # Custom Pagination Class
 class RefractionPagination(PageNumberPagination):
@@ -61,19 +97,23 @@ class RefractionListAPIView(generics.ListAPIView):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
 
     # Fields searchable via ?search=
-    search_fields = ['customer_full_name', 'customer_mobile', 'refraction_number']
+    search_fields = [
+        'refraction_number',
+        'patient__name',  # Search by patient name
+        'patient__phone_number',  # Search by patient phone number
+        'patient__nic',  # Search by patient NIC
+    ]
 
     # Fields orderable via ?ordering=
-    ordering_fields = ['refraction_number', 'customer_full_name']
+    ordering_fields = ['refraction_number', 'created_at']
     ordering = ['-refraction_number']  # Default ordering (latest first)
 
     def get_queryset(self):
         """
         Optionally filter by branch_id using ?branch_id=<id> and patient_id using ?patient_id=<id>
+        Also supports search by patient name, phone number, and NIC
         """
-        queryset = Refraction.objects.only(
-            'id', 'customer_full_name', 'customer_mobile', 'refraction_number', 'branch_id', 'patient_id'
-        )
+        queryset = Refraction.objects.select_related('branch', 'patient').all()
 
         branch_id = self.request.query_params.get("branch_id")
         if branch_id:
@@ -82,6 +122,15 @@ class RefractionListAPIView(generics.ListAPIView):
         patient_id = self.request.query_params.get("patient_id")
         if patient_id:
             queryset = queryset.filter(patient_id=patient_id)
+            
+        search_term = self.request.query_params.get("search")
+        if search_term:
+            queryset = queryset.filter(
+                Q(patient__name__icontains=search_term) |
+                Q(patient__phone_number__icontains=search_term) |
+                Q(patient__nic__icontains=search_term) |
+                Q(refraction_number__icontains=search_term)
+            )
 
         return queryset
 
@@ -90,19 +139,50 @@ class RefractionUpdateAPIView(generics.RetrieveUpdateAPIView):
     """
     API View to Update an Existing Refraction Record
     """
-    queryset = Refraction.objects.only('id', 'customer_full_name', 'customer_mobile', 'refraction_number')
+    queryset = Refraction.objects.all()
     serializer_class = RefractionSerializer
     permission_classes = [permissions.IsAuthenticated]
-
+#//TODO  TEST PATINT UPDATE ?? Debug all patient relations
     def update(self, request, *args, **kwargs):
         """
-        Override the default update method for better error handling.
+        Override the default update method to handle patient updates and better error handling.
         """
-        partial = kwargs.pop('partial', False)  # Enable PATCH if needed
+        partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-
-        if serializer.is_valid():
+        data = request.data.copy()
+        
+        # Handle patient data if provided
+        if 'customer_full_name' in data or 'customer_mobile' in data or 'nic' in data:
+            if not instance.patient:
+                # Create new patient if none exists
+                name = data.pop('customer_full_name', '')
+                if not name:
+                    return Response(
+                        {"error": "Customer name is required when creating a new patient"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                patient = Patient.objects.create(
+                    name=name,
+                    phone_number=data.pop('customer_mobile', None),
+                    nic=data.pop('nic', None)
+                )
+                data['patient_id'] = patient.id
+            else:
+                # Update existing patient
+                patient = instance.patient
+                if 'customer_full_name' in data:
+                    patient.name = data.pop('customer_full_name')
+                if 'customer_mobile' in data:
+                    patient.phone_number = data.pop('customer_mobile')
+                if 'nic' in data:
+                    patient.nic = data.pop('nic')
+                patient.save()
+        
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        
+        try:
             updated_instance = serializer.save()
             return Response(
                 {
@@ -111,11 +191,12 @@ class RefractionUpdateAPIView(generics.RetrieveUpdateAPIView):
                 },
                 status=status.HTTP_200_OK,
             )
-        else:
+        except Exception as e:
             return Response(
-                {"error": "Invalid data", "details": serializer.errors},
-                status=status.HTTP_400_BAD_REQUEST,
-            )           
+                {"error": f"Failed to update refraction: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
 #delete
 class RefractionDeleteAPIView(generics.DestroyAPIView):
     """

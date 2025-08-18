@@ -44,12 +44,23 @@ class RefractionSerializer(serializers.ModelSerializer):
     patient_id = serializers.PrimaryKeyRelatedField(
         queryset=Patient.objects.all(), source='patient', required=False, allow_null=True
     )
+    customer_full_name = serializers.CharField(source='patient.name', read_only=True, allow_blank=True, allow_null=True)
+    customer_mobile = serializers.CharField(source='patient.phone_number', read_only=True, allow_blank=True, allow_null=True)
+    nic = serializers.SerializerMethodField()  # Changed to SerializerMethodField to handle null patient
     
     class Meta:
         model = Refraction
-        fields = ['id', 'customer_full_name', 'customer_mobile', 'refraction_number', 
-                 'nic', 'branch_id', 'branch_name', 'patient_id', 'created_at']
+        fields = [
+            'id', 'refraction_number', 
+            'customer_full_name', 'customer_mobile', 'nic',
+            'branch_id', 'branch_name', 
+            'patient_id', 'created_at'
+        ]
         read_only_fields = ['refraction_number']  # Auto-generated
+    
+    def get_nic(self, obj):
+        # Safely get the NIC from the patient if it exists
+        return obj.patient.nic if obj.patient else None
 
 class RefractionDetailsSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())  # Accepts user ID
@@ -1589,6 +1600,7 @@ class PatientRefractionDetailOrderSerializer(serializers.ModelSerializer):
     refraction = RefractionSerializer(read_only=True)  # Removed redundant source='refraction'
     patient = PatientSerializer(source='customer', read_only=True)
     invoice_number = serializers.SerializerMethodField()
+    total_paid = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -1599,9 +1611,19 @@ class PatientRefractionDetailOrderSerializer(serializers.ModelSerializer):
             'patient',
             'total_price',
             'order_date',
-            'refraction'	
+            'refraction',
+            'total_paid'
         ]
 
     def get_invoice_number(self, obj):
         """Get invoice number if it exists."""
         return obj.invoice.invoice_number if hasattr(obj, 'invoice') and obj.invoice else None
+    def get_total_paid(self, obj):
+        """Get total paid amount for non-deleted and successful transactions."""
+        from django.db.models import Sum, Q
+        
+        return obj.orderpayment_set.filter(
+            is_deleted=False,
+        ).aggregate(
+            total=Sum('amount')
+        )['total'] or 0
