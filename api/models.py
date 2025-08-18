@@ -72,10 +72,8 @@ class Refraction(models.Model):
         null=True,
         blank=True
     )
-    customer_full_name = models.CharField(max_length=255)
-    customer_mobile = models.CharField(max_length=15,blank=True,null=True)
+
     refraction_number = models.CharField(max_length=10, blank=True)
-    nic = models.CharField(max_length=12, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
     def save(self, *args, **kwargs):
