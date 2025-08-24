@@ -19,7 +19,6 @@ class FrameOnlyOrderCreateView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = FrameOnlyOrderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        print(request.data)
         try:
             with transaction.atomic():
                 # ✅ FrameOnlyOrderService will now create or reuse the patient

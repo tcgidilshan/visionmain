@@ -16,7 +16,7 @@ class HearingOrderService:
         Creates a new hearing item order with the provided data.
         """
         print(data)
-        patient_data = data.get("patient")
+        patient_id = data.get("patient_id")
         hearing_item = data["hearing_item"]
         quantity = data["quantity"]
         price_per_unit = data["price_per_unit"]
@@ -28,8 +28,15 @@ class HearingOrderService:
 
         # Get or create patient
         customer = None
-        if patient_data:
-            customer = PatientService.create_or_update_patient(patient_data)
+        if patient_id:
+            try:
+                customer = Patient.objects.get(id=patient_id)
+            except Patient.DoesNotExist:
+                raise ValueError("Patient with the provided ID does not exist.")
+        else:
+            raise ValueError("Patient ID is required.")
+        # if patient_data:
+        #     customer = PatientService.create_or_update_patient(patient_data)
         
         # Prepare order item data
         order_items_data = [{
@@ -136,10 +143,10 @@ class HearingOrderService:
         Updates an existing hearing item order.
         """
         # Update or create patient
-        patient_data = data.get("patient")
-        if patient_data:
-            customer = PatientService.create_or_update_patient(patient_data)
-            order.customer = customer
+        # patient_data = data.get("patient")
+        # if patient_data:
+        #     customer = PatientService.create_or_update_patient(patient_data)
+        #     order.customer = customer
 
         # Get order data
         new_hearing_item = data["hearing_item"]

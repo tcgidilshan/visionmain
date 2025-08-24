@@ -44,9 +44,11 @@ class RefractionSerializer(serializers.ModelSerializer):
     patient_id = serializers.PrimaryKeyRelatedField(
         queryset=Patient.objects.all(), source='patient', required=False, allow_null=True
     )
+    # Include full patient object
+    # patient = serializers.SerializerMethodField()
     customer_full_name = serializers.CharField(source='patient.name', read_only=True, allow_blank=True, allow_null=True)
     customer_mobile = serializers.CharField(source='patient.phone_number', read_only=True, allow_blank=True, allow_null=True)
-    nic = serializers.SerializerMethodField()  # Changed to SerializerMethodField to handle null patient
+    nic = serializers.SerializerMethodField()
     
     class Meta:
         model = Refraction
@@ -54,12 +56,25 @@ class RefractionSerializer(serializers.ModelSerializer):
             'id', 'refraction_number', 
             'customer_full_name', 'customer_mobile', 'nic',
             'branch_id', 'branch_name', 
-            'patient_id', 'created_at'
+            'patient_id', 'created_at'  # Added 'patient' to fields
         ]
-        read_only_fields = ['refraction_number']  # Auto-generated
+        read_only_fields = ['refraction_number']
+    
+    # def get_patient(self, obj):
+    #     if obj.patient:
+    #         return {
+    #             'id': obj.patient.id,
+    #             'name': obj.patient.name,
+    #             'date_of_birth': obj.patient.date_of_birth,
+    #             'phone_number': obj.patient.phone_number,
+    #             'extra_phone_number': obj.patient.extra_phone_number,
+    #             'address': obj.patient.address,
+    #             'nic': obj.patient.nic,
+    #             'patient_note': obj.patient.patient_note,
+    #         }
+    #     return None
     
     def get_nic(self, obj):
-        # Safely get the NIC from the patient if it exists
         return obj.patient.nic if obj.patient else None
 
 class RefractionDetailsSerializer(serializers.ModelSerializer):
@@ -792,21 +807,16 @@ class ExternalLensBrandSerializer(serializers.ModelSerializer):
         fields = ['id', 'name']
 
 class PatientSerializer(serializers.ModelSerializer):
-    refraction_number = serializers.SerializerMethodField()
     class Meta:
         model = Patient
-        fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic','patient_note','refraction_id','refraction_number','extra_phone_number']
-    def get_refraction_number(self, obj):
-        # Fetch the related Refraction instance using refraction_id
-        refraction = Refraction.objects.filter(id=obj.refraction_id).first()
-        return refraction.refraction_number if refraction else None
-        
+        fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic','patient_note','extra_phone_number']
 
 class InvoiceSerializer(serializers.ModelSerializer):
     customer = serializers.PrimaryKeyRelatedField(source='order.customer', read_only=True)  #  Fetch customer ID
     customer_details = PatientSerializer(source='order.customer', read_only=True)  #  Full customer details
     order_details = OrderSerializer(source='order', read_only=True)  #  Full order details
     refraction_details = serializers.SerializerMethodField()
+    refraction_number = serializers.CharField(source='order.refraction.refraction_number', read_only=True)
     
     class Meta:
         model = Invoice
@@ -822,18 +832,16 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'invoice_date',
             'order_details',  #  Full order details (optional)
               #  NEW fields for tracking factory invoice progress
+            'refraction_number',
         ]
 
     def get_refraction_details(self, obj):
-        refraction = getattr(obj.order, 'refraction', None)
-        if refraction:
-            # This assumes RefractionDetails has a ForeignKey to Refraction
-            from api.models import RefractionDetails  # adjust path as needed
+        if hasattr(obj.order, 'refraction') and obj.order.refraction:
             try:
-                details = RefractionDetails.objects.get(refraction=refraction)
+                details = RefractionDetails.objects.get(refraction=obj.order.refraction)
                 return RefractionDetailsSerializer(details).data
             except RefractionDetails.DoesNotExist:
-                return None
+                pass
         return None
 
 class DoctorSerializer(serializers.ModelSerializer):
@@ -1249,7 +1257,7 @@ class FrameOnlyPatientInputSerializer(serializers.Serializer):
         return data
 
 class FrameOnlyOrderSerializer(serializers.Serializer):
-    patient = FrameOnlyPatientInputSerializer()
+    patient_id = serializers.IntegerField(required=True)
     frame = serializers.PrimaryKeyRelatedField(queryset=Frame.objects.all())
     quantity = serializers.IntegerField(min_value=1)
     price_per_unit = serializers.DecimalField(max_digits=10, decimal_places=2)

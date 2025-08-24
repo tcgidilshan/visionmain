@@ -2,7 +2,7 @@ from django.db import transaction
 from rest_framework import status,permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from ..models import Order, ArrivalStatus, OrderProgress,RefractionDetails,Refraction
+from ..models import Order, ArrivalStatus, OrderProgress,RefractionDetails,Refraction,Patient
 from ..serializers import OrderSerializer,ArrivalStatusBulkCreateSerializer,OrderProgressSerializer
 from ..services.order_payment_service import OrderPaymentService
 from ..services.stock_validation_service import StockValidationService
@@ -24,35 +24,42 @@ class OrderCreateView(APIView):
             with transaction.atomic():
                 
                 # 🔹 Step 1: Validate & Create/Update Patient
-                patient_data = request.data.get("patient")
-                if not patient_data:
+                patient_id = request.data.get("patient_id")
+                if not patient_id:
                     return Response({"error": "Patient details are required."}, status=status.HTTP_400_BAD_REQUEST)
-
-                patient = PatientService.create_or_update_patient(patient_data)
-
-                # 🔹 Step 2: Update Refraction linkage if provided
-                refraction_id = patient_data.get("refraction_id")
-                if refraction_id:
+                patient = None
+                if patient_id:
                     try:
-                        refraction = Refraction.objects.get(id=refraction_id)
-                        refraction.patient = patient
-                        refraction.save()
-                    except Refraction.DoesNotExist:
-                        return Response({"error": "Refraction record not found."}, status=status.HTTP_400_BAD_REQUEST)
+                        patient = Patient.objects.get(id=patient_id)
+                    except Patient.DoesNotExist:
+                        raise ValueError("Patient with the provided ID does not exist.")
+                else:
+                    raise ValueError("Patient ID is required.")
+
+                # # 🔹 Step 2: Update Refraction linkage if provided
+                #//! no need science new methid send patint id  
+                # refraction_id = patient_data.get("refraction_id")
+                # if refraction_id:
+                #     try:
+                #         refraction = Refraction.objects.get(id=refraction_id)
+                #         refraction.patient = patient
+                #         refraction.save()
+                #     except Refraction.DoesNotExist:
+                #         return Response({"error": "Refraction record not found."}, status=status.HTTP_400_BAD_REQUEST)
 
                 # 🔹 Step 3: Create Refraction Details if provided
-                refraction_details_data = request.data.get("refraction_details")
-                if refraction_details_data:
-                    refraction_details_data["patient"] = patient.id
-                    RefractionDetailsService.create_refraction_details(refraction_details_data)
-                else:
-                    if patient.refraction_id:
-                        try:
-                            refraction_details = RefractionDetails.objects.get(refraction_id=patient.refraction_id)
-                            refraction_details.patient_id = patient.id
-                            refraction_details.save()
-                        except RefractionDetails.DoesNotExist:
-                            pass  # No existing refraction details, continue
+                # refraction_details_data = request.data.get("refraction_details")
+                # if refraction_details_data:
+                #     refraction_details_data["patient"] = patient.id
+                #     RefractionDetailsService.create_refraction_details(refraction_details_data)
+                # else:
+                #     if patient.refraction_id:
+                #         try:
+                #             refraction_details = RefractionDetails.objects.get(refraction_id=patient.refraction_id)
+                #             refraction_details.patient_id = patient.id
+                #             refraction_details.save()
+                #         except RefractionDetails.DoesNotExist:
+                #             pass  # No existing refraction details, continue
 
                 # 🔹 Step 4: Extract Order Data
                 order_data = request.data.get('order')
