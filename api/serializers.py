@@ -44,9 +44,11 @@ class RefractionSerializer(serializers.ModelSerializer):
     patient_id = serializers.PrimaryKeyRelatedField(
         queryset=Patient.objects.all(), source='patient', required=False, allow_null=True
     )
+    # Include full patient object
+    patient = serializers.SerializerMethodField()
     customer_full_name = serializers.CharField(source='patient.name', read_only=True, allow_blank=True, allow_null=True)
     customer_mobile = serializers.CharField(source='patient.phone_number', read_only=True, allow_blank=True, allow_null=True)
-    nic = serializers.SerializerMethodField()  # Changed to SerializerMethodField to handle null patient
+    nic = serializers.SerializerMethodField()
     
     class Meta:
         model = Refraction
@@ -54,12 +56,27 @@ class RefractionSerializer(serializers.ModelSerializer):
             'id', 'refraction_number', 
             'customer_full_name', 'customer_mobile', 'nic',
             'branch_id', 'branch_name', 
-            'patient_id', 'created_at'
+            'patient_id', 'patient', 'created_at'  # Added 'patient' to fields
         ]
-        read_only_fields = ['refraction_number']  # Auto-generated
+        read_only_fields = ['refraction_number']
+    
+    def get_patient(self, obj):
+        if obj.patient:
+            return {
+                'id': obj.patient.id,
+                'name': obj.patient.name,
+                'date_of_birth': obj.patient.date_of_birth,
+                'phone_number': obj.patient.phone_number,
+                'extra_phone_number': obj.patient.extra_phone_number,
+                'address': obj.patient.address,
+                'nic': obj.patient.nic,
+                'patient_note': obj.patient.patient_note,
+                'refraction_id': obj.patient.refraction_id,
+                'refraction_number': obj.patient.refraction.refraction_number if hasattr(obj.patient, 'refraction') and obj.patient.refraction else None
+            }
+        return None
     
     def get_nic(self, obj):
-        # Safely get the NIC from the patient if it exists
         return obj.patient.nic if obj.patient else None
 
 class RefractionDetailsSerializer(serializers.ModelSerializer):
@@ -800,7 +817,6 @@ class PatientSerializer(serializers.ModelSerializer):
         # Fetch the related Refraction instance using refraction_id
         refraction = Refraction.objects.filter(id=obj.refraction_id).first()
         return refraction.refraction_number if refraction else None
-        
 
 class InvoiceSerializer(serializers.ModelSerializer):
     customer = serializers.PrimaryKeyRelatedField(source='order.customer', read_only=True)  #  Fetch customer ID

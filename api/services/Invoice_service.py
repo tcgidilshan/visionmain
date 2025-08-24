@@ -5,6 +5,7 @@ from rest_framework.exceptions import NotFound
 from ..serializers import InvoiceSerializer,RefractionDetailsSerializer
 from rest_framework.exceptions import ValidationError
 from django.db.models import OuterRef, Subquery
+
 class InvoiceService:
     """
     Service class to handle invoice creation based on new invoice type logic.
@@ -81,28 +82,50 @@ class InvoiceService:
             raise NotFound("Invoice not found.")
         
     @staticmethod
-    def search_factory_invoices(user, invoice_number=None, mobile=None, nic=None, branch_id=None, progress_status=None, patient_id=None):
+    def search_factory_invoices(user, invoice_number=None, mobile=None, nic=None, branch_id=None, progress_status=None, patient_id=None, patient_name=None):
+        """
+        Search for factory invoices with various filters.
+        
+        Args:
+            user: The user making the request
+            invoice_number: Filter by invoice number (exact match)
+            mobile: Filter by customer's mobile number
+            nic: Filter by customer's NIC number
+            branch_id: Filter by branch ID
+            progress_status: Comma-separated list of statuses to filter by
+            patient_id: Filter by patient ID (exact match)
+            patient_name: Filter by patient name (case-insensitive partial match)
+            
+        Returns:
+            QuerySet of matching invoices
+        """
         qs = Invoice.objects.filter(invoice_type='factory', is_deleted=False)  # exclude deleted invoices
 
-        # Handle invoice_number filtering by user branch
+        # Handle branch filtering
         if branch_id:
             qs = qs.filter(order__branch_id=branch_id)
+            
+        # Handle invoice number filtering with user branch check
         if invoice_number:
             user_branches = user.user_branches.all().values_list('branch_id', flat=True)
             if not user_branches:
                 raise ValueError("User has no branches assigned.")
-
             qs = qs.filter(invoice_number=invoice_number, order__branch_id__in=user_branches)
 
+        # Apply customer filters
         if mobile:
             qs = qs.filter(order__customer__phone_number=mobile)
 
         if nic:
             qs = qs.filter(order__customer__nic=nic)
             
-        if patient_id:  # Add patient_id filtering
+        if patient_id:
             qs = qs.filter(order__customer_id=patient_id)
+            
+        if patient_name:
+            qs = qs.filter(order__customer__name__icontains=patient_name)
 
+        # Handle progress status filtering
         if progress_status:
             status_list = [s.strip() for s in progress_status.split(",") if s.strip()]
             from api.models import OrderProgress
@@ -113,12 +136,13 @@ class InvoiceService:
                 latest_progress_status=Subquery(latest_progress.values('progress_status')[:1])
             ).filter(latest_progress_status__in=status_list)
         
-        qs = qs.select_related('order', 'order__customer').prefetch_related('order__order_progress_status').order_by('-invoice_date')
+        # Optimize the query
+        qs = qs.select_related('order', 'order__customer') \
+               .prefetch_related('order__order_progress_status') \
+               .order_by('-invoice_date')
+               
         return qs
 
-
-
-    
     @staticmethod
     def get_invoice_by_invoice_number(invoice_type, invoice_number, is_frame_only=None):
         try:

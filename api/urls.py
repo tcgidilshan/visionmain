@@ -72,7 +72,7 @@ from .views import (
     FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView,SolderingOrderReportView,
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
     LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
-    RestPasswordView,ResetPasswordConfirmView,RefractionOrderView
+    RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -226,6 +226,7 @@ urlpatterns = [
     path('doctor-absence/reschedule/', DoctorAbsenceRescheduleView.as_view(), name='doctor-absence-reschedule'),
     path('patients/', PatientListView.as_view(), name='patient-list'),
     path('patients/<int:pk>/', PatientUpdateView.as_view(), name='patient-update'),
+    path('patients/create/', CreatePatientView.as_view(), name='patient-create'),
     path('channel/', ChannelAppointmentView.as_view(), name='channel-appointment'),
     path('channels/', ChannelListView.as_view(), name='channel-list'),
     path('channels/time-slots/', DoctorAppointmentTimeListView.as_view(), name='doctor-appointment-time-list'),#time slots

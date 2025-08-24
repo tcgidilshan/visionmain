@@ -16,6 +16,7 @@ class StandardResultsSetPagination(PageNumberPagination):
 class FactoryInvoiceSearchView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardResultsSetPagination
+    
     def get(self, request):
         invoice_number = request.query_params.get('invoice_number')
         mobile = request.query_params.get('mobile')
@@ -23,10 +24,11 @@ class FactoryInvoiceSearchView(APIView):
         branch_id = request.query_params.get('branch_id')
         progress_status = request.query_params.get('progress_status')
         patient_id = request.query_params.get('patient_id')
+        patient_name = request.query_params.get('patient_name')
 
-        if not any([invoice_number, mobile, nic, branch_id, progress_status, patient_id]):
+        if not any([invoice_number, mobile, nic, branch_id, progress_status, patient_id, patient_name]):
             return Response(
-                {"error": "Please provide at least one search parameter: invoice_number, mobile, nic, branch_id, progress_status, or patient_id."},
+                {"error": "Please provide at least one search parameter: invoice_number, mobile, nic, branch_id, progress_status, patient_id, or patient_name."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -37,14 +39,16 @@ class FactoryInvoiceSearchView(APIView):
             nic=nic,
             branch_id=branch_id,
             progress_status=progress_status,
-            patient_id=patient_id
+            patient_id=patient_id,
+            patient_name=patient_name
         )
+        
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(invoices, request)
         if page is not None:
             serializer = InvoiceSearchSerializer(page, many=True)
             return paginator.get_paginated_response(serializer.data)
-        #InvoiceSearchSerializer provide only nesasry info for the checkin module
+            
         serializer = InvoiceSearchSerializer(invoices, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
