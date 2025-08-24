@@ -26,10 +26,10 @@ class OrderUpdateView(APIView):
             if not admin_id:
                return Response({"error": "Admin ID is required to perform an Edit operation."}, status=status.HTTP_400_BAD_REQUEST)
             # Step 1: Update Patient Details (if provided)
-
-            patient_data = request.data.get("patient")
-            if patient_data:
-                PatientService.create_or_update_patient(patient_data)
+            #//!no need patient service frontend architecher send direct patint ID
+            # patient_data = request.data.get("patient")
+            # if patient_data:
+            #     PatientService.create_or_update_patient(patient_data)
 
 
             # Step 2: Extract Order Data (check if on_hold status is changing)

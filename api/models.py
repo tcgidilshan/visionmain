@@ -99,9 +99,6 @@ class Patient(models.Model):
     extra_phone_number = models.CharField(max_length=15, null=True, blank=True)
     address = models.TextField(null=True, blank=True)
     nic = models.CharField(max_length=15, null=True, blank=True)
-    refraction = models.ForeignKey(
-        Refraction, null=True, blank=True, on_delete=models.SET_NULL, related_name="patients"
-    )
     patient_note = models.CharField(max_length=100, null=True, blank=True)
 
     def save(self, *args, **kwargs):

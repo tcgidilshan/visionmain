@@ -53,7 +53,7 @@ class HearingOrderCreateView(APIView):
                 
                 # Prepare data for HearingOrderService
                 service_data = {
-                    "patient": request.data.get('patient'),  
+                    "patient_id": request.data.get('patient_id'),  
                     "hearing_item": hearing_item,  
                     "quantity": item_data.get('quantity', 1),
                     "price_per_unit": item_data.get('price_per_unit', 0),
