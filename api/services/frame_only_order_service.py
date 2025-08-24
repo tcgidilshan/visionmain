@@ -12,7 +12,7 @@ class FrameOnlyOrderService:
     @transaction.atomic
     def create(data):
 
-        patient_data = data.get("patient")
+        patient_id = data.get("patient_id")
         frame = data["frame"]
         quantity = data["quantity"]
         price_per_unit = data["price_per_unit"]
@@ -21,10 +21,16 @@ class FrameOnlyOrderService:
         
         
 
-        # 🧠 Step 1: Get or create patient
+        # 🧠 Step 1: Get patient
         customer = None
-        if patient_data:
-            customer = PatientService.create_or_update_patient(patient_data)
+        if patient_id:
+            try:
+                customer = Patient.objects.get(id=patient_id)
+            except Patient.DoesNotExist:
+                raise ValueError("Patient with the provided ID does not exist.")
+        else:
+            raise ValueError("Patient ID is required.")
+    
         
         # Step 2: Prepare order item
         order_items_data = [{

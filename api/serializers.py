@@ -841,15 +841,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
         ]
 
     def get_refraction_details(self, obj):
-        refraction = getattr(obj.order, 'refraction', None)
-        if refraction:
-            # This assumes RefractionDetails has a ForeignKey to Refraction
-            from api.models import RefractionDetails  # adjust path as needed
+        if hasattr(obj.order, 'refraction') and obj.order.refraction:
             try:
-                details = RefractionDetails.objects.get(refraction=refraction)
+                details = RefractionDetails.objects.get(refraction=obj.order.refraction)
                 return RefractionDetailsSerializer(details).data
             except RefractionDetails.DoesNotExist:
-                return None
+                pass
         return None
 
 class DoctorSerializer(serializers.ModelSerializer):
@@ -1265,7 +1262,7 @@ class FrameOnlyPatientInputSerializer(serializers.Serializer):
         return data
 
 class FrameOnlyOrderSerializer(serializers.Serializer):
-    patient = FrameOnlyPatientInputSerializer()
+    patient_id = serializers.IntegerField(required=True)
     frame = serializers.PrimaryKeyRelatedField(queryset=Frame.objects.all())
     quantity = serializers.IntegerField(min_value=1)
     price_per_unit = serializers.DecimalField(max_digits=10, decimal_places=2)
