@@ -3,7 +3,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.filters import SearchFilter
-from ..models import Patient
+from ..models import Patient, PatientAuditLog,CustomUser
 from ..serializers import PatientSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 from ..services.pagination_service import PaginationService
@@ -11,6 +11,30 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework import serializers
+
+def log_patient_changes(patient, old_data, new_data, user):
+    """
+    Helper function to log changes to patient fields in PatientAuditLog table
+    """
+    fields_to_track = ['name', 'phone_number', 'nic', 'date_of_birth', 'address', 'extra_phone_number', 'patient_note']
+    
+    for field in fields_to_track:
+        old_value = old_data.get(field) if old_data else None
+        new_value = new_data.get(field)
+        
+        # Convert values to strings for comparison and storage
+        old_str = str(old_value) if old_value is not None else None
+        new_str = str(new_value) if new_value is not None else None
+        
+        # Only log if there's an actual change
+        if old_str != new_str:
+            PatientAuditLog.objects.create(
+                patient=patient,
+                field_name=field,
+                old_value=old_str,
+                new_value=new_str,
+                user=user
+            )
 
 class PatientListView(ListAPIView):
     """
@@ -48,33 +72,62 @@ class PatientUpdateView(RetrieveUpdateAPIView):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
     permission_classes = [IsAuthenticated]
+    
     def perform_update(self, serializer):
         """
         Check for duplicate phone_number and nic before updating.
         If duplicate NIC is found, raise a validation error with the existing patient's name.
+        Also log all changes to the PatientAuditLog table.
         """
-        phone_number = self.request.data.get("phone_number", serializer.instance.phone_number)
-        nic = self.request.data.get("nic", serializer.instance.nic)
+        user_id = self.request.data.get("user_id")
+        instance = serializer.instance
+        old_data = {
+            'name': instance.name,
+            'phone_number': instance.phone_number,
+            'nic': instance.nic,
+            'date_of_birth': instance.date_of_birth,
+            'address': instance.address,
+            'extra_phone_number': instance.extra_phone_number,
+            'patient_note': instance.patient_note,
+        }
+        
+        phone_number = self.request.data.get("phone_number", instance.phone_number)
+        nic = self.request.data.get("nic", instance.nic)
         
         # Check for duplicate NIC
-        if nic and nic != serializer.instance.nic:  # Only check if NIC is being changed
+        if nic and nic != instance.nic:  # Only check if NIC is being changed
             duplicate_patient = Patient.objects.filter(
                 nic__iexact=nic
             ).exclude(
-                id=serializer.instance.id  # Exclude current patient from the check
+                id=instance.id  # Exclude current patient from the check
             ).first()
             
             if duplicate_patient:
                 raise serializers.ValidationError({
                     "nic": f"NIC already exists for patient: {duplicate_patient.name}"
                 })
-
+        user = None
+        if user_id:
+            user = CustomUser.objects.get(id=user_id)
         # If no duplicates, proceed with update
-        serializer.save(
-            name=self.request.data.get("name", serializer.instance.name),
+        updated_patient = serializer.save(
+            name=self.request.data.get("name", instance.name),
             phone_number=phone_number,
             nic=nic,
         )
+        
+        # Log changes to audit table
+        new_data = {
+            'name': updated_patient.name,
+            'phone_number': updated_patient.phone_number,
+            'nic': updated_patient.nic,
+            'date_of_birth': updated_patient.date_of_birth,
+            'address': updated_patient.address,
+            'extra_phone_number': updated_patient.extra_phone_number,
+            'patient_note': updated_patient.patient_note,
+        }
+        
+        log_patient_changes(updated_patient, old_data, new_data,user)
 
 class CreatePatientView(APIView):
     """

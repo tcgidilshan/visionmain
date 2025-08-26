@@ -5,6 +5,7 @@ from ..serializers import RefractionSerializer, PatientRefractionDetailOrderSeri
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
 from django.db.models import Q
+from ..services.pagination_service import PaginationService
 
 class RefractionCreateAPIView(generics.CreateAPIView):
     """
@@ -82,10 +83,6 @@ class RefractionCreateAPIView(generics.CreateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-# Custom Pagination Class
-class RefractionPagination(PageNumberPagination):
-    page_size = 10  # Customize as needed
-
 class RefractionListAPIView(generics.ListAPIView):
     """
     API View to list all Refractions with pagination, search, ordering,
@@ -93,7 +90,7 @@ class RefractionListAPIView(generics.ListAPIView):
     """
     serializer_class = RefractionSerializer
     permission_classes = [permissions.IsAuthenticated]
-    pagination_class = RefractionPagination
+    pagination_class = PaginationService
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
 
     # Fields searchable via ?search=
@@ -241,8 +238,10 @@ class RefractionOrderView(APIView):
             ).order_by('-order_date')  # Order by most recent first
             
             # Use the new serializer
-            serializer = PatientRefractionDetailOrderSerializer(orders, many=True)
-            return Response(serializer.data)
+            paginator=PaginationService()
+            page = paginator.paginate_queryset(orders, request, view=self)
+            serializer = PatientRefractionDetailOrderSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
             
         except Exception as e:
             import traceback
