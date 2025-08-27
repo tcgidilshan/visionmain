@@ -250,3 +250,17 @@ class RefractionOrderView(APIView):
                 {"error": "An error occurred while processing your request"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+class PatientOrderCountView(APIView):
+    """
+    Returns total order count for a patient (includes all orders, regardless of refraction link).
+    Query param: ?patient_id=<id>
+    """
+    def get(self, request):
+        patient_id = request.query_params.get('patient_id')
+        if not patient_id:
+            return Response({"error": "patient_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            count = Order.objects.filter(customer_id=patient_id).count()
+            return Response({"count": count}, status=status.HTTP_200_OK)
+        except Exception:
+            return Response({"error": "An error occurred while processing your request"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
