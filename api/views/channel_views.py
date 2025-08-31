@@ -28,20 +28,24 @@ class ChannelAppointmentView(APIView):
         data = request.data
 
         # Step 1: Validate Input
-        required_fields = ['doctor_id', 'name', 'address', 'contact_number', 'channel_date', 'time', 'channeling_fee','doctor_fees','branch_fees','branch_id', 'payments']
+        required_fields = ['doctor_id', 'patient_id', 'channel_date', 'time', 'channeling_fee','doctor_fees','branch_fees','branch_id', 'payments']
         for field in required_fields:
             if field not in data:
                 return Response({"error": f"{field} is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             # Step 2: Handle Patient
-            patient_payload = {
-                "id": data.get("patient_id"),
-                "name": data["name"],
-                "phone_number": data["contact_number"],
-                "address": data.get("address", "")
-            }
-            patient = PatientService.create_or_update_patient(patient_payload)
+            patient_id = data.get("patient_id")
+            if not patient_id:
+                    return Response({"error": "Patient details are required."}, status=status.HTTP_400_BAD_REQUEST)
+            patient = None
+            if patient_id:
+                    try:
+                        patient = Patient.objects.get(id=patient_id)
+                    except Patient.DoesNotExist:
+                        raise ValueError("Patient with the provided ID does not exist.")
+            else:
+                    raise ValueError("Patient ID is required.")
             # Step 3: Handle Schedule (Create If Not Exists)
             schedule, created = Schedule.objects.get_or_create(
                 doctor_id=data['doctor_id'],
@@ -284,9 +288,10 @@ class ChannelUpdateView(APIView):
 
         # Step 1: Validate required fields
         required_fields = [
-            'doctor_id', 'name', 'address', 'contact_number', 'channel_date',
+            'doctor_id', "patient_id", 'channel_date',
             'branch_fees', 'doctor_fees', 'time', 'channeling_fee', 'branch_id', 'payments'
         ]
+        
         for field in required_fields:
             if field not in data:
                 return Response({"error": f"{field} is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -294,15 +299,18 @@ class ChannelUpdateView(APIView):
         try:
             # Step 2: Fetch & update patient
             appointment = get_object_or_404(Appointment, pk=appointment_id)
-            patient = appointment.patient
-
-            patient_payload = {
-                "id": patient.id,
-                "name": data["name"],
-                "phone_number": data["contact_number"],
-                "address": data.get("address", "")
-            }
-            patient = PatientService.create_or_update_patient(patient_payload)
+            
+            patient_id = data.get("patient_id")
+            if not patient_id:
+                    return Response({"error": "Patient details are required."}, status=status.HTTP_400_BAD_REQUEST)
+            patient = None
+            if patient_id:
+                    try:
+                        patient = Patient.objects.get(id=patient_id)
+                    except Patient.DoesNotExist:
+                        raise ValueError("Patient with the provided ID does not exist.")
+            else:
+                    raise ValueError("Patient ID is required.")
            
             # Step 3: Handle schedule (create or reassign)
             # Check if schedule details are changing

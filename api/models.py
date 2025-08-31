@@ -108,6 +108,24 @@ class Patient(models.Model):
 
     def __str__(self):
         return self.name
+
+class PatientAuditLog(models.Model):
+    patient = models.ForeignKey(
+        Patient,
+        on_delete=models.CASCADE,
+        related_name='patient_audit_logs'
+    )
+    field_name = models.CharField(max_length=100)
+    old_value = models.TextField(null=True, blank=True)
+    new_value = models.TextField(null=True, blank=True)
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='patient_audit_log'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
     
 class RefractionDetails(models.Model):
     refraction = models.OneToOneField(

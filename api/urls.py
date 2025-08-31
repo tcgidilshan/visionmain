@@ -72,7 +72,7 @@ from .views import (
     FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView,SolderingOrderReportView,
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
     LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
-    RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView
+    RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -317,5 +317,6 @@ urlpatterns = [
     path('order-feedback/by-invoice/', OrderFeedbackByInvoiceView.as_view(), name='order-feedback-by-invoice'),
     path('order-feedback/', OrderFeedbackCreateView.as_view(), name='order-feedback-create'),
     path('refraction/orders/', RefractionOrderView.as_view(), name='refraction-order-list'),
+    path('refraction/orders/count/', PatientOrderCountView.as_view(), name='refraction-order-count'),
     ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
