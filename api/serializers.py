@@ -997,10 +997,10 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
         payments = ChannelPayment.objects.filter(appointment=obj)  # Related payments
         return ChannelPaymentSerializer(payments, many=True).data 
         
-class OtherItemSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = OtherItem
-        fields = ['id', 'name', 'price', 'is_active']
+# class OtherItemSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = OtherItem
+#         fields = ['id', 'name', 'price', 'is_active']
 class OtherItemStockSerializer(serializers.ModelSerializer):
     other_item_id = serializers.PrimaryKeyRelatedField(
         queryset=OtherItem.objects.all(), source='other_item', write_only=True
