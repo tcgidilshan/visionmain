@@ -68,3 +68,4 @@ from .hearing_order_report_view import HearingOrderReportView,HearingOrderRemind
 from .order_item_view import OrderItemUpdateView
 from .hearing_order_service_view import HearingOrderServiceView
 from .reset_auth_data import RestPasswordView,ResetPasswordConfirmView
+from .payment_method_banks import PaymentMethodBanksView, PaymentMethodBanksDetailView

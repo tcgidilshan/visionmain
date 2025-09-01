@@ -954,7 +954,13 @@ class OrderPayment(models.Model):
     deleted_at = models.DateTimeField(null=True, blank=True)
     user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='user_order_payments')
     admin = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_order_payments')
-
+    payment_method_bank = models.ForeignKey(
+        'PaymentMethodBanks',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='order_payments'
+    )  
     def __str__(self):
         return f"Payment for Order {self.order.id} - Amount: {self.amount}"
 
@@ -1371,3 +1377,19 @@ class HearingOrderItemService(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
  
     
+class PaymentMethodBanks(models.Model):
+    PAYMENT_METHOD_CHOICES = [
+        ('credit_card', 'Credit Card'),
+        ('cash', 'Cash'),
+        ('online_transfer', 'Online Transfer'),
+    ]
+    name = models.CharField(max_length=100)
+    account_no = models.CharField(max_length=50)
+    payment_method = models.CharField(max_length=30, choices=PAYMENT_METHOD_CHOICES)
+    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True, related_name="payment_method_banks")
+    is_active = models.BooleanField(default=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+
+    def __str__(self):
+        return self.name

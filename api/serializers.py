@@ -22,7 +22,7 @@ from .models import (
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
     UserBranch,ExpenseMainCategory, ExpenseSubCategory,LensStockHistory,
     DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus,FrameImage,
-    DoctorBranchChannelFees,OrderFeedback,HearingItem,HearingItemStock,HearingOrderItemService
+    DoctorBranchChannelFees,OrderFeedback,HearingItem,HearingItemStock,HearingOrderItemService,PaymentMethodBanks
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -607,7 +607,8 @@ class OrderPaymentSerializer(serializers.ModelSerializer):
             'admin',
             'user_username',
             'admin_username',
-            'deleted_at'
+            'deleted_at',
+            'payment_method_bank'
         ]
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -1635,3 +1636,16 @@ class PatientRefractionDetailOrderSerializer(serializers.ModelSerializer):
         ).aggregate(
             total=Sum('amount')
         )['total'] or 0
+class PaymentMethodBanksSerializer(serializers.ModelSerializer):
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
+    class Meta:
+        model = PaymentMethodBanks
+        fields = [
+            'id',
+            'name',
+            'account_no',
+            'payment_method',
+            'branch',
+            'branch_name',
+            'is_active'
+        ]

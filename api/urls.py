@@ -72,7 +72,7 @@ from .views import (
     FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView,SolderingOrderReportView,
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
     LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
-    RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView
+    RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -318,5 +318,7 @@ urlpatterns = [
     path('order-feedback/', OrderFeedbackCreateView.as_view(), name='order-feedback-create'),
     path('refraction/orders/', RefractionOrderView.as_view(), name='refraction-order-list'),
     path('refraction/orders/count/', PatientOrderCountView.as_view(), name='refraction-order-count'),
-    ]
+    path("payment-method/banks/", PaymentMethodBanksView.as_view(), name="payment-method-banks"),
+    path("payment-method/banks/<int:pk>/", PaymentMethodBanksDetailView.as_view(), name="payment-method-banks-detail"),
+]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
