@@ -905,7 +905,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'invoice_number',
             'note',
             'doctor_fees',
-            'branch_fees'
+            'branch_fees',
+            "is_deleted"
         ]
 
 class ChannelPaymentSerializer(serializers.ModelSerializer):
