@@ -61,7 +61,8 @@ class ChannelAppointmentView(APIView):
             # Step 4: Calculate channel number (branch + date specific)
             channel_date = data['channel_date']
             branch_id = data['branch_id']
-            appointments_today = Appointment.objects.filter(date=channel_date, branch_id=branch_id).count()
+            doctor_id = data['doctor_id']
+            appointments_today = Appointment.all_objects.filter(date=channel_date, branch_id=branch_id, doctor_id=doctor_id).count()
             channel_no = appointments_today + 1
 
             # Step 5: Create Appointment
@@ -124,7 +125,7 @@ class ChannelAppointmentView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class ChannelListView(ListAPIView):
-    queryset = Appointment.objects.prefetch_related('payments').select_related('doctor', 'patient', 'branch')
+    queryset = Appointment.all_objects.prefetch_related('payments').select_related('doctor', 'patient', 'branch')
     serializer_class = ChannelListSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['doctor', 'date','branch','invoice_number']  # Optional DRF filters
@@ -133,13 +134,11 @@ class ChannelListView(ListAPIView):
     pagination_class = PaginationService
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-
+        queryset = Appointment.all_objects.prefetch_related('payments').select_related('doctor', 'patient', 'branch')
         # ✅ Get branch_id from query params
         branch_id = self.request.query_params.get('branch_id')
         if branch_id:
             queryset = queryset.filter(branch_id=branch_id)
-
         return queryset
 
     
