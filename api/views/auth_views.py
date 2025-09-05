@@ -11,6 +11,7 @@ from ..serializers import BranchSerializer
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from django.conf import settings
+from rest_framework_simplejwt.tokens import RefreshToken  # Add this import
 
 User = get_user_model()
 
@@ -18,7 +19,6 @@ User = get_user_model()
 class LoginView(APIView):
     permission_classes = [AllowAny]  
     def post(self, request):
-        
         username = request.data.get('username')
         password = request.data.get('password')
 
@@ -31,25 +31,47 @@ class LoginView(APIView):
         user = authenticate(username=username, password=password)
 
         if user is not None:
-            token, created = Token.objects.get_or_create(user=user)
+            # Generate JWT tokens instead of simple token
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+            
             branches = UserBranch.objects.filter(user_id=user.id).select_related("branch")
             branch_details = [
                 {
                     "id": ub.branch.id,
-                    "branch_name": ub.branch.branch_name,  # Change this to `ub.branch.branch_name` if your model uses `branch_name`
-                    "location": ub.branch.location,  # Include other fields if needed
+                    "branch_name": ub.branch.branch_name,
+                    "location": ub.branch.location,
                 }
                 for ub in branches
             ]
 
-            return Response({
+            response = Response({
                 "message": "Login successful",
-                "token": token.key,
                 "username": user.username,
                 "is_staff": user.is_staff,
                 "is_superuser": user.is_superuser,
                 "branches": branch_details
             })
+            
+            response.set_cookie(
+                key="access_token",
+                value=access_token,
+                httponly=True,
+                secure=True,  # Set to True in production
+                samesite="None",
+                max_age=60*60  # 1 hour
+            )
+            
+            response.set_cookie(
+                key="refresh_token",
+                value=str(refresh),
+                httponly=True,
+                secure=True,  # Set to True in production
+                samesite="None",
+                max_age=60*60*24*7  # 7 days
+            )
+            
+            return response
         else:
             return Response(
                 {"error": "Invalid username or password."},
@@ -160,6 +182,6 @@ class AdminRegistrationView(APIView):
             status=status.HTTP_201_CREATED
         )
 
-    
-    
+
+
 
