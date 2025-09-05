@@ -190,6 +190,8 @@ class OrderPaymentService:
             amount = float(payment.get('amount', 0))
             method = payment.get('payment_method')
             txn_status = payment.get('transaction_status', 'success')
+            payment_method_bank = payment.get('payment_method_bank', None)
+
             # --- Validation
             if amount <= 0:
                 raise ValidationError(f"Payment #{i+1}: Amount must be greater than 0.")
@@ -204,7 +206,8 @@ class OrderPaymentService:
                     changed = (
                         float(old_payment.amount) != amount or
                         old_payment.payment_method != method or
-                        old_payment.transaction_status != txn_status
+                        old_payment.transaction_status != txn_status or 
+                        old_payment.payment_method_bank.id != payment_method_bank 
                     )
                     if changed:
                         # Soft-delete old, create new (keep date)
@@ -221,6 +224,7 @@ class OrderPaymentService:
                             "payment_date": old_payment.payment_date,  # Carry forward
                             "is_partial": False,
                             "is_final_payment": False,
+                            "payment_method_bank": payment_method_bank,
                             "user": None,
                             "admin": None,
                             
@@ -242,6 +246,7 @@ class OrderPaymentService:
                 payment_data = {
                     "order": order.id,
                     "amount": amount,
+                    "payment_method_bank": payment_method_bank,
                     "payment_method": method,
                     "transaction_status": txn_status,
                     "is_partial": False,

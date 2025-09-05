@@ -34,7 +34,7 @@ class InvoiceReportService:
             datetime.combine(payment_date, time.max)
         )
         
-        print(f"Date range for query: {start_datetime} to {end_datetime}")
+    # print(f"Date range for query: {start_datetime} to {end_datetime}")
         
         payments = OrderPayment.all_objects.select_related("order").filter(
             (Q(payment_date__range=(start_datetime, end_datetime)) |  Q(order__deleted_at__range=(start_datetime, end_datetime))),
@@ -76,8 +76,8 @@ class InvoiceReportService:
             # order__is_deleted=False
         )
         
-        for i in invoice_qs:
-            print(f"invoice_id={i.id}, invoice_number={i.invoice_number}, invoice_date={i.invoice_date}, order_id={i.order_id}, order_is_deleted={i.order.is_deleted}")
+        # for i in invoice_qs:
+        #     print(f"invoice_id={i.id}, invoice_number={i.invoice_number}, invoice_date={i.invoice_date}, order_id={i.order_id}, order_is_deleted={i.order.is_deleted}")
 
         results = []
 
@@ -219,10 +219,10 @@ class InvoiceReportService:
         if start_datetime > end_datetime:
             raise ValueError("Start date cannot be after end date.")
         
-        for inv in Invoice.objects.all():
-            print(f"id={inv.id}, invoice_type={inv.invoice_type}, invoice_date={inv.invoice_date}, branch_id={inv.order.branch_id}, is_deleted={inv.is_deleted}, order_is_deleted={inv.order.is_deleted}")
+    # for inv in Invoice.objects.all():
+    #     print(f"id={inv.id}, invoice_type={inv.invoice_type}, invoice_date={inv.invoice_date}, branch_id={inv.order.branch_id}, is_deleted={inv.is_deleted}, order_is_deleted={inv.order.is_deleted}")
             
-        print(f"start_date: {start_datetime}, end_date: {end_datetime}")
+  
         # Get all factory invoices in the date range for the branch
         invoices = Invoice.objects.select_related(
             'order', 'order__customer', 'order__refraction'
@@ -245,7 +245,7 @@ class InvoiceReportService:
             total_paid=Sum('amount')
         )
 
-        print(f"invoices: {invoices}")
+        # print(f"invoices: {invoices}")
         # Get all payments for these orders
         order_ids = invoices.values_list('order_id', flat=True)
         payments = OrderPayment.objects.filter(
@@ -270,18 +270,12 @@ class InvoiceReportService:
             refraction = order.refraction
             
             # Get customer details from refraction if available, otherwise from patient
-            if refraction:
-                customer_name = refraction.customer_full_name
-                nic = refraction.nic or ''
-                address = ''  # Address not directly on refraction, would need to be added if needed
-                mobile_number = refraction.customer_mobile or ''
-                refraction_number = refraction.refraction_number or ''
-            else:
-                customer_name = customer.name
-                nic = customer.nic or ''
-                address = customer.address or ''
-                mobile_number = customer.phone_number or ''
-                refraction_number = ''
+            
+            # refraction_number = refraction. or ''
+            customer_name = customer.name
+            nic = customer.nic or ''
+            address = customer.address or ''
+            mobile_number = customer.phone_number or ''
             
             # Calculate payment totals
             total_amount = float(order.total_price)
@@ -295,7 +289,7 @@ class InvoiceReportService:
             
             # Add order to results
             orders.append({
-                'refraction_number': refraction_number,
+                # 'refraction_number': refraction_number,
                 'invoice_number': invoice.invoice_number or '',
                 'date': invoice.invoice_date.strftime("%Y-%m-%d"),
                 'time': invoice.invoice_date.strftime("%H:%M:%S"),
@@ -360,7 +354,7 @@ class InvoiceReportService:
             start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date_str, end_date_str)
 
              
-            print(f"Normal Order Report start_date: {start_datetime}, end_date: {end_datetime}")
+            # print(f"Normal Order Report start_date: {start_datetime}, end_date: {end_datetime}")
         except ValueError:
             raise ValueError("Invalid date format. Use YYYY-MM-DD.")
             
@@ -368,8 +362,8 @@ class InvoiceReportService:
             raise ValueError("Start date cannot be after end date.")
             
         
-        for inv in Invoice.objects.all():
-            print(f"id={inv.id}, invoice_type={inv.invoice_type}, invoice_date={inv.invoice_date}, branch_id={inv.order.branch_id}, is_deleted={inv.is_deleted}, order_is_deleted={inv.order.is_deleted}")
+        # for inv in Invoice.objects.all():
+        #     print(f"idz={inv.id}, invoice_type={inv.invoice_type}, invoice_date={inv.invoice_date}, branch_id={inv.order.branch_id}, is_deleted={inv.is_deleted}, order_is_deleted={inv.order.is_deleted}")
         
         # Get all normal invoices in the date range for the branch
         invoices = Invoice.objects.select_related(
@@ -605,7 +599,7 @@ class InvoiceReportService:
             # Parse dates properly
             start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date_str, end_date_str)
             
-            print(f"Soldering Order start_date: {start_date_str}, end_date: {end_date_str}")
+            # print(f"Soldering Order start_date: {start_date_str}, end_date: {end_date_str}")
         except ValueError:
             raise ValueError("Invalid date format. Use YYYY-MM-DD.")
             
@@ -628,7 +622,7 @@ class InvoiceReportService:
         ).values('order_id').annotate(
             total_paid=Sum('amount')
         )
-        print(f"SolderingPayment: {payments}")
+    # print(f"SolderingPayment: {payments}")
         
         # Create a dictionary of order_id to total_paid
         payments_dict = {p['order_id']: float(p['total_paid'] or 0) for p in payments}
