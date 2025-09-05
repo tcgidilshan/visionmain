@@ -79,6 +79,7 @@ from .views.employee_report_views import EmployeeHistoryReportView
 from .views.banking_views import BankingReportView,ConfirmDepositView
 from .views.customer_report_views import CustomerLocationStatisticsView,CustomerLocationTableView
 from .views.order_feedback import OrderFeedbackCreateView, OrderFeedbackByInvoiceView
+from .views.profile_views import ProfileView
 
 # from .views import CustomAuthToken
 
@@ -320,5 +321,6 @@ urlpatterns = [
     path('refraction/orders/count/', PatientOrderCountView.as_view(), name='refraction-order-count'),
     path("payment-method/banks/", PaymentMethodBanksView.as_view(), name="payment-method-banks"),
     path("payment-method/banks/<int:pk>/", PaymentMethodBanksDetailView.as_view(), name="payment-method-banks-detail"),
+    path('profile/', ProfileView.as_view(), name='profile'),
 ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
