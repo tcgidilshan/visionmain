@@ -72,7 +72,7 @@ from .views import (
     FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView,SolderingOrderReportView,
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
     LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
-    RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView
+    RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -85,6 +85,7 @@ from .views.profile_views import ProfileView
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
+    path('logout/', LogoutView.as_view(), name='logout'),
     path('admin-only/', AdminOnlyView.as_view(), name='admin-only'),
     path('super-admin/', SuperAdminOnlyView.as_view(), name='super-admin-only'),
     path('register/user/', UserRegistrationView.as_view(), name='user-registration'),
