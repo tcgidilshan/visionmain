@@ -182,6 +182,16 @@ class AdminRegistrationView(APIView):
             status=status.HTTP_201_CREATED
         )
 
+class LogoutView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        response = Response({"message": "Logout successful."}, status=status.HTTP_200_OK)
+        # Remove tokens from cookies
+        response.delete_cookie("access_token", samesite="None")
+        response.delete_cookie("refresh_token", samesite="None")
+        return response
+
 
 
 
