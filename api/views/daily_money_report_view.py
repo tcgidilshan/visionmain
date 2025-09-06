@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from api.models import (
     Branch, Order, OrderPayment, Invoice, Appointment, ChannelPayment, 
     SolderingOrder, SolderingPayment, Expense, OtherIncome, BankDeposit,
-    SafeTransaction, CustomUser, MntOrder
+    SafeTransaction, CustomUser, MntOrder, HearingOrderItemService
 )
 from api.services.time_zone_convert_service import TimezoneConverterService
 
@@ -79,8 +79,12 @@ class DailyMoneyReportView(APIView):
                 total_income += branch_transactions["total_income"]
                 total_expenses += branch_transactions["total_expenses"]
             
-            # Sort transactions by time (most recent first)
-            all_transactions.sort(key=lambda x: (x["date"], x["time"]), reverse=True)
+            # Sort transactions by datetime (most recent first)
+            all_transactions.sort(key=lambda x: x.get("datetime_sort", datetime.min), reverse=True)
+            
+            # Remove datetime_sort field from response (used only for sorting)
+            for transaction in all_transactions:
+                transaction.pop("datetime_sort", None)
             
             report_data = {
                 "date": date_str,
@@ -111,10 +115,12 @@ class DailyMoneyReportView(APIView):
         normal_data = self._get_normal_orders_flat(branch, day_start, day_end)
         frame_data = self._get_frame_only_orders_flat(branch, day_start, day_end)
         hearing_data = self._get_hearing_orders_flat(branch, day_start, day_end)
+        hearing_services_data = self._get_hearing_order_services_flat(branch, day_start, day_end)
         channel_data = self._get_channel_payments_flat(branch, day_start, day_end)
         soldering_data = self._get_soldering_orders_flat(branch, day_start, day_end)
         safe_expenses_data = self._get_expenses_flat(branch, target_date, 'safe')
-        cashier_expenses_data = self._get_expenses_flat(branch, target_date, 'cashier')
+        cash_expenses_data = self._get_expenses_flat(branch, target_date, 'cash')
+        bank_expenses_data = self._get_expenses_flat(branch, target_date, 'bank')
         banking_data = self._get_banking_transactions_flat(branch, target_date)
         safe_transactions_data = self._get_safe_transactions_flat(branch, target_date)
         other_income_data = self._get_other_income_flat(branch, target_date)
@@ -124,20 +130,22 @@ class DailyMoneyReportView(APIView):
         all_transactions.extend(normal_data["transactions"])
         all_transactions.extend(frame_data["transactions"])
         all_transactions.extend(hearing_data["transactions"])
+        all_transactions.extend(hearing_services_data["transactions"])
         all_transactions.extend(channel_data["transactions"])
         all_transactions.extend(soldering_data["transactions"])
         all_transactions.extend(safe_expenses_data["transactions"])
-        all_transactions.extend(cashier_expenses_data["transactions"])
+        all_transactions.extend(cash_expenses_data["transactions"])
+        all_transactions.extend(bank_expenses_data["transactions"])
         all_transactions.extend(banking_data["transactions"])
         all_transactions.extend(safe_transactions_data["transactions"])
         all_transactions.extend(other_income_data["transactions"])
         
         # Calculate totals
         total_income = (factory_data["total"] + normal_data["total"] + frame_data["total"] + 
-                       hearing_data["total"] + channel_data["total"] + soldering_data["total"] + 
-                       banking_data["total"] + other_income_data["total"])
+                       hearing_data["total"] + hearing_services_data["total"] + channel_data["total"] + 
+                       soldering_data["total"] + banking_data["total"] + other_income_data["total"])
         
-        total_expenses = (safe_expenses_data["total"] + cashier_expenses_data["total"])
+        total_expenses = (safe_expenses_data["total"] + cash_expenses_data["total"] + bank_expenses_data["total"])
         
         # Add safe transaction amounts (can be positive or negative)
         total_income += max(0, safe_transactions_data["total"])
@@ -176,6 +184,7 @@ class DailyMoneyReportView(APIView):
                 transactions.append({
                     "date": payment.payment_date.strftime('%d/%m/%Y'),
                     "time": payment.payment_date.strftime('%I.%M%p'),
+                    "datetime_sort": payment.payment_date,
                     "user_name": payment.user.username if payment.user else payment.admin.username if payment.admin else "-",
                     "form_name": "Factory order",
                     "remark": payment.order.order_remark or "-",
@@ -213,6 +222,7 @@ class DailyMoneyReportView(APIView):
                 transactions.append({
                     "date": payment.payment_date.strftime('%d/%m/%Y'),
                     "time": payment.payment_date.strftime('%I.%M%p'),
+                    "datetime_sort": payment.payment_date,
                     "user_name": payment.user.username if payment.user else payment.admin.username if payment.admin else "-",
                     "form_name": "Normal order",
                     "remark": payment.order.order_remark or "-",
@@ -250,6 +260,7 @@ class DailyMoneyReportView(APIView):
                 transactions.append({
                     "date": payment.payment_date.strftime('%d/%m/%Y'),
                     "time": payment.payment_date.strftime('%I.%M%p'),
+                    "datetime_sort": payment.payment_date,
                     "user_name": payment.user.username if payment.user else payment.admin.username if payment.admin else "-",
                     "form_name": "Frame only order",
                     "remark": payment.order.order_remark or "-",
@@ -287,6 +298,7 @@ class DailyMoneyReportView(APIView):
                 transactions.append({
                     "date": payment.payment_date.strftime('%d/%m/%Y'),
                     "time": payment.payment_date.strftime('%I.%M%p'),
+                    "datetime_sort": payment.payment_date,
                     "user_name": payment.user.username if payment.user else payment.admin.username if payment.admin else "-",
                     "form_name": "Hearing order",
                     "remark": payment.order.order_remark or "-",
@@ -315,6 +327,7 @@ class DailyMoneyReportView(APIView):
             transactions.append({
                 "date": payment.payment_date.strftime('%d/%m/%Y'),
                 "time": payment.payment_date.strftime('%I.%M%p'),
+                "datetime_sort": payment.payment_date,
                 "user_name": "-",
                 "form_name": "Channel",
                 "remark": payment.appointment.note or "-",
@@ -344,6 +357,7 @@ class DailyMoneyReportView(APIView):
             transactions.append({
                 "date": payment.payment_date.strftime('%d/%m/%Y'),
                 "time": payment.payment_date.strftime('%I.%M%p'),
+                "datetime_sort": payment.payment_date,
                 "user_name": "-",
                 "form_name": "Soldering",
                 "remark": payment.order.note or "-",
@@ -360,19 +374,31 @@ class DailyMoneyReportView(APIView):
         transactions = []
         total = 0
         
+        # Create timezone-aware datetime range for the day (same as other transactions)
+        day_start = timezone.make_aware(datetime.combine(target_date, datetime.min.time()))
+        day_end = timezone.make_aware(datetime.combine(target_date, datetime.max.time()))
+        
         expenses = Expense.objects.filter(
             branch=branch,
-            created_at__date=target_date,
+            created_at__range=(day_start, day_end),
             paid_source=source_type
         ).select_related('main_category', 'sub_category')
         
         for expense in expenses:
-            source_name = "Safe" if source_type == 'safe' else "Cashier"
+            if source_type == 'safe':
+                source_name = "Safe"
+            elif source_type == 'cash':
+                source_name = "Cash"
+            elif source_type == 'bank':
+                source_name = "Bank"
+            else:
+                source_name = source_type.title()
             special_indicator = self._get_special_indicator(False, False, expense.is_refund)
             
             transactions.append({
                 "date": expense.created_at.strftime('%d/%m/%Y'),
                 "time": expense.created_at.strftime('%I.%M%p'),
+                "datetime_sort": expense.created_at,
                 "user_name": "-",
                 "form_name": source_name,
                 "remark": expense.note or "-",
@@ -400,6 +426,7 @@ class DailyMoneyReportView(APIView):
             transactions.append({
                 "date": deposit.date.strftime('%d/%m/%Y'),
                 "time": "-",
+                "datetime_sort": timezone.make_aware(datetime.combine(deposit.date, datetime.min.time())),
                 "user_name": "-",
                 "form_name": "Banking",
                 "remark": deposit.note or "-",
@@ -427,6 +454,7 @@ class DailyMoneyReportView(APIView):
             transactions.append({
                 "date": transaction.date.strftime('%d/%m/%Y'),
                 "time": transaction.created_at.strftime('%I.%M%p'),
+                "datetime_sort": transaction.created_at,
                 "user_name": "-",
                 "form_name": "Safe",
                 "remark": transaction.reason or "-",
@@ -456,6 +484,7 @@ class DailyMoneyReportView(APIView):
             transactions.append({
                 "date": income.date.strftime('%d/%m/%Y'),
                 "time": income.date.strftime('%I.%M%p'),
+                "datetime_sort": income.date,
                 "user_name": "-",
                 "form_name": "Other Income",
                 "remark": income.note or "-",
@@ -464,6 +493,32 @@ class DailyMoneyReportView(APIView):
                 "amount": f"Rs. {int(income.amount)}"
             })
             total += float(income.amount)
+        
+        return {"transactions": transactions, "total": total}
+    
+    def _get_hearing_order_services_flat(self, branch, day_start, day_end):
+        """Get hearing order item services in flat table format"""
+        transactions = []
+        total = 0
+        
+        hearing_services = HearingOrderItemService.objects.filter(
+            order__branch=branch,
+            created_at__range=(day_start, day_end)
+        ).select_related('order', 'order__customer')
+        
+        for service in hearing_services:
+            transactions.append({
+                "date": service.created_at.strftime('%d/%m/%Y'),
+                "time": service.created_at.strftime('%I.%M%p'),
+                "datetime_sort": service.created_at,
+                "user_name": "-",
+                "form_name": "Hearing service",
+                "remark": f"Service Date: {service.scheduled_service_date.strftime('%d/%m/%Y')}" if service.scheduled_service_date else "-",
+                "type": "Save",
+                "special": False,
+                "amount": f"Rs. {int(service.price)}"
+            })
+            total += float(service.price)
         
         return {"transactions": transactions, "total": total}
     
