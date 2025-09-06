@@ -79,6 +79,7 @@ from .views.employee_report_views import EmployeeHistoryReportView
 from .views.banking_views import BankingReportView,ConfirmDepositView
 from .views.customer_report_views import CustomerLocationStatisticsView,CustomerLocationTableView
 from .views.order_feedback import OrderFeedbackCreateView, OrderFeedbackByInvoiceView
+from .views.daily_money_report_view import DailyMoneyReportView
 
 # from .views import CustomAuthToken
 
@@ -317,5 +318,7 @@ urlpatterns = [
     path('order-feedback/by-invoice/', OrderFeedbackByInvoiceView.as_view(), name='order-feedback-by-invoice'),
     path('order-feedback/', OrderFeedbackCreateView.as_view(), name='order-feedback-create'),
     path('refraction/orders/', RefractionOrderView.as_view(), name='refraction-order-list'),
-    ]
-    # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
+    
+    # Daily Money Report
+    path('reports/daily-money/', DailyMoneyReportView.as_view(), name='daily-money-report'),
+]

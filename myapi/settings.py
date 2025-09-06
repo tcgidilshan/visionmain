@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken', 
     'corsheaders',
     'django_filters',
-    'visionmain',
+    #  'visionmain',
 ]
 
 REST_FRAMEWORK = {
