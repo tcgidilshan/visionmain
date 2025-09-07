@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from decimal import Decimal
 from ..services.patient_service import PatientService
-from ..models import SolderingOrder, Branch,SolderingInvoice,SolderingPayment
+from ..models import Patient, SolderingOrder, Branch,SolderingInvoice,SolderingPayment
 from ..serializers import SolderingOrderSerializer, SolderingInvoiceSerializer, SolderingPaymentSerializer
 from ..services.soldering_order_service import SolderingOrderService
 from ..services.soldering_payment_service import SolderingPaymentService
@@ -25,14 +25,24 @@ class CreateSolderingOrderView(APIView):
         data = request.data
 
         # 1. Validate required fields
-        required_fields = ['patient', 'branch_id', 'price', 'payments']
+        required_fields = ['patient_id', 'branch_id', 'price', 'payments']
         for field in required_fields:
             if field not in data:
                 return Response({"error": f"{field} is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # 2. Handle patient creation/updating
-            patient = PatientService.create_or_update_patient(data['patient'])
+            # 2. Hfind patient
+            patient_id = data.get("patient_id")
+            if not patient_id:
+                    return Response({"error": "Patient details are required."}, status=status.HTTP_400_BAD_REQUEST)
+            patient = None
+            if patient_id:
+                    try:
+                        patient = Patient.objects.get(id=patient_id)
+                    except Patient.DoesNotExist:
+                        raise ValueError("Patient with the provided ID does not exist.")
+            else:
+                    raise ValueError("Patient ID is required.")
 
             # 3. Get branch
             branch = get_object_or_404(Branch, id=data['branch_id'])

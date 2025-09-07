@@ -207,7 +207,7 @@ class OrderPaymentService:
                         float(old_payment.amount) != amount or
                         old_payment.payment_method != method or
                         old_payment.transaction_status != txn_status or 
-                        old_payment.payment_method_bank.id != payment_method_bank 
+                        (old_payment.payment_method_bank.id if old_payment.payment_method_bank else None) != payment_method_bank
                     )
                     if changed:
                         # Soft-delete old, create new (keep date)

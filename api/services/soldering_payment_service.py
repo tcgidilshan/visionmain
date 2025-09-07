@@ -1,5 +1,5 @@
 from rest_framework.exceptions import ValidationError
-from ..models import SolderingPayment
+from ..models import SolderingPayment, PaymentMethodBanks
 from decimal import Decimal
 from django.db import models
 
@@ -20,6 +20,13 @@ class SolderingPaymentService:
 
             method = payment.get('payment_method')
             is_final = payment.get('is_final_payment', False)
+            bank_id = payment.get('payment_method_bank')
+            payment_method_bank = None
+            if bank_id:
+                try:
+                    payment_method_bank = PaymentMethodBanks.objects.get(id=bank_id)
+                except PaymentMethodBanks.DoesNotExist:
+                    raise ValidationError("Invalid payment_method_bank ID.")
 
             if is_final:
                 if final_payment_flagged:
@@ -34,7 +41,8 @@ class SolderingPaymentService:
                 payment_method=method,
                 transaction_status=SolderingPayment.TransactionStatus.COMPLETED,
                 is_final_payment=is_final,
-                is_partial=False,  
+                is_partial=False,
+                payment_method_bank=payment_method_bank
             )
 
             payment_instances.append(payment_instance)
@@ -51,7 +59,7 @@ class SolderingPaymentService:
         return payment_instances
 
     @staticmethod
-    def add_repayment(order, amount, payment_method, is_final_payment=False):
+    def add_repayment(order, amount, payment_method, is_final_payment=False, payment_method_bank=None):
         """
         Add a repayment for a soldering order with validation.
         This method now uses DRF's ValidationError to ensure API-friendly errors.
@@ -78,6 +86,13 @@ class SolderingPaymentService:
         ).exists():
             raise ValidationError("A final payment has already been made for this order.")
 
+        bank_instance = None
+        if payment_method_bank:
+            try:
+                bank_instance = PaymentMethodBanks.objects.get(id=payment_method_bank)
+            except PaymentMethodBanks.DoesNotExist:
+                raise ValidationError("Invalid payment_method_bank ID.")
+
         # Create and return the payment instance
         payment = SolderingPayment.objects.create(
             order=order,
@@ -85,8 +100,8 @@ class SolderingPaymentService:
             payment_method=payment_method,
             transaction_status=SolderingPayment.TransactionStatus.COMPLETED,
             is_final_payment=is_final_payment,
-            is_partial=(amount != remaining)
+            is_partial=(amount != remaining),
+            payment_method_bank=bank_instance
         )
         return payment
 
-        

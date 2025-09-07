@@ -1333,7 +1333,13 @@ class SolderingPayment(models.Model):
     order = models.ForeignKey('SolderingOrder', related_name='payments', on_delete=models.CASCADE)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
-
+    payment_method_bank = models.ForeignKey(
+        'PaymentMethodBanks',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='soldering_order_payments'
+    ) 
     objects = SoftDeleteManager()      # Only active payments
     all_objects = models.Manager()     # Include soft-deleted
 

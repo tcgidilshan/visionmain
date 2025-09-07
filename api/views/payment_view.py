@@ -48,7 +48,7 @@ class PaymentView(APIView):
                 return Response({"error": "Payments data is required."}, status=status.HTTP_400_BAD_REQUEST)
 
             # ✅ Process payments using the service function
-            total_payment = OrderPaymentService.update_process_payments(order, payments_data,admin_id,user_id)
+            total_payment = OrderPaymentService.append_on_change_payments_for_order(order, payments_data,admin_id,user_id)
 
             # ✅ Return updated order payment details
             updated_payments = order.orderpayment_set.all()
