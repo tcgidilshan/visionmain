@@ -175,56 +175,19 @@ class SolderingOrderEditView(APIView):
         # --- Payment Handling ---
         payments_data = data.get("payments")
         if payments_data is not None:
-            # //TODO: Implicitly soft-delete payments NOT included in payload
-            ids_in_payload = set()
-            for payment_data in payments_data:
-                payment_id = payment_data.get('id')
-                if payment_id:
-                    ids_in_payload.add(payment_id)
-            # Auto soft-delete all other payments
-            existing_payments = order.payments.filter(is_deleted=False)
-            for payment in existing_payments:
-                if payment.id not in ids_in_payload:
-                    payment.is_deleted = True
-                    payment.save()
-
-            # Now, handle creation and updating
-            seen_ids = set()
-            for payment_data in payments_data:
-                payment_id = payment_data.get('id')
-                # Existing payment: update fields
-                if payment_id:
-                    payment = order.payments.filter(id=payment_id, is_deleted=False).first()
-                    if not payment:
-                        transaction.set_rollback(True)
-                        return Response({"error": f"Payment with id {payment_id} not found."}, status=400)
-                    for field in ['amount', 'payment_method', 'is_final_payment']:
-                        if field in payment_data:
-                            setattr(payment, field, payment_data[field])
-                    payment.save()
-                    seen_ids.add(payment_id)
-                else:
-                    # New payment: create
-                    SolderingPayment.objects.create(
-                        order=order,
-                        amount=payment_data['amount'],
-                        payment_method=payment_data['payment_method'],
-                        transaction_status=SolderingPayment.TransactionStatus.COMPLETED,
-                        is_final_payment=payment_data.get('is_final_payment', False),
-                        is_partial=False,
-                    )
-
-            # --- Business Rule Validation ---
-            non_deleted_payments = order.payments.filter(is_deleted=False)
-            total_paid = sum(Decimal(str(p.amount)) for p in non_deleted_payments)
-            if total_paid > Decimal(str(order.price)):
+            try:
+                # You may want to pass admin_id/user_id from request.user if available
+                admin_id = getattr(request.user, "id", None)
+                user_id = getattr(request.user, "id", None)
+                total_paid = SolderingPaymentService.append_on_change_payments_for_order(
+                    order, payments_data, admin_id, user_id
+                )
+            except ValidationError as e:
                 transaction.set_rollback(True)
-                return Response({"error": "Total payments exceed the order price."}, status=400)
-
-            final_payment_count = non_deleted_payments.filter(is_final_payment=True).count()
-            if final_payment_count > 1:
+                return Response({"error": str(e)}, status=400)
+            except Exception as e:
                 transaction.set_rollback(True)
-                return Response({"error": "Only one final payment is allowed."}, status=400)
+                return Response({"error": f"Payment update failed: {str(e)}"}, status=400)
 
         # --- Output full, up-to-date order ---
         return Response(SolderingOrderSerializer(order).data, status=status.HTTP_200_OK)

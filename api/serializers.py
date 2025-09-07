@@ -929,7 +929,9 @@ class ChannelPaymentSerializer(serializers.ModelSerializer):
             'created_at',  # Auto-generated timestamp for record creation
             'updated_at',  # Auto-generated timestamp for record updates
             'is_edited',
+            'payment_method_bank',
         ]
+    
 class ChannelListSerializer(serializers.ModelSerializer):
     doctor_name = serializers.CharField(source='doctor.name', read_only=True)
     patient_name = serializers.CharField(source='patient.name', read_only=True)

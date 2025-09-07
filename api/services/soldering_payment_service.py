@@ -1,7 +1,7 @@
+from ..models import SolderingPayment, SolderingOrder
+from ..serializers import SolderingPaymentSerializer
 from rest_framework.exceptions import ValidationError
-from ..models import SolderingPayment, PaymentMethodBanks
-from decimal import Decimal
-from django.db import models
+from django.db import transaction
 
 class SolderingPaymentService:
     @staticmethod
@@ -104,4 +104,101 @@ class SolderingPaymentService:
             payment_method_bank=bank_instance
         )
         return payment
+
+    @staticmethod
+    @transaction.atomic
+    def append_on_change_payments_for_order(order, payments_data, admin_id, user_id):
+        """
+        Medical-compliant payment update with append-on-change logic for SolderingOrder.
+        1. For each payment in input:
+            - If id provided, check if data changed.
+                - If changed: soft-delete old, create new (copying date).
+                - If not changed: skip.
+            - If no id: create new.
+        2. Soft-delete any DB payments not referenced in input.
+        """
+        db_payments = {p.id: p for p in order.payments.filter(is_deleted=False)}
+        seen_payment_ids = set()
+        total_paid = 0
+        payment_records = []
+
+        for i, payment in enumerate(payments_data):
+            payment_id = payment.get("id")
+            amount = float(payment.get('amount', 0))
+            method = payment.get('payment_method')
+            txn_status = payment.get('transaction_status', SolderingPayment.TransactionStatus.COMPLETED)
+            payment_method_bank = payment.get('payment_method_bank', None)
+
+            if amount <= 0:
+                raise ValidationError(f"Payment #{i+1}: Amount must be greater than 0.")
+            if not method:
+                raise ValidationError(f"Payment #{i+1}: payment_method is required.")
+
+            if payment_id:
+                old_payment = db_payments.get(payment_id)
+                if old_payment:
+                    seen_payment_ids.add(payment_id)
+                    changed = (
+                        float(old_payment.amount) != amount or
+                        old_payment.payment_method != method or
+                        old_payment.transaction_status != txn_status or 
+                        (old_payment.payment_method_bank.id if old_payment.payment_method_bank else None) != payment_method_bank
+                    )
+                    if changed:
+                        old_payment.is_deleted = True
+                        old_payment.deleted_at = old_payment.payment_date
+                        old_payment.save(update_fields=['is_deleted', 'deleted_at'])
+                        payment_data = {
+                            "order": order.id,
+                            "amount": amount,
+                            "payment_method": method,
+                            "transaction_status": txn_status,
+                            "payment_date": old_payment.payment_date,
+                            "is_partial": False,
+                            "is_final_payment": False,
+                            "payment_method_bank": payment_method_bank,
+                        }
+                        payment_serializer = SolderingPaymentSerializer(data=payment_data)
+                        payment_serializer.is_valid(raise_exception=True)
+                        new_payment = payment_serializer.save()
+                        payment_records.append(new_payment)
+                        total_paid += amount
+                    else:
+                        payment_records.append(old_payment)
+                        total_paid += float(old_payment.amount)
+                else:
+                    raise ValidationError(f"Payment id {payment_id} not found for this order.")
+            else:
+                payment_data = {
+                    "order": order.id,
+                    "amount": amount,
+                    "payment_method": method,
+                    "transaction_status": txn_status,
+                    "is_partial": False,
+                    "is_final_payment": False,
+                    "payment_method_bank": payment_method_bank,
+                }
+                payment_serializer = SolderingPaymentSerializer(data=payment_data)
+                payment_serializer.is_valid(raise_exception=True)
+                new_payment = payment_serializer.save()
+                payment_records.append(new_payment)
+                total_paid += amount
+
+        for db_id, db_pmt in db_payments.items():
+            if db_id not in seen_payment_ids:
+                db_pmt.is_deleted = True
+                db_pmt.deleted_at = db_pmt.payment_date
+                db_pmt.save(update_fields=['is_deleted', 'deleted_at'])
+
+        running_total = 0
+        for p in payment_records:
+            running_total += float(p.amount)
+            p.is_final_payment = (round(running_total, 2) == round(float(order.price), 2))
+            p.is_partial = (running_total < float(order.price))
+            p.save()
+
+        if round(total_paid, 2) > round(float(order.price), 2):
+            raise ValidationError("Total payments exceed the order price. No payments saved.")
+
+        return total_paid
 

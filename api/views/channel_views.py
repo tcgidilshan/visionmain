@@ -94,6 +94,7 @@ class ChannelAppointmentView(APIView):
                     "appointment": appointment.id,
                     "amount": payment['amount'],
                     "payment_method": payment['payment_method'],
+                    "payment_method_bank": payment.get('payment_method_bank'),
                     "is_final": False
                 }
                 total_paid += payment['amount']
@@ -319,16 +320,16 @@ class ChannelUpdateView(APIView):
                 appointment.time.strftime("%H:%M:%S") != data['time'] or
                 appointment.branch_id != int(data['branch_id'])
             )
-            print({
-                "appointment.doctor_id": appointment.doctor_id,
-                "data['doctor_id']": data['doctor_id'],
-                "appointment.date": appointment.date,
-                "data['channel_date']": data['channel_date'],
-                "appointment.time": appointment.time,
-                "data['time']": data['time'],
-                "appointment.branch_id": appointment.branch_id,
-            })
-            print("schedule_changed",schedule_changed)
+            # print({
+            #     "appointment.doctor_id": appointment.doctor_id,
+            #     "data['doctor_id']": data['doctor_id'],
+            #     "appointment.date": appointment.date,
+            #     "data['channel_date']": data['channel_date'],
+            #     "appointment.time": appointment.time,
+            #     "data['time']": data['time'],
+            #     "appointment.branch_id": appointment.branch_id,
+            # })
+            # print("schedule_changed",schedule_changed)
             if schedule_changed:
                 # Only try to get/create new schedule if details are actually changing
                 new_schedule, created = Schedule.objects.get_or_create(
@@ -398,6 +399,7 @@ class ChannelUpdateView(APIView):
                 payment_id = payment.get('id')
                 amount = payment['amount']
                 payment_method = payment['payment_method']
+                payment_method_bank = payment.get('payment_method_bank')
                 
                 if payment_id and payment_id in existing_payment_dict:
                     # Existing payment - check if data changed
@@ -407,7 +409,8 @@ class ChannelUpdateView(APIView):
                     # Compare payment data to detect changes
                     payment_changed = (
                         float(existing_payment.amount) != float(amount) or
-                        existing_payment.payment_method != payment_method
+                        existing_payment.payment_method != payment_method or
+                        (existing_payment.payment_method_bank.id if existing_payment.payment_method_bank else None) != payment_method_bank
                     )
                     
                     if payment_changed:
@@ -421,6 +424,7 @@ class ChannelUpdateView(APIView):
                             "appointment": appointment.id,
                             "amount": amount,
                             "payment_method": payment_method,
+                            "payment_method_bank": payment_method_bank,
                             "is_final": False
                         }
                         payment_serializer = ChannelPaymentSerializer(data=payment_data)
@@ -438,6 +442,7 @@ class ChannelUpdateView(APIView):
                         "appointment": appointment.id,
                         "amount": amount,
                         "payment_method": payment_method,
+                        "payment_method_bank": payment_method_bank,
                         "is_final": False
                     }
                     payment_serializer = ChannelPaymentSerializer(data=payment_data)

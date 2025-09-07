@@ -1022,7 +1022,7 @@ class Schedule(models.Model):
         self.save()
 
     class Meta:
-        unique_together = ('doctor', 'branch', 'date', 'start_time','status') 
+        unique_together = ('doctor', 'branch', 'date', 'start_time','status','is_deleted') 
 
     def __str__(self):
         return f"{self.doctor} - {self.date} ({self.start_time}) - {self.status}"
@@ -1111,7 +1111,14 @@ class ChannelPayment(models.Model):
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
     is_edited = models.BooleanField(default=False)
-
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    payment_method_bank = models.ForeignKey(
+        'PaymentMethodBanks',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='channel_order_payments'
+    ) 
     objects = SoftDeleteManager()      # Only active records
     all_objects = models.Manager() 
 
