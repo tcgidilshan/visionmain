@@ -64,7 +64,7 @@ from .order_feedback import OrderFeedbackCreateView
 from .lens_history_report_view import LensHistoryReportView
 from .hearing_view import HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView
 from .order_hearing_view import HearingOrderCreateView,HearingOrderUpdateView
-from .hearing_order_report_view import HearingOrderReportView,HearingOrderReminderReportView
+from .hearing_order_report_view import HearingOrderReportView,HearingOrderReminderReportView,HearingOrderReportByOrderDateView
 from .order_item_view import OrderItemUpdateView
 from .hearing_order_service_view import HearingOrderServiceView
 from .reset_auth_data import RestPasswordView,ResetPasswordConfirmView
