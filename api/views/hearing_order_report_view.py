@@ -58,7 +58,7 @@ class HearingOrderReportView(APIView):
             if search_filters:
                 invoices = invoices.filter(search_filters)
             
-            # Create a Q object for the next_service_date filter
+            # Create a Q object for the next_service_date filterw
             date_filters = Q()
             if start_datetime and end_datetime:
                 date_filters &= Q(order__order_items__next_service_date__range=(start_datetime.date(), end_datetime.date()))

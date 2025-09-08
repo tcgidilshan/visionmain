@@ -185,7 +185,7 @@ urlpatterns = [
     path('hearing-items/<int:pk>/', HearingItemRetrieveUpdateDeleteView.as_view(), name='hearing-item-detail'),
     path('hearing-orders/', HearingOrderCreateView.as_view(), name='hearing-order-create'),
     path('hearing-orders/<int:pk>/', HearingOrderUpdateView.as_view(), name='hearing-order-update'),
-    path('hearing-report/invoice/', HearingOrderReportView.as_view(), name='hearing-order-report'),
+    path('hearing-report/invoice/upcoming/', HearingOrderReportView.as_view(), name='hearing-order-report'),
     path('hearing-report/reminder/', HearingOrderReminderReportView.as_view(), name='hearing-reminder-report'),
     path('hearing-orders/service/', HearingOrderServiceView.as_view(), name='hearing-order-service'),
 
