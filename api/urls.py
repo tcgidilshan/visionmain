@@ -73,7 +73,7 @@ from .views import (
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
     LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
     RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
-    HearingOrderReportByOrderDateView
+    HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -310,6 +310,7 @@ urlpatterns = [
     path('reports/best-customers/', BestCustomersReportView.as_view(), name='best-customers-report'),
     path('reports/employee-history/', EmployeeHistoryReportView.as_view(), name='employee-history-report'),
     path('reports/payment-method/', PaymentSummaryReportView.as_view(), name='payment-summary-report'),
+    path('reports/payment-method/banking/', OrderPaymentBankReportViewSet.as_view(), name='payment-summary-report-detail'),
     path('banking-report/', BankingReportView.as_view(), name='banking-report'),
     # 2. Banking confirm action endpoint
     path('banking-report/confirm/<int:deposit_id>/', ConfirmDepositView.as_view(), name='confirm-deposit'),

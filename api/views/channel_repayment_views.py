@@ -21,6 +21,7 @@ class ChannelRepaymentView(APIView):
                         appointment=appointment,
                         amount=payment_data.get('amount'),
                         method=payment_data['payment_method'],
+                        payment_method_bank=payment_data.get('payment_method_bank')  # Use .get() instead of direct access
                     )
 
                     results.append({

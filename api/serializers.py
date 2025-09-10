@@ -1321,6 +1321,7 @@ class SingleRepaymentSerializer(serializers.Serializer):
     appointment_id = serializers.IntegerField()
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     payment_method = serializers.ChoiceField(choices=ChannelPayment.PAYMENT_METHOD_CHOICES)
+    payment_method_bank = serializers.IntegerField(allow_null=True, required=False)  # Add this line
     is_final = serializers.BooleanField(required=False, default=False)
 
 class MultipleRepaymentSerializer(serializers.Serializer):

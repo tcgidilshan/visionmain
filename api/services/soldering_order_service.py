@@ -1,10 +1,17 @@
 from django.utils import timezone
 from django.core.exceptions import ValidationError
-from ..models import SolderingOrder  # adjust path as needed
-
+from decimal import Decimal
+from ..models import SolderingOrder, SolderingPayment
+from django.db import models
 class SolderingOrderService:
     @staticmethod
-    def create_order(*, patient, branch, price, note="", progress_status=None,status=None,):
+    def create_order(*, patient, branch, price, note="", progress_status=None, status=None):
+        # Convert price to Decimal if it's not already
+        try:
+            price = Decimal(str(price))
+        except (ValueError, TypeError) as e:
+            raise ValidationError(f"Invalid price format: {str(e)}")
+        
         if price < 0:
             raise ValidationError("Price must be greater than or equal to 0.")
 
@@ -20,12 +27,6 @@ class SolderingOrderService:
 
         return order
 
-# services/soldering_payment_service.py
-
-from ..models import SolderingOrder, SolderingPayment
-from decimal import Decimal
-from django.core.exceptions import ValidationError
-from django.db import models
 
 class SolderingPaymentService:
     # ...other methods...

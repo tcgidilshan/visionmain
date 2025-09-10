@@ -59,7 +59,7 @@ class LoginView(APIView):
                 httponly=True,
                 secure=True,  # Set to True in production
                 samesite="None",
-                max_age=60*60*24  # 1 day
+                max_age=60*60*24*30  # 1 day
             )
             
             response.set_cookie(
@@ -68,7 +68,7 @@ class LoginView(APIView):
                 httponly=True,
                 secure=True,  # Set to True in production
                 samesite="None",
-                max_age=60*60*24*7  # 7 days
+                max_age=60*60*24*30  # 7 days
             )
             
             return response

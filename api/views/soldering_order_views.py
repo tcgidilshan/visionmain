@@ -3,7 +3,6 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from decimal import Decimal
 from ..services.patient_service import PatientService
 from ..models import Patient, SolderingOrder, Branch,SolderingInvoice,SolderingPayment
 from ..serializers import SolderingOrderSerializer, SolderingInvoiceSerializer, SolderingPaymentSerializer
@@ -51,7 +50,7 @@ class CreateSolderingOrderView(APIView):
             order = SolderingOrderService.create_order(
                 patient=patient,
                 branch=branch,
-                price=Decimal(str(data['price'])),
+                price=data.get('price'),
                 note=data.get('note', ''),
                 progress_status=data.get('progress_status', SolderingOrder.ProgressStatus.RECEIVED_FROM_CUSTOMER),
             )

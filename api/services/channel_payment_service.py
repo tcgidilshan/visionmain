@@ -7,9 +7,10 @@ from ..models import Appointment
 from ..models import Expense
 from ..serializers import ExpenseSerializer
 from django.db.models import Sum
+from ..models import PaymentMethodBanks
 class ChannelPaymentService:
     @staticmethod
-    def create_repayment(appointment, amount, method):
+    def create_repayment(appointment, amount, method, payment_method_bank=None):
         # Prevent if already finalized
         if appointment.payments.filter(is_final=True).exists():
             raise ValueError("Final payment has already been made.")
@@ -26,12 +27,24 @@ class ChannelPaymentService:
         total_paid = appointment.get_total_paid() + Decimal(str(amount))
         is_final = total_paid >= appointment.amount
 
+        # Convert payment_method_bank ID to instance if needed
+        bank_instance = None
+        if payment_method_bank:
+            try:
+                bank_instance = PaymentMethodBanks.objects.get(id=payment_method_bank)
+            except PaymentMethodBanks.DoesNotExist:
+                bank_instance = None
+
+        print("Bank instance:", bank_instance)
+        print("Raw payment_method_bank value:", payment_method_bank)
+
         # Save payment
         payment = ChannelPayment.objects.create(
             appointment=appointment,
             amount=amount,
             payment_method=method,
-            is_final=is_final
+            is_final=is_final,
+            payment_method_bank=bank_instance
         )
 
         if is_final:
