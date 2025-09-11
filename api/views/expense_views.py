@@ -16,6 +16,7 @@ from rest_framework import status
 from django.db import transaction
 from decimal import Decimal
 from ..services.time_zone_convert_service import TimezoneConverterService
+from django.utils import timezone
 
 # ---------- Main Category Views ----------
 class ExpenseMainCategoryListCreateView(generics.ListCreateAPIView):
@@ -175,3 +176,43 @@ class ExpenseUpdateView(APIView):
 class ExpenseRetrieveView(generics.RetrieveAPIView):
     queryset = Expense.objects.all()
     serializer_class = ExpenseSerializer
+
+class ExpenceCashReturn(APIView):
+    def patch(self, request, pk):
+        try:
+            expense = Expense.objects.get(pk=pk)
+        except Expense.DoesNotExist:
+            return Response({"error": "Expense not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = ExpenseSerializer(expense, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            cash_return = serializer.validated_data.get('cash_return')
+            cash_return_date = timezone.now()  # Use now if not provided
+
+            if cash_return is None or cash_return <= 0:
+                return Response({"error": "Invalid cash return amount."}, status=status.HTTP_400_BAD_REQUEST)
+
+            if cash_return > expense.amount:
+                return Response({"error": "Cash return cannot exceed the original expense amount."}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                with transaction.atomic():
+                    expense.cash_return = cash_return
+                    expense.cash_return_date = cash_return_date
+                    expense.save()
+
+                    SafeService.record_transaction(
+                        branch=expense.branch,
+                        amount=cash_return,
+                        transaction_type='income',
+                        reason=f"Cash return for: {expense.main_category.name} - {expense.sub_category.name}",
+                        reference_id=f"expense-cash-return-{expense.id}"
+                    )
+
+                    return Response(ExpenseSerializer(expense).data, status=status.HTTP_200_OK)
+
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -73,7 +73,7 @@ from .views import (
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
     LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
     RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
-    HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet
+    HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceCashReturn
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -269,6 +269,7 @@ urlpatterns = [
 
     path('expenses/<int:pk>/update/', ExpenseUpdateView.as_view(), name='expense-update'),
     path('expenses/<int:pk>/', ExpenseRetrieveView.as_view(), name='expense-detail'),
+    path('expense/<int:pk>/cash-return/', ExpenceCashReturn.as_view(), name='expense-cash-return'),
 
     #bus
     path('bus/title/', BusSystemSettingListCreateView.as_view(), name='bus-system-title-list-create'),
