@@ -1196,7 +1196,9 @@ class ExpenseReportSerializer(serializers.ModelSerializer):
             'amount',
             'note',
             'paid_from_safe',
-            'is_refund'
+            'is_refund',
+            'cash_return',
+            'cash_return_date'
         ]
 
 class OtherIncomeCategorySerializer(serializers.ModelSerializer):
@@ -1614,6 +1616,7 @@ class PatientRefractionDetailOrderSerializer(serializers.ModelSerializer):
     patient = PatientSerializer(source='customer', read_only=True)
     invoice_number = serializers.SerializerMethodField()
     total_paid = serializers.SerializerMethodField()
+    invoice_type = serializers.CharField(source='invoice.invoice_type', read_only=True)
 
     class Meta:
         model = Order
@@ -1625,7 +1628,8 @@ class PatientRefractionDetailOrderSerializer(serializers.ModelSerializer):
             'total_price',
             'order_date',
             'refraction',
-            'total_paid'
+            'total_paid',
+            'invoice_type'
         ]
 
     def get_invoice_number(self, obj):

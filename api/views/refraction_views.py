@@ -227,14 +227,14 @@ class RefractionOrderView(APIView):
         try:
             # Get orders with refraction for the specified patient
             orders = Order.objects.filter(
-                refraction__isnull=False,
                 customer_id=patient_id
             ).select_related(
                 'refraction', 
                 'customer', 
                 'invoice',
                 'refraction__refraction_details',
-                'refraction__refraction_details__user'
+                'refraction__refraction_details__user',
+                
             ).order_by('-order_date')  # Order by most recent first
             
             # Use the new serializer

@@ -87,16 +87,25 @@ class ExpenseReportView(APIView):
             ).order_by('-created_at')
 
             total = queryset.aggregate(total_expense=Sum('amount'))['total_expense'] or 0
+            totalCashReturn = queryset.aggregate(cash_return=Sum('cash_return'))['cash_return'] or 0
+
             cash_total = queryset.filter(paid_source='cash').aggregate(cash_total=Sum('amount'))['cash_total'] or 0
+            cash_total_return = queryset.filter(paid_source='cash').aggregate(cash_total_return=Sum('cash_return'))['cash_total_return'] or 0
+
+
             safe_total = queryset.filter(paid_source='safe').aggregate(safe_total=Sum('amount'))['safe_total'] or 0
+            safe_total_return = queryset.filter(paid_source='safe').aggregate(safe_total_return=Sum('cash_return'))['safe_total_return'] or 0
+
             bank_total = queryset.filter(paid_source='bank').aggregate(bank_total=Sum('amount'))['bank_total'] or 0
-            
+            bank_total_return = queryset.filter(paid_source='bank').aggregate(bank_total_return=Sum('cash_return'))['bank_total_return'] or 0
+
+            print(totalCashReturn)
             return Response({
-                "total_expense": total,
-                "cash_expense_total": cash_total,
-                "safe_expense_total": safe_total,
-                "bank_expense_total": bank_total,
-                "subtotal_expense": total,  
+                "total_expense": total-totalCashReturn,
+                "cash_expense_total": cash_total-cash_total_return,
+                "safe_expense_total": safe_total-safe_total_return,
+                "bank_expense_total": bank_total-bank_total_return,
+                "subtotal_expense": total,
                 "expenses": ExpenseReportSerializer(queryset, many=True).data
             })
 
