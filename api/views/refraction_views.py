@@ -1,7 +1,7 @@
 from rest_framework import generics, permissions, status, filters
 from rest_framework.response import Response
-from ..models import Refraction, Patient, Order
-from ..serializers import RefractionSerializer, PatientRefractionDetailOrderSerializer
+from ..models import Refraction, Patient, Order,Appointment,SolderingInvoice
+from ..serializers import RefractionSerializer, PatientRefractionDetailOrderSerializer,AppointmentSerializer,SolderingInvoiceSerializer
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
 from django.db.models import Q
@@ -237,11 +237,39 @@ class RefractionOrderView(APIView):
                 
             ).order_by('-order_date')  # Order by most recent first
             
+            # Get appointments/channels for the specified patient
+            appointments = Appointment.objects.filter(
+                patient_id=patient_id,
+                is_deleted=False
+            ).select_related(
+                'doctor',
+                'patient',
+                'branch',
+                'schedule'
+            ).prefetch_related('payments').order_by('-created_at')
+             # Get soldering invoices for the specified patient
+            # Get soldering invoices for the specified patient
+            soldering_invoices = SolderingInvoice.objects.filter(
+                order__patient_id=patient_id,  # SolderingInvoice -> order (SolderingOrder) -> patient
+                is_deleted=False
+            ).select_related(
+                'order',           # SolderingOrder
+                'order__patient',  # Patient through SolderingOrder
+                'order__branch'    # Branch through SolderingOrder
+            ).order_by('-invoice_date')  # Changed from created_at to invoice_date since that's the field in SolderingInvoice
+            # AppointmentSerializer use this and return data 
+            appointment_serializer = AppointmentSerializer(appointments, many=True)
+            appointment_data = appointment_serializer.data
+            return Response({
+                "orders": PatientRefractionDetailOrderSerializer(orders, many=True).data,
+                "appointments": appointment_data,
+                "soldering_invoices": SolderingInvoiceSerializer(soldering_invoices, many=True).data
+            })
             # Use the new serializer
-            paginator=PaginationService()
-            page = paginator.paginate_queryset(orders, request, view=self)
-            serializer = PatientRefractionDetailOrderSerializer(page, many=True)
-            return paginator.get_paginated_response(serializer.data)
+            # paginator=PaginationService()
+            # page = paginator.paginate_queryset(orders, request, view=self)
+            # serializer = PatientRefractionDetailOrderSerializer(page, many=True)
+            # return paginator.get_paginated_response(serializer.data)
             
         except Exception as e:
             import traceback
