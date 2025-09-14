@@ -344,7 +344,7 @@ class FrameStockHistorySerializer(serializers.ModelSerializer):
             'action', 'quantity_changed', 'timestamp',
             'branch', 'transfer_to'
         ]
-
+    
 
 class LensStockHistorySerializer(serializers.ModelSerializer):
     lens_id = serializers.IntegerField(source='lens.id', read_only=True)

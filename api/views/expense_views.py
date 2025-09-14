@@ -10,7 +10,6 @@ from ..services.safe_service import SafeService
 from django.db.models import Sum
 from django.utils.dateparse import parse_date
 from django.db import transaction
-from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction

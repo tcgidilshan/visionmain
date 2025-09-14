@@ -1,13 +1,14 @@
 from rest_framework import generics, filters
 from rest_framework.response import Response
-from ..models import FrameStockHistory, FrameStock,OrderItem,Branch
+from ..models import FrameStockHistory, FrameStock,OrderItem,Branch,Frame
 from ..serializers import FrameStockHistorySerializer
 from ..services.pagination_service import PaginationService
 from django.db.models import Sum, Q, Min, Max
 from datetime import datetime
 from django.utils import timezone
 from django.conf import settings
-
+from rest_framework.views import APIView
+from ..services.time_zone_convert_service import TimezoneConverterService
 class FrameHistoryReportView(generics.ListAPIView):
     pagination_class = PaginationService
     serializer_class = FrameStockHistorySerializer
@@ -75,411 +76,157 @@ class FrameHistoryReportView(generics.ListAPIView):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
-class FrameSaleReportView(generics.ListAPIView):
-    serializer_class = FrameStockHistorySerializer
-    
-    def get_queryset(self):
-       
-        # Get query parameters
-        store_id = self.request.query_params.get('store_branch_id')
-        date_start = self.request.query_params.get('date_start')
-        date_end = self.request.query_params.get('date_end')
+class FrameSaleReportView(APIView):
+    def get(self, request, *args, **kwargs):
+        store_branch_id = request.query_params.get('store_branch_id')
+        date_start = request.query_params.get('date_start')
+        date_end = request.query_params.get('date_end')
+        if not store_branch_id:
+            return Response({'error': 'store_branch_id is missing'}, status=400)
 
-        #no store id provided return error not id found
+        start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(date_start, date_end)
+        if not start_datetime or not end_datetime:
+            return Response({'error': 'Invalid date format'}, status=400)
 
-        if not store_id:\
-            #no store id provided return error not id found
-
-            return
+        # Get all frames for this branch (only the ones initialized in this branch)
+        frames = Frame.objects.filter(initial_branch_id=store_branch_id).select_related(
+            'brand', 'code', 'color'
+        )
+        frame_ids = [frame.id for frame in frames]
+        
+        # Create lookup dictionaries for quick access
+        frame_dict = {frame.id: frame for frame in frames}
+        
+        # Get all branches
+        all_branches = Branch.objects.all()
+        branch_dict = {branch.id: branch for branch in all_branches}
+        
+        # Get current stock levels for these frames from FrameStock
+        current_stocks = FrameStock.objects.filter(
+            frame_id__in=frame_ids
+        ).values('frame_id', 'branch_id', 'qty')
+        
+        # Group stocks by frame_id and branch_id
+        stock_by_frame_branch = {}
+        for stock in current_stocks:
+            frame_id = stock['frame_id']
+            branch_id = stock['branch_id']
+            qty = stock['qty']
             
-        store_branch_id = store_id
-            
-        # Convert date strings to datetime objects with proper timezone handling
-        try:
-            # Parse dates as naive datetimes first
-            start_date = datetime.strptime(date_start, '%Y-%m-%d')
-            end_date = datetime.strptime(date_end, '%Y-%m-%d')
-            
-            # Make end_date include the entire day
-            end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-            
-            # Only make timezone aware if USE_TZ is True in settings
-            if getattr(settings, 'USE_TZ', False):
-                if timezone.is_naive(start_date):
-                    start_date = timezone.make_aware(start_date)
-                if timezone.is_naive(end_date):
-                    end_date = timezone.make_aware(end_date)
+            if frame_id not in stock_by_frame_branch:
+                stock_by_frame_branch[frame_id] = {}
                 
-            print(f"DEBUG: Parsed date range - Start: {start_date}, End: {end_date}")
-                
-        except (ValueError, TypeError) as e:
-            print(f"ERROR: Invalid date format - {e}")
-            return FrameStock.objects.none()
+            stock_by_frame_branch[frame_id][branch_id] = qty
+        
+        # Get total stock by frame
+        total_stock_by_frame = {}
+        store_stock_by_frame = {}
+        other_stock_by_frame = {}
+        
+        for frame_id, branch_stocks in stock_by_frame_branch.items():
+            total = sum(branch_stocks.values())
+            store_qty = branch_stocks.get(int(store_branch_id), 0)
+            other_qty = total - store_qty
             
-        # Get frame stock history up to the end date
-        # Get all frame stock history up to the end date
-        stock_history = FrameStockHistory.objects.filter(
-            timestamp__lte=end_date
-        )
+            total_stock_by_frame[frame_id] = total
+            store_stock_by_frame[frame_id] = store_qty
+            other_stock_by_frame[frame_id] = other_qty
         
-        # First, get all frames that have stock in the specified store (qty >= 0)
-        frame_ids_in_store = FrameStock.objects.filter(
-            branch_id=store_branch_id,
-            qty__gte=0  # Include frames with zero quantity
-        ).values_list('frame_id', flat=True).distinct()
-        
-        # print(f"\n=== DEBUG: Frames in store {store_branch_id} (qty >= 0): {list(frame_ids_in_store)}")
-        
-        # Get frame details for all frames in the store (including zero quantity)
-        frame_details = FrameStock.objects.filter(
-            branch_id=store_branch_id,
-            frame_id__in=frame_ids_in_store
-        ).select_related('frame__brand', 'frame__code', 'frame__color')
-        
-        # Calculate store stocks for these frames
-        store_stocks = stock_history.filter(
-            branch_id=store_branch_id,
-            frame_id__in=frame_ids_in_store
-        ).values('frame').annotate(
-            qty=Sum('quantity_changed')
-        )
-        
-        # Debug: Print frame details being processed
-        # print("\n=== DEBUG: Frame Details ===")
-        # print(f"Total frames with stock > 0 in store {store_branch_id}: {frame_details.count()}")
-        # for stock in frame_details:
-        #     print(f"  - Frame ID: {stock.frame_id}, Qty: {stock.qty}, Branch: {stock.branch_id}")
-        
-        # Create a mapping of frame_id to frame details
-        frame_details_dict = {}
-        for stock in frame_details:
-            if stock.frame_id not in frame_details_dict:  # Only keep the first occurrence
-                frame_details_dict[stock.frame_id] = stock.frame
-        
-        # print(f"DEBUG: Processed frame_details_dict: {list(frame_details_dict.keys())}")
-        
-        # Calculate stock levels for the store branch
-        current_branch_stocks = stock_history.filter(
-            branch_id=store_branch_id,
-            frame_id__in=frame_details_dict.keys()  # Only include frames that exist in the store
-        ).values('frame').annotate(
-            current_branch_qty=Sum('quantity_changed')
-        )
-        current_branch_dict = {
-            item['frame']: max(0, item['current_branch_qty'])  # Ensure non-negative
-            for item in current_branch_stocks
-        }
-        print(f"DEBUG: current_branch_dict: {current_branch_dict}")
-        
-        # Calculate stock levels for all other branches
-        other_branches_stocks = stock_history.filter(
-            ~Q(branch_id=store_branch_id)
-        ).values('frame').annotate(
-            total_other_qty=Sum('quantity_changed')
-        )
-        
-        # Get sold quantities for each frame per branch in the specified date range
-        print(f"\n=== DEBUG: Fetching sold quantities from {start_date} to {end_date} for store: {store_branch_id}")
-        
-        # Debug: Print the exact query being executed
-        print(f"DEBUG: Sales query date range: {start_date} to {end_date}")
-        
-        # Debug: Check if there are any OrderItems at all
-        total_order_items = OrderItem.objects.filter(frame__isnull=False).count()
-        print(f"DEBUG: Total OrderItems with frames: {total_order_items}")
-        
-        # Debug: Check if there are any OrderItems in the date range
-        date_range_items = OrderItem.objects.filter(
-            order__order_date__gte=start_date,
-            order__order_date__lte=end_date,
-            frame__isnull=False
-        ).count()
-        print(f"DEBUG: OrderItems in date range: {date_range_items}")
-        
-        # Debug: Print the actual date range of orders in the system
-        date_range = OrderItem.objects.filter(
-            frame__isnull=False
-        ).aggregate(
-            min_date=Min('order__order_date'),
-            max_date=Max('order__order_date')
-        )
-        print(f"DEBUG: System order date range: {date_range['min_date']} to {date_range['max_date']}")
-        
-        # Debug: Check the actual query being executed
-        print(f"DEBUG: Querying sales from {start_date} to {end_date}")
-        
-        # Use direct datetime comparison instead of __date__range to avoid timezone issues
-        sold_quantities = OrderItem.objects.filter(
-            order__order_date__gte=start_date,
-            order__order_date__lte=end_date,
-            frame__isnull=False,
+        # Get sold quantities within date range by branch
+        sold_items = OrderItem.objects.filter(
+            frame_id__in=frame_ids,
             is_deleted=False,
-            order__is_deleted=False,
-            order__is_refund=False
-        ).values('frame', 'order__branch').annotate(
-            total_sold=Sum('quantity')
-        )
+            created_at__gte=start_datetime,
+            created_at__lte=end_datetime
+        ).values('frame_id', 'order__branch_id').annotate(sold_count=Sum('quantity'))
         
-        # Debug: Print the raw SQL query
-        print(f"DEBUG: Raw SQL Query: {sold_quantities.query}")
-        
-        results = list(sold_quantities)
-        print(f"DEBUG: Raw sold quantities query results: {results}")
-        
-        # Debug: Print sample order dates to verify the range
-        if not results:
-            print("\n=== DEBUG: No sales found in the specified date range. Checking for any sales data...")
-            sample_sales = OrderItem.objects.filter(
-                frame__isnull=False,
-                is_deleted=False,
-                order__is_deleted=False,
-                order__is_refund=False
-            ).select_related('order').order_by('-order__order_date')[:5]
+        # Group sold quantities by frame_id and branch_id
+        sold_by_frame_branch = {}
+        for item in sold_items:
+            frame_id = item['frame_id']
+            branch_id = item['order__branch_id']
+            count = item['sold_count'] or 0
             
-            if sample_sales.exists():
-                print("DEBUG: Sample of recent sales (most recent first):")
-                for item in sample_sales:
-                    print(f"  - Order {item.order.id} on {item.order.order_date}: "
-                          f"Frame {item.frame_id}, Qty: {item.quantity}")
-            else:
-                print("DEBUG: No sales records found in the system at all.")
+            if frame_id not in sold_by_frame_branch:
+                sold_by_frame_branch[frame_id] = {}
+                
+            sold_by_frame_branch[frame_id][branch_id] = count
         
-        # Convert to dictionary for faster lookup
-        sold_quantities_dict = {}
-        for item in sold_quantities:
-            if item['total_sold']:
-                frame_id = str(item['frame'])  # Ensure frame_id is string for consistent lookup
-                branch_id = int(item['order__branch'])  # Convert branch_id to int for consistent comparison
-                if frame_id not in sold_quantities_dict:
-                    sold_quantities_dict[frame_id] = {}
-                sold_quantities_dict[frame_id][branch_id] = item['total_sold']
+        # Calculate total sold by frame
+        sold_by_frame = {}
+        for frame_id, branch_sales in sold_by_frame_branch.items():
+            sold_by_frame[frame_id] = sum(branch_sales.values())
         
-        # Calculate other branches quantity
-        other_branches_stocks = stock_history.filter(
-            ~Q(branch_id=store_branch_id)
-        ).values('frame').annotate(
-            total_other_qty=Sum('quantity_changed')
-        )
+        # Get received stock (transfers to branch from store)
+        received_stock = FrameStockHistory.objects.filter(
+            frame_id__in=frame_ids,
+            branch_id=store_branch_id,
+            action='transfer',
+            timestamp__gte=start_datetime,
+            timestamp__lte=end_datetime
+        ).values('frame_id', 'transfer_to_id').annotate(received_count=Sum('quantity_changed'))
         
-        other_branches_dict = {
-            item['frame']: item['total_other_qty'] 
-            for item in other_branches_stocks
-        }
+        # Group received stock by frame_id and branch_id
+        received_by_frame_branch = {}
+        for item in received_stock:
+            frame_id = item['frame_id']
+            branch_id = item['transfer_to_id']
+            count = item['received_count'] or 0
+            
+            if frame_id not in received_by_frame_branch:
+                received_by_frame_branch[frame_id] = {}
+                
+            received_by_frame_branch[frame_id][branch_id] = count
         
-        # print(f"DEBUG: Processed sold_quantities_dict: {sold_quantities_dict}")
-        # print(f"DEBUG: other_branches_dict: {other_branches_dict}")
-        # print(f"DEBUG: Total frames with sales: {len(sold_quantities_dict)}")
-        
-        # Debug: Print frame_ids we're processing
-        frame_ids = list(frame_details_dict.keys())
-        # print(f"DEBUG: Processing {len(frame_ids)} frames. First 5 frame IDs: {frame_ids[:5]}")
-        # 
-        # Debug: Check if any frame has sales
-        # frames_with_sales = [fid for fid in frame_ids if str(fid) in sold_quantities_dict]
-        # print(f"DEBUG: Found {len(frames_with_sales)} frames with sales data")
-        # print(f"DEBUG: Frames with sales: {frames_with_sales}")
-        
-        # Get removed quantities for each frame and branch in the date range
-        removed_quantities = FrameStockHistory.objects.filter(
+        # Get removed stock (removals from any branch)
+        removed_stock = FrameStockHistory.objects.filter(
+            frame_id__in=frame_ids,
             action='remove',
-            timestamp__range=(start_date, end_date)
-        ).values(
-            'frame',
-            'branch'
-        ).annotate(
-            total_removed=Sum('quantity_changed')
-        )
+            timestamp__gte=start_datetime,
+            timestamp__lte=end_datetime
+        ).values('frame_id', 'branch_id').annotate(removed_count=Sum('quantity_changed'))
         
-        # Convert to a nested dictionary: {frame_id: {branch_id: removed_count}}
-        removed_quantities_dict = {}
-        for item in removed_quantities:
-            frame_id = str(item['frame'])
-            branch_id = item['branch']
-            if frame_id not in removed_quantities_dict:
-                removed_quantities_dict[frame_id] = {}
-            removed_quantities_dict[frame_id][branch_id] = abs(item['total_removed'])  # Take absolute value since removed quantities are negative
-        
-        # print(f"DEBUG: Removed quantities: {removed_quantities_dict}")
-        
-        # Get all branches and their stock for each frame
-  
-        
-        # Get all branches except the store branch
-        all_branches = Branch.objects.exclude(id=store_branch_id)
-        
-        # Get stock quantities for each branch for each frame
-        branch_stocks = {}
-        # Get transfer counts from store branch to each branch for each frame
-        branch_transfers = {}
-        
-        for branch in all_branches:
-            # Current stock in branch
-            branch_stock = stock_history.filter(
-                branch_id=branch.id
-            ).values('frame').annotate(
-                qty=Sum('quantity_changed')
-            )
+        # Group removed stock by frame_id and branch_id
+        removed_by_frame_branch = {}
+        for item in removed_stock:
+            frame_id = item['frame_id']
+            branch_id = item['branch_id']
+            count = abs(item['removed_count'] or 0)  # Make sure it's positive
             
-            # Count of frames received from store branch
-            received_from_store = FrameStockHistory.objects.filter(
-                branch_id=store_branch_id,
-                transfer_to=branch,
-                action='transfer',
-                timestamp__lte=end_date
-            ).values('frame').annotate(
-                received_count=Sum('quantity_changed')
-            )
-            
-            # Store the received counts
-            for item in received_from_store:
-                frame_id = item['frame']
-                if frame_id not in branch_transfers:
-                    branch_transfers[frame_id] = []
-                branch_transfers[frame_id].append({
-                    'branch_id': branch.id,
-                    'branch_name': branch.branch_name,
-                    'received_from_store': item['received_count'] or 0
-                })
-            
-            # Store the current stock
-            for item in branch_stock:
-                frame_id = item['frame']
-                if frame_id not in branch_stocks:
-                    branch_stocks[frame_id] = []
-                branch_stocks[frame_id].append({
-                    'branch_id': branch.id,
-                    'branch_name': branch.branch_name,
-                    'qty': max(0, item['qty'])  # Ensure non-negative
-                })
+            if frame_id not in removed_by_frame_branch:
+                removed_by_frame_branch[frame_id] = {}
+                
+            removed_by_frame_branch[frame_id][branch_id] = count
         
-        # Prepare the result
+        # Build the result
         result = []
-        for stock in store_stocks:
-            frame_id = stock['frame']
-            frame = frame_details_dict.get(frame_id)
+        for frame_id in frame_ids:
+            frame = frame_dict.get(frame_id)
             if not frame:
                 continue
                 
-            qty = max(0, stock['qty'])  # Ensure non-negative
-            other_qty = max(0, other_branches_dict.get(frame_id, 0))
+            # Get branch data for this frame - include ALL branches
+            branches_data = []
             
-            # Get current stock from FrameStock for all branches for this frame
-            frame_branches = []
-            
-            # Get all branches that have this frame in stock
-            current_stocks = FrameStock.objects.filter(
-                frame_id=frame_id
-            ).select_related('branch')
-            
-            # Get all branches that received this frame from store (even if they have no current stock)
-            all_relevant_branches = set()
-            
-            # Add branches that have current stock
-            for stock in current_stocks:
-                all_relevant_branches.add((stock.branch.id, stock.branch.branch_name))
-            
-            # Add branches that received frames from store (even if they have no current stock)
-            if frame_id in branch_transfers:
-                for transfer in branch_transfers[frame_id]:
-                    all_relevant_branches.add((transfer['branch_id'], transfer['branch_name']))
-            
-            # Create the branches array with complete information
-            for branch_id, branch_name in all_relevant_branches:
-                # Get current stock for this branch
-                current_qty = 0
-                current_stock = FrameStock.objects.filter(
-                    frame_id=frame_id,
-                    branch_id=branch_id
-                ).first()
+            for branch in all_branches:
+                branch_id = branch.id
                 
-                if current_stock:
-                    current_qty = current_stock.qty
-                    print(f"  - Found stock for frame {frame_id} in branch {branch_id}: {current_qty}")
-                else:
-                    print(f"  - No stock record found for frame {frame_id} in branch {branch_id}")
-                    # Debug: Check if this frame exists in Frame model
-                    from ..models import Frame
-                    frame_exists = Frame.objects.filter(id=frame_id).exists()
-                    print(f"    - Frame {frame_id} exists in Frame model: {frame_exists}")
-                    
-                    # Debug: Check all stock records for this frame
-                    all_stock = FrameStock.objects.filter(frame_id=frame_id).values('branch_id', 'qty')
-                    print(f"    - All stock records for frame {frame_id}: {list(all_stock)}")
-                    
-                # Initialize branch data with current stock, sold and removed quantities
+                # Always include each branch, regardless of activity
                 branch_data = {
                     'branch_id': branch_id,
-                    'branch_name': branch_name,
-                    'stock_count': max(0, current_qty),  # Current stock count in the branch
-                    'stock_received': 0,  # Total received from store
-                    'stock_removed': 0,  # Total removed from store
-                    'sold_qty': sold_quantities_dict.get(str(frame_id), {}).get(int(branch_id), 0),  # Sold in date range
+                    'branch_name': branch.branch_name,
+                    'stock_count': stock_by_frame_branch.get(frame_id, {}).get(branch_id, 0),
+                    'stock_received': received_by_frame_branch.get(frame_id, {}).get(branch_id, 0),
+                    'stock_removed': removed_by_frame_branch.get(frame_id, {}).get(branch_id, 0),
+                    'sold_qty': sold_by_frame_branch.get(frame_id, {}).get(branch_id, 0) or 0
                 }
                 
-                # Set removed quantity if exists
-                if str(frame_id) in removed_quantities_dict and branch_id in removed_quantities_dict[str(frame_id)]:
-                    branch_data['stock_removed'] = removed_quantities_dict[str(frame_id)][branch_id]
-                
-                # Update with received from store count if exists
-                if frame_id in branch_transfers:
-                    for transfer in branch_transfers[frame_id]:
-                        if transfer['branch_id'] == branch_id:
-                            received_qty = transfer['received_from_store']
-                            branch_data['stock_received'] = received_qty
-                            
-                            break
-                
-                frame_branches.append(branch_data)
+                branches_data.append(branch_data)
             
-            # Get current stock levels across all branches
-            all_branch_stock = FrameStock.objects.filter(
-                frame_id=frame_id
-            ).aggregate(
-                total=Sum('qty')
-            )['total'] or 0
-            
-            # Get store branch quantity
-            store_qty = current_branch_dict.get(frame_id, 0)
-            other_qty = all_branch_stock - store_qty
-            
-            # Calculate starting inventory (stock at beginning of period)
-            starting_stock = FrameStockHistory.objects.filter(
-                frame_id=frame_id,
-                branch_id=store_branch_id,
-                timestamp__lt=start_date
-            ).aggregate(
-                total=Sum('quantity_changed')
-            )['total'] or 0
-            
-            # Calculate additions (positive quantity changes in the period)
-            additions = FrameStockHistory.objects.filter(
-                frame_id=frame_id,
-                branch_id=store_branch_id,
-                timestamp__range=(start_date, end_date),
-                quantity_changed__gt=0
-            ).aggregate(
-                total=Sum('quantity_changed')
-            )['total'] or 0
-            
-            # Get sales count for the period
-            sold_count = sum(sold_quantities_dict.get(str(frame_id), {}).values()) if str(frame_id) in sold_quantities_dict else 0
-            
-            # Calculate ending inventory (should match current stock)
-            calculated_ending = starting_stock + additions - sold_count
-            
-            # Debug output
-            # print(f"\n=== DEBUG: Inventory Movement for Frame {frame_id} ===")
-            # print(f"Starting Stock (before {start_date}): {starting_stock}")
-            # print(f"Additions (received stock): {additions}")
-            # print(f"Sold in period: {sold_count}")
-            # print(f"Calculated Ending Stock: {calculated_ending}")
-            # print(f"Actual Current Stock: {store_qty}")
-            # print(f"Other Branches Stock: {other_qty}")
-            # print(f"Total Available Across All Branches: {all_branch_stock}")
-            
-            # Verify calculation matches actual
-            if calculated_ending != store_qty:
-                print(f"WARNING: Stock calculation mismatch! Calculated: {calculated_ending}, Actual: {store_qty}")
+            # Calculate stock values
+            store_branch_qty = store_stock_by_frame.get(frame_id, 0)
+            other_branches_qty = other_stock_by_frame.get(frame_id, 0)
+            total_qty = total_stock_by_frame.get(frame_id, 0)
             
             result.append({
                 'frame_id': frame_id,
@@ -488,20 +235,443 @@ class FrameSaleReportView(generics.ListAPIView):
                 'color': frame.color.name,
                 'size': frame.size,
                 'species': frame.species,
-                'starting_stock': starting_stock,
-                'additions': additions,
-                'sold_count': sold_count,
-                'ending_stock': store_qty,
-                'other_branches_qty': other_qty,
-                'total_available': all_branch_stock,  # Sum of all branches including store
-                'sold_count': sum(sold_quantities_dict.get(str(frame_id), {}).values()) if str(frame_id) in sold_quantities_dict else 0,
-                'debug_sold_data': sold_quantities_dict.get(str(frame_id), "No sales data"),
-                'as_of_date': end_date.date().isoformat(),
-                'branches': frame_branches  # Includes branch_id, branch_name, qty, and received_from_store
+                'store_branch_qty': store_branch_qty,
+                'other_branches_qty': other_branches_qty,
+                'total_qty': total_qty,
+                'sold_count': sold_by_frame.get(frame_id, 0),
+                'current_branch_qty': store_branch_qty,  # Same as store_branch_qty
+                'as_of_date': end_datetime.date().isoformat(),
+                'branches': branches_data
             })
+        
+        return Response(result, status=200)
+  
+
+
+    # def get_queryset(self):
+       
+    #     # Get query parameters
+    #     store_id = self.request.query_params.get('store_branch_id')
+    #     date_start = self.request.query_params.get('date_start')
+    #     date_end = self.request.query_params.get('date_end')
+
+    #     #no store id provided return error not id found
+
+    #     if not store_id:
+    #         #no store id provided return error not id found
+    #        return Response({'error': 'store_branch_id is missing'}, status=400)
+
             
-        return result
+    #     store_branch_id = store_id
+            
+    #     # Convert date strings to datetime objects with proper timezone handling
+    #     try:
+    #         # Parse dates as naive datetimes first
+    #         start_date = datetime.strptime(date_start, '%Y-%m-%d')
+    #         end_date = datetime.strptime(date_end, '%Y-%m-%d')
+            
+    #         # Make end_date include the entire day
+    #         end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            
+    #         # Only make timezone aware if USE_TZ is True in settings
+    #         if getattr(settings, 'USE_TZ', False):
+    #             if timezone.is_naive(start_date):
+    #                 start_date = timezone.make_aware(start_date)
+    #             if timezone.is_naive(end_date):
+    #                 end_date = timezone.make_aware(end_date)
+                
+    #         # print(f"DEBUG: Parsed date range - Start: {start_date}, End: {end_date}")
+                
+    #     except (ValueError, TypeError) as e:
+    #         print(f"ERROR: Invalid date format - {e}")
+    #         return FrameStock.objects.none()
+            
+    #     # Get frame stock history up to the end date
+    #     # Get all frame stock history up to the end date
+    #     stock_history = FrameStockHistory.objects.filter(
+    #         timestamp__lte=end_date
+    #     )
+        
+    #     # First, get all frames that have stock in the specified store (qty >= 0)
+    #     frame_ids_in_store = FrameStock.objects.filter(
+    #         branch_id=store_branch_id,
+    #         qty__gte=0  # Include frames with zero quantity
+    #     ).values_list('frame_id', flat=True).distinct()
+        
+    #     # print(f"\n=== DEBUG: Frames in store {store_branch_id} (qty >= 0): {list(frame_ids_in_store)}")
+        
+    #     # Get frame details for all frames in the store (including zero quantity)
+    #     frame_details = FrameStock.objects.filter(
+    #         branch_id=store_branch_id,
+    #         frame_id__in=frame_ids_in_store
+    #     ).select_related('frame__brand', 'frame__code', 'frame__color')
+        
+    #     # Calculate store stocks for these frames
+    #     store_stocks = stock_history.filter(
+    #         branch_id=store_branch_id,
+    #         frame_id__in=frame_ids_in_store
+    #     ).values('frame').annotate(
+    #         qty=Sum('quantity_changed')
+    #     )
+        
+    #     # Debug: Print frame details being processed
+    #     # print("\n=== DEBUG: Frame Details ===")
+    #     # print(f"Total frames with stock > 0 in store {store_branch_id}: {frame_details.count()}")
+    #     # for stock in frame_details:
+    #     #     print(f"  - Frame ID: {stock.frame_id}, Qty: {stock.qty}, Branch: {stock.branch_id}")
+        
+    #     # Create a mapping of frame_id to frame details
+    #     frame_details_dict = {}
+    #     for stock in frame_details:
+    #         if stock.frame_id not in frame_details_dict:  # Only keep the first occurrence
+    #             frame_details_dict[stock.frame_id] = stock.frame
+        
+    #     # print(f"DEBUG: Processed frame_details_dict: {list(frame_details_dict.keys())}")
+        
+    #     # Calculate stock levels for the store branch
+    #     current_branch_stocks = stock_history.filter(
+    #         branch_id=store_branch_id,
+    #         frame_id__in=frame_details_dict.keys()  # Only include frames that exist in the store
+    #     ).values('frame').annotate(
+    #         current_branch_qty=Sum('quantity_changed')
+    #     )
+    #     current_branch_dict = {
+    #         item['frame']: max(0, item['current_branch_qty'])  # Ensure non-negative
+    #         for item in current_branch_stocks
+    #     }
+    #     print(f"DEBUG: current_branch_dict: {current_branch_dict}")
+        
+    #     # Calculate stock levels for all other branches
+    #     other_branches_stocks = stock_history.filter(
+    #         ~Q(branch_id=store_branch_id)
+    #     ).values('frame').annotate(
+    #         total_other_qty=Sum('quantity_changed')
+    #     )
+        
+    #     # Get sold quantities for each frame per branch in the specified date range
+    #     print(f"\n=== DEBUG: Fetching sold quantities from {start_date} to {end_date} for store: {store_branch_id}")
+        
+    #     # Debug: Print the exact query being executed
+    #     print(f"DEBUG: Sales query date range: {start_date} to {end_date}")
+        
+    #     # Debug: Check if there are any OrderItems at all
+    #     total_order_items = OrderItem.objects.filter(frame__isnull=False).count()
+    #     print(f"DEBUG: Total OrderItems with frames: {total_order_items}")
+        
+    #     # Debug: Check if there are any OrderItems in the date range
+    #     date_range_items = OrderItem.objects.filter(
+    #         order__order_date__gte=start_date,
+    #         order__order_date__lte=end_date,
+    #         frame__isnull=False
+    #     ).count()
+    #     print(f"DEBUG: OrderItems in date range: {date_range_items}")
+        
+    #     # Debug: Print the actual date range of orders in the system
+    #     date_range = OrderItem.objects.filter(
+    #         frame__isnull=False
+    #     ).aggregate(
+    #         min_date=Min('order__order_date'),
+    #         max_date=Max('order__order_date')
+    #     )
+    #     print(f"DEBUG: System order date range: {date_range['min_date']} to {date_range['max_date']}")
+        
+    #     # Debug: Check the actual query being executed
+    #     print(f"DEBUG: Querying sales from {start_date} to {end_date}")
+        
+    #     # Use direct datetime comparison instead of __date__range to avoid timezone issues
+    #     sold_quantities = OrderItem.objects.filter(
+    #         order__order_date__gte=start_date,
+    #         order__order_date__lte=end_date,
+    #         frame__isnull=False,
+    #         is_deleted=False,
+    #         order__is_deleted=False,
+    #         order__is_refund=False
+    #     ).values('frame', 'order__branch').annotate(
+    #         total_sold=Sum('quantity')
+    #     )
+        
+    #     # Debug: Print the raw SQL query
+    #     print(f"DEBUG: Raw SQL Query: {sold_quantities.query}")
+        
+    #     results = list(sold_quantities)
+    #     print(f"DEBUG: Raw sold quantities query results: {results}")
+        
+    #     # Debug: Print sample order dates to verify the range
+    #     if not results:
+    #         print("\n=== DEBUG: No sales found in the specified date range. Checking for any sales data...")
+    #         sample_sales = OrderItem.objects.filter(
+    #             frame__isnull=False,
+    #             is_deleted=False,
+    #             order__is_deleted=False,
+    #             order__is_refund=False
+    #         ).select_related('order').order_by('-order__order_date')[:5]
+            
+    #         if sample_sales.exists():
+    #             print("DEBUG: Sample of recent sales (most recent first):")
+    #             for item in sample_sales:
+    #                 print(f"  - Order {item.order.id} on {item.order.order_date}: "
+    #                       f"Frame {item.frame_id}, Qty: {item.quantity}")
+    #         else:
+    #             print("DEBUG: No sales records found in the system at all.")
+        
+    #     # Convert to dictionary for faster lookup
+    #     sold_quantities_dict = {}
+    #     for item in sold_quantities:
+    #         if item['total_sold']:
+    #             frame_id = str(item['frame'])  # Ensure frame_id is string for consistent lookup
+    #             branch_id = int(item['order__branch'])  # Convert branch_id to int for consistent comparison
+    #             if frame_id not in sold_quantities_dict:
+    #                 sold_quantities_dict[frame_id] = {}
+    #             sold_quantities_dict[frame_id][branch_id] = item['total_sold']
+        
+    #     # Calculate other branches quantity
+    #     other_branches_stocks = stock_history.filter(
+    #         ~Q(branch_id=store_branch_id)
+    #     ).values('frame').annotate(
+    #         total_other_qty=Sum('quantity_changed')
+    #     )
+        
+    #     other_branches_dict = {
+    #         item['frame']: item['total_other_qty'] 
+    #         for item in other_branches_stocks
+    #     }
+        
+    #     # print(f"DEBUG: Processed sold_quantities_dict: {sold_quantities_dict}")
+    #     # print(f"DEBUG: other_branches_dict: {other_branches_dict}")
+    #     # print(f"DEBUG: Total frames with sales: {len(sold_quantities_dict)}")
+        
+    #     # Debug: Print frame_ids we're processing
+    #     frame_ids = list(frame_details_dict.keys())
+    #     # print(f"DEBUG: Processing {len(frame_ids)} frames. First 5 frame IDs: {frame_ids[:5]}")
+    #     # 
+    #     # Debug: Check if any frame has sales
+    #     # frames_with_sales = [fid for fid in frame_ids if str(fid) in sold_quantities_dict]
+    #     # print(f"DEBUG: Found {len(frames_with_sales)} frames with sales data")
+    #     # print(f"DEBUG: Frames with sales: {frames_with_sales}")
+        
+    #     # Get removed quantities for each frame and branch in the date range
+    #     removed_quantities = FrameStockHistory.objects.filter(
+    #         action='remove',
+    #         timestamp__range=(start_date, end_date)
+    #     ).values(
+    #         'frame',
+    #         'branch'
+    #     ).annotate(
+    #         total_removed=Sum('quantity_changed')
+    #     )
+        
+    #     # Convert to a nested dictionary: {frame_id: {branch_id: removed_count}}
+    #     removed_quantities_dict = {}
+    #     for item in removed_quantities:
+    #         frame_id = str(item['frame'])
+    #         branch_id = item['branch']
+    #         if frame_id not in removed_quantities_dict:
+    #             removed_quantities_dict[frame_id] = {}
+    #         removed_quantities_dict[frame_id][branch_id] = abs(item['total_removed'])  # Take absolute value since removed quantities are negative
+        
+    #     # print(f"DEBUG: Removed quantities: {removed_quantities_dict}")
+        
+    #     # Get all branches and their stock for each frame
+  
+        
+    #     # Get all branches except the store branch
+    #     all_branches = Branch.objects.exclude(id=store_branch_id)
+        
+    #     # Get stock quantities for each branch for each frame
+    #     branch_stocks = {}
+    #     # Get transfer counts from store branch to each branch for each frame
+    #     branch_transfers = {}
+        
+    #     for branch in all_branches:
+    #         # Current stock in branch
+    #         branch_stock = stock_history.filter(
+    #             branch_id=branch.id
+    #         ).values('frame').annotate(
+    #             qty=Sum('quantity_changed')
+    #         )
+            
+    #         # Count of frames received from store branch
+    #         received_from_store = FrameStockHistory.objects.filter(
+    #             branch_id=store_branch_id,
+    #             transfer_to=branch,
+    #             action='transfer',
+    #             timestamp__lte=end_date
+    #         ).values('frame').annotate(
+    #             received_count=Sum('quantity_changed')
+    #         )
+            
+    #         # Store the received counts
+    #         for item in received_from_store:
+    #             frame_id = item['frame']
+    #             if frame_id not in branch_transfers:
+    #                 branch_transfers[frame_id] = []
+    #             branch_transfers[frame_id].append({
+    #                 'branch_id': branch.id,
+    #                 'branch_name': branch.branch_name,
+    #                 'received_from_store': item['received_count'] or 0
+    #             })
+            
+    #         # Store the current stock
+    #         for item in branch_stock:
+    #             frame_id = item['frame']
+    #             if frame_id not in branch_stocks:
+    #                 branch_stocks[frame_id] = []
+    #             branch_stocks[frame_id].append({
+    #                 'branch_id': branch.id,
+    #                 'branch_name': branch.branch_name,
+    #                 'qty': max(0, item['qty'])  # Ensure non-negative
+    #             })
+        
+    #     # Prepare the result
+    #     result = []
+    #     for stock in store_stocks:
+    #         frame_id = stock['frame']
+    #         frame = frame_details_dict.get(frame_id)
+    #         if not frame:
+    #             continue
+                
+    #         qty = max(0, stock['qty'])  # Ensure non-negative
+    #         other_qty = max(0, other_branches_dict.get(frame_id, 0))
+            
+    #         # Get current stock from FrameStock for all branches for this frame
+    #         frame_branches = []
+            
+    #         # Get all branches that have this frame in stock
+    #         current_stocks = FrameStock.objects.filter(
+    #             frame_id=frame_id
+    #         ).select_related('branch')
+            
+    #         # Get all branches that received this frame from store (even if they have no current stock)
+    #         all_relevant_branches = set()
+            
+    #         # Add branches that have current stock
+    #         for stock in current_stocks:
+    #             all_relevant_branches.add((stock.branch.id, stock.branch.branch_name))
+            
+    #         # Add branches that received frames from store (even if they have no current stock)
+    #         if frame_id in branch_transfers:
+    #             for transfer in branch_transfers[frame_id]:
+    #                 all_relevant_branches.add((transfer['branch_id'], transfer['branch_name']))
+            
+    #         # Create the branches array with complete information
+    #         for branch_id, branch_name in all_relevant_branches:
+    #             # Get current stock for this branch
+    #             current_qty = 0
+    #             current_stock = FrameStock.objects.filter(
+    #                 frame_id=frame_id,
+    #                 branch_id=branch_id
+    #             ).first()
+                
+    #             if current_stock:
+    #                 current_qty = current_stock.qty
+    #                 print(f"  - Found stock for frame {frame_id} in branch {branch_id}: {current_qty}")
+    #             else:
+    #                 print(f"  - No stock record found for frame {frame_id} in branch {branch_id}")
+    #                 # Debug: Check if this frame exists in Frame model
+    #                 from ..models import Frame
+    #                 frame_exists = Frame.objects.filter(id=frame_id).exists()
+    #                 print(f"    - Frame {frame_id} exists in Frame model: {frame_exists}")
+                    
+    #                 # Debug: Check all stock records for this frame
+    #                 all_stock = FrameStock.objects.filter(frame_id=frame_id).values('branch_id', 'qty')
+    #                 print(f"    - All stock records for frame {frame_id}: {list(all_stock)}")
+                    
+    #             # Initialize branch data with current stock, sold and removed quantities
+    #             branch_data = {
+    #                 'branch_id': branch_id,
+    #                 'branch_name': branch_name,
+    #                 'stock_count': max(0, current_qty),  # Current stock count in the branch
+    #                 'stock_received': 0,  # Total received from store
+    #                 'stock_removed': 0,  # Total removed from store
+    #                 'sold_qty': sold_quantities_dict.get(str(frame_id), {}).get(int(branch_id), 0),  # Sold in date range
+    #             }
+                
+    #             # Set removed quantity if exists
+    #             if str(frame_id) in removed_quantities_dict and branch_id in removed_quantities_dict[str(frame_id)]:
+    #                 branch_data['stock_removed'] = removed_quantities_dict[str(frame_id)][branch_id]
+                
+    #             # Update with received from store count if exists
+    #             if frame_id in branch_transfers:
+    #                 for transfer in branch_transfers[frame_id]:
+    #                     if transfer['branch_id'] == branch_id:
+    #                         received_qty = transfer['received_from_store']
+    #                         branch_data['stock_received'] = received_qty
+                            
+    #                         break
+                
+    #             frame_branches.append(branch_data)
+            
+    #         # Get current stock levels across all branches
+    #         all_branch_stock = FrameStock.objects.filter(
+    #             frame_id=frame_id
+    #         ).aggregate(
+    #             total=Sum('qty')
+    #         )['total'] or 0
+            
+    #         # Get store branch quantity
+    #         store_qty = current_branch_dict.get(frame_id, 0)
+    #         other_qty = all_branch_stock - store_qty
+            
+    #         # Calculate starting inventory (stock at beginning of period)
+    #         starting_stock = FrameStockHistory.objects.filter(
+    #             frame_id=frame_id,
+    #             branch_id=store_branch_id,
+    #             timestamp__lt=start_date
+    #         ).aggregate(
+    #             total=Sum('quantity_changed')
+    #         )['total'] or 0
+            
+    #         # Calculate additions (positive quantity changes in the period)
+    #         additions = FrameStockHistory.objects.filter(
+    #             frame_id=frame_id,
+    #             branch_id=store_branch_id,
+    #             timestamp__range=(start_date, end_date),
+    #             quantity_changed__gt=0
+    #         ).aggregate(
+    #             total=Sum('quantity_changed')
+    #         )['total'] or 0
+            
+    #         # Get sales count for the period
+    #         sold_count = sum(sold_quantities_dict.get(str(frame_id), {}).values()) if str(frame_id) in sold_quantities_dict else 0
+            
+    #         # Calculate ending inventory (should match current stock)
+    #         calculated_ending = starting_stock + additions - sold_count
+            
+    #         # Debug output
+    #         # print(f"\n=== DEBUG: Inventory Movement for Frame {frame_id} ===")
+    #         # print(f"Starting Stock (before {start_date}): {starting_stock}")
+    #         # print(f"Additions (received stock): {additions}")
+    #         # print(f"Sold in period: {sold_count}")
+    #         # print(f"Calculated Ending Stock: {calculated_ending}")
+    #         # print(f"Actual Current Stock: {store_qty}")
+    #         # print(f"Other Branches Stock: {other_qty}")
+    #         # print(f"Total Available Across All Branches: {all_branch_stock}")
+            
+    #         # Verify calculation matches actual
+    #         if calculated_ending != store_qty:
+    #             print(f"WARNING: Stock calculation mismatch! Calculated: {calculated_ending}, Actual: {store_qty}")
+            
+    #         result.append({
+    #             'frame_id': frame_id,
+    #             'brand': frame.brand.name,
+    #             'code': frame.code.name,
+    #             'color': frame.color.name,
+    #             'size': frame.size,
+    #             'species': frame.species,
+    #             'starting_stock': starting_stock,
+    #             'additions': addition,
+    #             'sold_count': sold_count,
+    #             'ending_stock': store_qty,
+    #             'other_branches_qty': other_qty,
+    #             'total_available': all_branch_stock,  # Sum of all branches including store
+    #             'sold_count': sum(sold_quantities_dict.get(str(frame_id), {}).values()) if str(frame_id) in sold_quantities_dict else 0,
+    #             'debug_sold_data': sold_quantities_dict.get(str(frame_id), "No sales data"),
+    #             'as_of_date': end_date.date().isoformat(),
+    #             'branches': frame_branches  # Includes branch_id, branch_name, qty, and received_from_store
+    #         })
+            
+    #     return result
     
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        return Response(queryset)
+    # def list(self, request, *args, **kwargs):
+    #     queryset = self.get_queryset()
+    #     return Response(queryset)
