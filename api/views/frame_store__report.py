@@ -81,12 +81,16 @@ class FrameSaleReportView(generics.ListAPIView):
     def get_queryset(self):
        
         # Get query parameters
-        store_id = self.request.query_params.get('store_id')
+        store_id = self.request.query_params.get('store_branch_id')
         date_start = self.request.query_params.get('date_start')
         date_end = self.request.query_params.get('date_end')
-        
-        if not store_id:
-            return FrameStock.objects.none()
+
+        #no store id provided return error not id found
+
+        if not store_id:\
+            #no store id provided return error not id found
+
+            return
             
         store_branch_id = store_id
             
@@ -124,7 +128,7 @@ class FrameSaleReportView(generics.ListAPIView):
             qty__gte=0  # Include frames with zero quantity
         ).values_list('frame_id', flat=True).distinct()
         
-        print(f"\n=== DEBUG: Frames in store {store_branch_id} (qty >= 0): {list(frame_ids_in_store)}")
+        # print(f"\n=== DEBUG: Frames in store {store_branch_id} (qty >= 0): {list(frame_ids_in_store)}")
         
         # Get frame details for all frames in the store (including zero quantity)
         frame_details = FrameStock.objects.filter(
@@ -141,10 +145,10 @@ class FrameSaleReportView(generics.ListAPIView):
         )
         
         # Debug: Print frame details being processed
-        print("\n=== DEBUG: Frame Details ===")
-        print(f"Total frames with stock > 0 in store {store_branch_id}: {frame_details.count()}")
-        for stock in frame_details:
-            print(f"  - Frame ID: {stock.frame_id}, Qty: {stock.qty}, Branch: {stock.branch_id}")
+        # print("\n=== DEBUG: Frame Details ===")
+        # print(f"Total frames with stock > 0 in store {store_branch_id}: {frame_details.count()}")
+        # for stock in frame_details:
+        #     print(f"  - Frame ID: {stock.frame_id}, Qty: {stock.qty}, Branch: {stock.branch_id}")
         
         # Create a mapping of frame_id to frame details
         frame_details_dict = {}
@@ -152,7 +156,7 @@ class FrameSaleReportView(generics.ListAPIView):
             if stock.frame_id not in frame_details_dict:  # Only keep the first occurrence
                 frame_details_dict[stock.frame_id] = stock.frame
         
-        print(f"DEBUG: Processed frame_details_dict: {list(frame_details_dict.keys())}")
+        # print(f"DEBUG: Processed frame_details_dict: {list(frame_details_dict.keys())}")
         
         # Calculate stock levels for the store branch
         current_branch_stocks = stock_history.filter(
@@ -262,18 +266,18 @@ class FrameSaleReportView(generics.ListAPIView):
             for item in other_branches_stocks
         }
         
-        print(f"DEBUG: Processed sold_quantities_dict: {sold_quantities_dict}")
-        print(f"DEBUG: other_branches_dict: {other_branches_dict}")
-        print(f"DEBUG: Total frames with sales: {len(sold_quantities_dict)}")
+        # print(f"DEBUG: Processed sold_quantities_dict: {sold_quantities_dict}")
+        # print(f"DEBUG: other_branches_dict: {other_branches_dict}")
+        # print(f"DEBUG: Total frames with sales: {len(sold_quantities_dict)}")
         
         # Debug: Print frame_ids we're processing
         frame_ids = list(frame_details_dict.keys())
-        print(f"DEBUG: Processing {len(frame_ids)} frames. First 5 frame IDs: {frame_ids[:5]}")
-        
+        # print(f"DEBUG: Processing {len(frame_ids)} frames. First 5 frame IDs: {frame_ids[:5]}")
+        # 
         # Debug: Check if any frame has sales
-        frames_with_sales = [fid for fid in frame_ids if str(fid) in sold_quantities_dict]
-        print(f"DEBUG: Found {len(frames_with_sales)} frames with sales data")
-        print(f"DEBUG: Frames with sales: {frames_with_sales}")
+        # frames_with_sales = [fid for fid in frame_ids if str(fid) in sold_quantities_dict]
+        # print(f"DEBUG: Found {len(frames_with_sales)} frames with sales data")
+        # print(f"DEBUG: Frames with sales: {frames_with_sales}")
         
         # Get removed quantities for each frame and branch in the date range
         removed_quantities = FrameStockHistory.objects.filter(
@@ -295,7 +299,7 @@ class FrameSaleReportView(generics.ListAPIView):
                 removed_quantities_dict[frame_id] = {}
             removed_quantities_dict[frame_id][branch_id] = abs(item['total_removed'])  # Take absolute value since removed quantities are negative
         
-        print(f"DEBUG: Removed quantities: {removed_quantities_dict}")
+        # print(f"DEBUG: Removed quantities: {removed_quantities_dict}")
         
         # Get all branches and their stock for each frame
   
@@ -464,14 +468,14 @@ class FrameSaleReportView(generics.ListAPIView):
             calculated_ending = starting_stock + additions - sold_count
             
             # Debug output
-            print(f"\n=== DEBUG: Inventory Movement for Frame {frame_id} ===")
-            print(f"Starting Stock (before {start_date}): {starting_stock}")
-            print(f"Additions (received stock): {additions}")
-            print(f"Sold in period: {sold_count}")
-            print(f"Calculated Ending Stock: {calculated_ending}")
-            print(f"Actual Current Stock: {store_qty}")
-            print(f"Other Branches Stock: {other_qty}")
-            print(f"Total Available Across All Branches: {all_branch_stock}")
+            # print(f"\n=== DEBUG: Inventory Movement for Frame {frame_id} ===")
+            # print(f"Starting Stock (before {start_date}): {starting_stock}")
+            # print(f"Additions (received stock): {additions}")
+            # print(f"Sold in period: {sold_count}")
+            # print(f"Calculated Ending Stock: {calculated_ending}")
+            # print(f"Actual Current Stock: {store_qty}")
+            # print(f"Other Branches Stock: {other_qty}")
+            # print(f"Total Available Across All Branches: {all_branch_stock}")
             
             # Verify calculation matches actual
             if calculated_ending != store_qty:
