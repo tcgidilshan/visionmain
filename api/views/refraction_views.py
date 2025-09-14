@@ -234,8 +234,7 @@ class RefractionOrderView(APIView):
                 'invoice',
                 'refraction__refraction_details',
                 'refraction__refraction_details__user',
-                
-            ).order_by('-order_date')  # Order by most recent first
+            ).order_by('-order_date')
             
             # Get appointments/channels for the specified patient
             appointments = Appointment.objects.filter(
@@ -247,29 +246,89 @@ class RefractionOrderView(APIView):
                 'branch',
                 'schedule'
             ).prefetch_related('payments').order_by('-created_at')
-             # Get soldering invoices for the specified patient
+            
             # Get soldering invoices for the specified patient
             soldering_invoices = SolderingInvoice.objects.filter(
-                order__patient_id=patient_id,  # SolderingInvoice -> order (SolderingOrder) -> patient
+                order__patient_id=patient_id,
                 is_deleted=False
             ).select_related(
-                'order',           # SolderingOrder
-                'order__patient',  # Patient through SolderingOrder
-                'order__branch'    # Branch through SolderingOrder
-            ).order_by('-invoice_date')  # Changed from created_at to invoice_date since that's the field in SolderingInvoice
-            # AppointmentSerializer use this and return data 
+                'order',
+                'order__patient',
+                'order__branch'
+            ).order_by('-invoice_date')
+            
+            # Serialize orders and categorize them
+            orders_serializer = PatientRefractionDetailOrderSerializer(orders, many=True)
+            orders_data = orders_serializer.data
+            
+            # Sort orders by invoice type and mark frame-only orders
+            factory_orders = []
+            normal_orders = []
+            hearing_orders = []
+            frame_only_orders = []
+            
+            for order_data in orders_data:
+                # Find the corresponding order instance to check for refraction
+                order_instance = next((o for o in orders if o.id == order_data['id']), None)
+                
+                if order_instance and order_instance.invoice:
+                    invoice_type = order_instance.invoice.invoice_type
+                    
+                    # Check if factory order has no refraction (frame only)
+                    if invoice_type == 'factory' and not order_instance.refraction:
+                        order_data['is_frame_only'] = True
+                        order_data['category'] = 'Frame Only'
+                        frame_only_orders.append(order_data)
+                    elif invoice_type == 'factory':
+                        order_data['is_frame_only'] = False
+                        order_data['category'] = 'Factory'
+                        factory_orders.append(order_data)
+                    elif invoice_type == 'normal':
+                        order_data['is_frame_only'] = False
+                        order_data['category'] = 'Normal'
+                        normal_orders.append(order_data)
+                    elif invoice_type == 'hearing':
+                        order_data['is_frame_only'] = False
+                        order_data['category'] = 'Hearing'
+                        hearing_orders.append(order_data)
+                else:
+                    # Orders without invoice
+                    order_data['is_frame_only'] = False
+                    order_data['category'] = 'Unknown'
+                    normal_orders.append(order_data)
+            
+            # Sort each category by order date (most recent first)
+            factory_orders.sort(key=lambda x: x['order_date'], reverse=True)
+            normal_orders.sort(key=lambda x: x['order_date'], reverse=True)
+            hearing_orders.sort(key=lambda x: x['order_date'], reverse=True)
+            frame_only_orders.sort(key=lambda x: x['order_date'], reverse=True)
+            
+            # Serialize appointments and soldering invoices
             appointment_serializer = AppointmentSerializer(appointments, many=True)
             appointment_data = appointment_serializer.data
+            
+            soldering_serializer = SolderingInvoiceSerializer(soldering_invoices, many=True)
+            soldering_data = soldering_serializer.data
+            
             return Response({
-                "orders": PatientRefractionDetailOrderSerializer(orders, many=True).data,
+           
+                    "factory_orders": factory_orders,
+                    "frame_only_orders": frame_only_orders,
+                    "normal_orders": normal_orders,
+                    "hearing_orders": hearing_orders,
+                    # "all_orders": orders_data,  # All orders combined for backward compatibility
                 "appointments": appointment_data,
-                "soldering_invoices": SolderingInvoiceSerializer(soldering_invoices, many=True).data
+                "soldering_invoices": soldering_data,
+                "summary": {
+                    "total_orders": len(orders_data),
+                    "factory_orders_count": len(factory_orders),
+                    "frame_only_orders_count": len(frame_only_orders),
+                    "normal_orders_count": len(normal_orders),
+                    "hearing_orders_count": len(hearing_orders),
+                    "total_appointments": len(appointment_data),
+                    "total_soldering_invoices": len(soldering_data)
+                }
             })
-            # Use the new serializer
-            # paginator=PaginationService()
-            # page = paginator.paginate_queryset(orders, request, view=self)
-            # serializer = PatientRefractionDetailOrderSerializer(page, many=True)
-            # return paginator.get_paginated_response(serializer.data)
             
         except Exception as e:
             import traceback
