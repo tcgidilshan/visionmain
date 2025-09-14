@@ -81,17 +81,22 @@ class FrameSaleReportView(APIView):
         store_branch_id = request.query_params.get('store_branch_id')
         date_start = request.query_params.get('date_start')
         date_end = request.query_params.get('date_end')
-        if not store_branch_id:
-            return Response({'error': 'store_branch_id is missing'}, status=400)
-
+        
         start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(date_start, date_end)
         if not start_datetime or not end_datetime:
             return Response({'error': 'Invalid date format'}, status=400)
 
-        # Get all frames for this branch (only the ones initialized in this branch)
-        frames = Frame.objects.filter(initial_branch_id=store_branch_id).select_related(
-            'brand', 'code', 'color'
-        )
+        # Get frames based on store_branch_id (if provided)
+        if store_branch_id:
+            frames = Frame.objects.filter(initial_branch_id=store_branch_id).select_related(
+                'brand', 'code', 'color'
+            )
+        else:
+            # Get all frames if store_branch_id is not provided
+            frames = Frame.objects.all().select_related(
+                'brand', 'code', 'color'
+            )
+            
         frame_ids = [frame.id for frame in frames]
         
         # Create lookup dictionaries for quick access
@@ -125,8 +130,15 @@ class FrameSaleReportView(APIView):
         
         for frame_id, branch_stocks in stock_by_frame_branch.items():
             total = sum(branch_stocks.values())
-            store_qty = branch_stocks.get(int(store_branch_id), 0)
-            other_qty = total - store_qty
+            
+            # If store_branch_id is provided, separate store stock and other branches
+            if store_branch_id:
+                store_qty = branch_stocks.get(int(store_branch_id), 0)
+                other_qty = total - store_qty
+            else:
+                # Without a specific store, consider all stock as "store" stock
+                store_qty = total
+                other_qty = 0
             
             total_stock_by_frame[frame_id] = total
             store_stock_by_frame[frame_id] = store_qty
@@ -158,14 +170,23 @@ class FrameSaleReportView(APIView):
             sold_by_frame[frame_id] = sum(branch_sales.values())
         
         # Get received stock (transfers to branch from store)
-        received_stock = FrameStockHistory.objects.filter(
-            frame_id__in=frame_ids,
-            branch_id=store_branch_id,
-            action='transfer',
-            timestamp__gte=start_datetime,
-            timestamp__lte=end_datetime
-        ).values('frame_id', 'transfer_to_id').annotate(received_count=Sum('quantity_changed'))
-        
+        if store_branch_id:
+            received_stock = FrameStockHistory.objects.filter(
+                frame_id__in=frame_ids,
+                branch_id=store_branch_id,
+                action='transfer',
+                timestamp__gte=start_datetime,
+                timestamp__lte=end_datetime
+            ).values('frame_id', 'transfer_to_id').annotate(received_count=Sum('quantity_changed'))
+        else:
+            # If no store_branch_id, get all transfers
+            received_stock = FrameStockHistory.objects.filter(
+                frame_id__in=frame_ids,
+                action='transfer',
+                timestamp__gte=start_datetime,
+                timestamp__lte=end_datetime
+            ).values('frame_id', 'transfer_to_id').annotate(received_count=Sum('quantity_changed'))
+            
         # Group received stock by frame_id and branch_id
         received_by_frame_branch = {}
         for item in received_stock:
