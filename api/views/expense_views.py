@@ -1,7 +1,7 @@
 # views.py
 
 from rest_framework import generics,status
-from ..models import ExpenseMainCategory, ExpenseSubCategory,Expense
+from ..models import ExpenseMainCategory, ExpenseSubCategory,Expense,ExpenseReturn
 from ..serializers import ExpenseMainCategorySerializer, ExpenseSubCategorySerializer,ExpenseSerializer,ExpenseReportSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -16,6 +16,7 @@ from django.db import transaction
 from decimal import Decimal
 from ..services.time_zone_convert_service import TimezoneConverterService
 from django.utils import timezone
+from ..services.pagination_service import PaginationService
 
 # ---------- Main Category Views ----------
 class ExpenseMainCategoryListCreateView(generics.ListCreateAPIView):
@@ -185,42 +186,86 @@ class ExpenseRetrieveView(generics.RetrieveAPIView):
     queryset = Expense.objects.all()
     serializer_class = ExpenseSerializer
 
-# class ExpenceCashReturn(APIView):
-#     def patch(self, request, pk):
-#         try:
-#             expense = Expense.objects.get(pk=pk)
-#         except Expense.DoesNotExist:
-#             return Response({"error": "Expense not found."}, status=status.HTTP_404_NOT_FOUND)
+class ExpenceSummeryReportView(APIView):
 
-#         serializer = ExpenseSerializer(expense, data=request.data, partial=True)
+    
+    def get(self, request):
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        branch_id = request.query_params.get('branch_id')
 
-#         if serializer.is_valid():
-#             cash_return = serializer.validated_data.get('cash_return')
-#             cash_return_date = timezone.now()  # Use now if not provided
+        if not start_date or not end_date or not branch_id:
+            return Response({
+                "error": "start_date, end_date, and branch_id are required."
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-#             if cash_return is None or cash_return <= 0:
-#                 return Response({"error": "Invalid cash return amount."}, status=status.HTTP_400_BAD_REQUEST)
-
-#             if cash_return > expense.amount:
-#                 return Response({"error": "Cash return cannot exceed the original expense amount."}, status=status.HTTP_400_BAD_REQUEST)
-
-#             try:
-#                 with transaction.atomic():
-#                     expense.cash_return = cash_return
-#                     expense.cash_return_date = cash_return_date
-#                     expense.save()
-
-#                     SafeService.record_transaction(
-#                         branch=expense.branch,
-#                         amount=cash_return,
-#                         transaction_type='income',
-#                         reason=f"Cash return for: {expense.main_category.name} - {expense.sub_category.name}",
-#                         reference_id=f"expense-cash-return-{expense.id}"
-#                     )
-
-#                     return Response(ExpenseSerializer(expense).data, status=status.HTTP_200_OK)
-
-#             except Exception as e:
-#                 return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
+            
+            # Get expenses grouped by subcategory
+            expense_queryset = Expense.objects.filter(
+                created_at__range=[start_datetime, end_datetime],
+                branch_id=branch_id
+            ).values(
+                'main_category__name',
+                'sub_category__name',
+                'sub_category_id'
+            ).annotate(
+                total=Sum('amount')
+            ).order_by('main_category__name', 'sub_category__name')
+            
+            # Get expense returns grouped by subcategory
+            return_queryset = ExpenseReturn.objects.filter(
+                created_at__range=[start_datetime, end_datetime],
+                branch_id=branch_id
+            ).values(
+                'main_category__name',
+                'sub_category__name',
+                'sub_category_id'
+            ).annotate(
+                total=Sum('amount')
+            ).order_by('main_category__name', 'sub_category__name')
+            
+            # Convert to dictionaries for easier manipulation
+            expense_dict = {item['sub_category_id']: item for item in expense_queryset}
+            return_dict = {item['sub_category_id']: item for item in return_queryset}
+            
+            # Combine results and calculate net amounts
+            combined_results = []
+            
+            # Process all subcategory IDs from both datasets
+            all_subcategory_ids = set(expense_dict.keys()) | set(return_dict.keys())
+            
+            for sub_cat_id in all_subcategory_ids:
+                expense_data = expense_dict.get(sub_cat_id, {})
+                return_data = return_dict.get(sub_cat_id, {})
+                
+                expense_amount = expense_data.get('total', 0)
+                return_amount = return_data.get('total', 0)
+                net_amount = expense_amount - return_amount
+                
+                # Use data from whichever source has it
+                main_category = expense_data.get('main_category__name') or return_data.get('main_category__name')
+                sub_category = expense_data.get('sub_category__name') or return_data.get('sub_category__name')
+                
+                combined_results.append({
+                    'main_category': main_category,
+                    'sub_category': sub_category,
+                    'expense_amount': expense_amount,
+                    'return_amount': return_amount,
+                    'net_amount': net_amount
+                })
+            
+            # Calculate totals
+            total_expense = sum(item['expense_amount'] for item in combined_results)
+            total_return = sum(item['return_amount'] for item in combined_results)
+            net_total = total_expense - total_return
+            
+            return Response({
+                "total_expense": total_expense,
+                "total_return": total_return,
+                "net_total": net_total,
+                "summary_by_subcategory": combined_results
+            })
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

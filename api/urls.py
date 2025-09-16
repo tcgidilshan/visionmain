@@ -73,7 +73,7 @@ from .views import (
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
     LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
     RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
-    HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView
+    HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -266,6 +266,7 @@ urlpatterns = [
     path('expense-subcategories/<int:pk>/', ExpenseSubCategoryRetrieveUpdateDestroyView.as_view(), name='expense-sub-category-detail'),
     path('expenses/', ExpenseCreateView.as_view(), name='expense-create'),
     path("expenses/report/", ExpenseReportView.as_view(), name="expense-report"),
+    path("expense/summary-report/", ExpenceSummeryReportView.as_view(), name="expense-report-summery"),
 
     path('expenses/<int:pk>/update/', ExpenseUpdateView.as_view(), name='expense-update'),
     path('expenses/<int:pk>/', ExpenseRetrieveView.as_view(), name='expense-detail'),
