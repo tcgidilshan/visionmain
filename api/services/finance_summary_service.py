@@ -1,7 +1,7 @@
 from django.utils import timezone
 from django.db.models import Sum
 from datetime import timedelta, datetime, date
-from ..models import OrderPayment,ChannelPayment,OtherIncome,Expense,BankDeposit,SafeTransaction,SolderingPayment,DailyCashInHandRecord,Order
+from ..models import ExpenseReturn, OrderPayment,ChannelPayment,OtherIncome,Expense,BankDeposit,SafeTransaction,SolderingPayment,DailyCashInHandRecord,Order
 from decimal import Decimal
 from django.utils.timezone import is_naive, make_aware, localtime
 
@@ -209,6 +209,15 @@ class DailyFinanceSummaryService:
                 payment_method="cash"
             )
         )
+        today_expense_returns = DailyFinanceSummaryService._sum(
+        ExpenseReturn.objects.filter(
+            branch_id=branch_id,
+            created_at__gte=start_of_day,
+            created_at__lte=end_of_day,
+            paid_source="cash",)
+        )
+
+
         today_expenses = DailyFinanceSummaryService._sum(
             Expense.objects.filter(
                 branch_id=branch_id, 
@@ -233,8 +242,8 @@ class DailyFinanceSummaryService:
             today_order_payments +
             today_channel_payments +
             today_other_income +
-            today_soldering_income
-        ) - (today_expenses + today_safe_balance)
+            today_soldering_income + today_expense_returns
+        ) - (today_expenses + today_safe_balance )
       
         cash_in_hand = previous_balance + today_balance
 

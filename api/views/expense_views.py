@@ -86,24 +86,24 @@ class ExpenseReportView(APIView):
             ).order_by('-created_at')
 
             total = queryset.aggregate(total_expense=Sum('amount'))['total_expense'] or 0
-            totalCashReturn = queryset.aggregate(cash_return=Sum('cash_return'))['cash_return'] or 0
+           
 
             cash_total = queryset.filter(paid_source='cash').aggregate(cash_total=Sum('amount'))['cash_total'] or 0
-            cash_total_return = queryset.filter(paid_source='cash').aggregate(cash_total_return=Sum('cash_return'))['cash_total_return'] or 0
+           
 
 
             safe_total = queryset.filter(paid_source='safe').aggregate(safe_total=Sum('amount'))['safe_total'] or 0
-            safe_total_return = queryset.filter(paid_source='safe').aggregate(safe_total_return=Sum('cash_return'))['safe_total_return'] or 0
+           
 
             bank_total = queryset.filter(paid_source='bank').aggregate(bank_total=Sum('amount'))['bank_total'] or 0
-            bank_total_return = queryset.filter(paid_source='bank').aggregate(bank_total_return=Sum('cash_return'))['bank_total_return'] or 0
+           
 
-            print(totalCashReturn)
+       
             return Response({
-                "total_expense": total-totalCashReturn,
-                "cash_expense_total": cash_total-cash_total_return,
-                "safe_expense_total": safe_total-safe_total_return,
-                "bank_expense_total": bank_total-bank_total_return,
+                "total_expense": total,
+                "cash_expense_total": cash_total,
+                "safe_expense_total": safe_total,
+                "bank_expense_total": bank_total,
                 "subtotal_expense": total,
                 "expenses": ExpenseReportSerializer(queryset, many=True).data
             })
@@ -185,42 +185,42 @@ class ExpenseRetrieveView(generics.RetrieveAPIView):
     queryset = Expense.objects.all()
     serializer_class = ExpenseSerializer
 
-class ExpenceCashReturn(APIView):
-    def patch(self, request, pk):
-        try:
-            expense = Expense.objects.get(pk=pk)
-        except Expense.DoesNotExist:
-            return Response({"error": "Expense not found."}, status=status.HTTP_404_NOT_FOUND)
+# class ExpenceCashReturn(APIView):
+#     def patch(self, request, pk):
+#         try:
+#             expense = Expense.objects.get(pk=pk)
+#         except Expense.DoesNotExist:
+#             return Response({"error": "Expense not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = ExpenseSerializer(expense, data=request.data, partial=True)
+#         serializer = ExpenseSerializer(expense, data=request.data, partial=True)
 
-        if serializer.is_valid():
-            cash_return = serializer.validated_data.get('cash_return')
-            cash_return_date = timezone.now()  # Use now if not provided
+#         if serializer.is_valid():
+#             cash_return = serializer.validated_data.get('cash_return')
+#             cash_return_date = timezone.now()  # Use now if not provided
 
-            if cash_return is None or cash_return <= 0:
-                return Response({"error": "Invalid cash return amount."}, status=status.HTTP_400_BAD_REQUEST)
+#             if cash_return is None or cash_return <= 0:
+#                 return Response({"error": "Invalid cash return amount."}, status=status.HTTP_400_BAD_REQUEST)
 
-            if cash_return > expense.amount:
-                return Response({"error": "Cash return cannot exceed the original expense amount."}, status=status.HTTP_400_BAD_REQUEST)
+#             if cash_return > expense.amount:
+#                 return Response({"error": "Cash return cannot exceed the original expense amount."}, status=status.HTTP_400_BAD_REQUEST)
 
-            try:
-                with transaction.atomic():
-                    expense.cash_return = cash_return
-                    expense.cash_return_date = cash_return_date
-                    expense.save()
+#             try:
+#                 with transaction.atomic():
+#                     expense.cash_return = cash_return
+#                     expense.cash_return_date = cash_return_date
+#                     expense.save()
 
-                    SafeService.record_transaction(
-                        branch=expense.branch,
-                        amount=cash_return,
-                        transaction_type='income',
-                        reason=f"Cash return for: {expense.main_category.name} - {expense.sub_category.name}",
-                        reference_id=f"expense-cash-return-{expense.id}"
-                    )
+#                     SafeService.record_transaction(
+#                         branch=expense.branch,
+#                         amount=cash_return,
+#                         transaction_type='income',
+#                         reason=f"Cash return for: {expense.main_category.name} - {expense.sub_category.name}",
+#                         reference_id=f"expense-cash-return-{expense.id}"
+#                     )
 
-                    return Response(ExpenseSerializer(expense).data, status=status.HTTP_200_OK)
+#                     return Response(ExpenseSerializer(expense).data, status=status.HTTP_200_OK)
 
-            except Exception as e:
-                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+#             except Exception as e:
+#                 return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -1186,8 +1186,24 @@ class Expense(models.Model):
     paid_from_safe = models.BooleanField(default=True) 
     created_at = models.DateTimeField(auto_now_add=True)
     is_refund=models.BooleanField(default=False)
-    cash_return = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
-    cash_return_date = models.DateTimeField(null=True, blank=True)
+
+class ExpenseReturn(models.Model):
+    SOURCE_CHOICES = [
+    ('safe', 'Safe'),
+    ('cash', 'Cash'),
+    ('bank', 'Bank'),
+    ]
+    paid_source = models.CharField(max_length=20, choices=SOURCE_CHOICES)
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE)
+    main_category = models.ForeignKey(ExpenseMainCategory, on_delete=models.CASCADE)
+    sub_category = models.ForeignKey(ExpenseSubCategory, on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+  
+    note = models.TextField(blank=True)
+    paid_from_safe = models.BooleanField(default=True) 
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_refund=models.BooleanField(default=False)
+
 
 class OtherIncomeCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)

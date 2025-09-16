@@ -73,7 +73,7 @@ from .views import (
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
     LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
     RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
-    HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceCashReturn
+    HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -269,7 +269,8 @@ urlpatterns = [
 
     path('expenses/<int:pk>/update/', ExpenseUpdateView.as_view(), name='expense-update'),
     path('expenses/<int:pk>/', ExpenseRetrieveView.as_view(), name='expense-detail'),
-    path('expense/<int:pk>/cash-return/', ExpenceCashReturn.as_view(), name='expense-cash-return'),
+    path('expense/cash-return/', ExpenceReturnAPIView.as_view(), name='expense-cash-return'),
+    path('expense/cash-return/<int:pk>/', ExpenceReturnAPIView.as_view(), name='expense-cash-return-detail'),
 
     #bus
     path('bus/title/', BusSystemSettingListCreateView.as_view(), name='bus-system-title-list-create'),
@@ -327,5 +328,6 @@ urlpatterns = [
     path("payment-method/banks/", PaymentMethodBanksView.as_view(), name="payment-method-banks"),
     path("payment-method/banks/<int:pk>/", PaymentMethodBanksDetailView.as_view(), name="payment-method-banks-detail"),
     path('profile/', ProfileView.as_view(), name='profile'),
+
 ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
