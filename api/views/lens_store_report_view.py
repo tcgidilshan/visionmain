@@ -3,10 +3,12 @@ from rest_framework.response import Response
 from django.db.models import Sum, Q, F, Count
 from datetime import datetime
 from django.utils import timezone
+from rest_framework.views import APIView
 
 from ..models import LensStockHistory, LensStock, OrderItem, Branch, Lens, LenseType, Coating, Brand, LensPower
 from ..serializers import LensStockHistorySerializer
 from ..services.pagination_service import PaginationService
+from ..services.time_zone_convert_service import TimezoneConverterService
 
 class LensHistoryReportView(generics.ListAPIView):
     pagination_class = PaginationService
@@ -58,331 +60,251 @@ class LensHistoryReportView(generics.ListAPIView):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
-class LensSaleReportView(generics.ListAPIView):
-    serializer_class = LensStockHistorySerializer
-    
-    def get_queryset(self):
-        # Get query parameters
-        store_id = self.request.query_params.get('store_id')
-        date_start = self.request.query_params.get('date_start')
-        date_end = self.request.query_params.get('date_end')
+# Replace the existing LensSaleReportView class with this one
+class LensSaleReportView(APIView):
+    def get(self, request, *args, **kwargs):
+        store_branch_id = request.query_params.get('store_branch_id')
+        date_start = request.query_params.get('date_start')
+        date_end = request.query_params.get('date_end')
         
-        if not store_id:
-            return LensStock.objects.none()
+        # Use TimezoneConverterService for consistent date handling
+        start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(date_start, date_end)
+        if not start_datetime or not end_datetime:
+            return Response({'error': 'Invalid date format'}, status=400)
+        
+        # Get lenses based on store_branch_id (if provided)
+        if store_branch_id:
+            # Find all lenses that have stock in the specified store
+            lens_ids = LensStock.objects.filter(
+                branch_id=store_branch_id,
+                qty__gte=0  # Include lenses with zero quantity
+            ).values_list('lens_id', flat=True).distinct()
             
-        store_branch_id = store_id
+            lenses = Lens.objects.filter(id__in=lens_ids).select_related(
+                'type', 'coating', 'brand'
+            )
+        else:
+            # Get all lenses if store_branch_id is not provided
+            lenses = Lens.objects.all().select_related(
+                'type', 'coating', 'brand'
+            )
+        
+        lens_ids = [lens.id for lens in lenses]
+        
+        # Create lookup dictionaries for quick access
+        lens_dict = {lens.id: lens for lens in lenses}
+        
+        # Get all branches
+        all_branches = Branch.objects.all()
+        branch_dict = {branch.id: branch for branch in all_branches}
+        
+        # Get current stock levels for these lenses from LensStock
+        current_stocks = LensStock.objects.filter(
+            lens_id__in=lens_ids
+        ).values('lens_id', 'branch_id', 'qty')
+        
+        # Group stocks by lens_id and branch_id
+        stock_by_lens_branch = {}
+        for stock in current_stocks:
+            lens_id = stock['lens_id']
+            branch_id = stock['branch_id']
+            qty = stock['qty']
             
-        # Convert date strings to datetime objects with proper timezone handling
-        try:
-            # Parse dates as naive datetimes first
-            start_date = datetime.strptime(date_start, '%Y-%m-%d')
-            end_date = datetime.strptime(date_end, '%Y-%m-%d')
-            
-            # Make end_date include the entire day
-            end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-            
-            # Make timezone aware if needed
-            if timezone.is_naive(start_date):
-                start_date = timezone.make_aware(start_date)
-            if timezone.is_naive(end_date):
-                end_date = timezone.make_aware(end_date)
+            if lens_id not in stock_by_lens_branch:
+                stock_by_lens_branch[lens_id] = {}
                 
-            print(f"DEBUG: Parsed date range - Start: {start_date}, End: {end_date}")
-                
-        except (ValueError, TypeError) as e:
-            print(f"ERROR: Invalid date format - {e}")
-            return LensStock.objects.none()
+            stock_by_lens_branch[lens_id][branch_id] = qty
+        
+        # Get total stock by lens
+        total_stock_by_lens = {}
+        store_stock_by_lens = {}
+        other_stock_by_lens = {}
+        
+        for lens_id, branch_stocks in stock_by_lens_branch.items():
+            total = sum(branch_stocks.values())
             
-        # Get lens stock history up to the end date
-        stock_history = LensStockHistory.objects.filter(
-            timestamp__lte=end_date
-        )
+            # If store_branch_id is provided, separate store stock and other branches
+            if store_branch_id:
+                store_qty = branch_stocks.get(int(store_branch_id), 0)
+                other_qty = total - store_qty
+            else:
+                # Without a specific store, consider all stock as "store" stock
+                store_qty = total
+                other_qty = 0
+            
+            total_stock_by_lens[lens_id] = total
+            store_stock_by_lens[lens_id] = store_qty
+            other_stock_by_lens[lens_id] = other_qty
         
-        # First, get all lenses that have stock in the specified store (qty >= 0)
-        lens_ids_in_store = LensStock.objects.filter(
-            branch_id=store_branch_id,
-            qty__gte=0  # Include lenses with zero quantity
-        ).values_list('lens_id', flat=True).distinct()
-        
-        print(f"\n=== DEBUG: Lenses in store {store_branch_id} (qty >= 0): {list(lens_ids_in_store)}")
-        
-        # Get lens details for all lenses in the store (including zero quantity)
-        lens_details = LensStock.objects.filter(
-            branch_id=store_branch_id,
-            lens_id__in=lens_ids_in_store
-        ).select_related('lens__type', 'lens__coating', 'lens__brand')
-        
-        # Calculate store stocks for these lenses
-        store_stocks = stock_history.filter(
-            branch_id=store_branch_id,
-            lens_id__in=lens_ids_in_store
-        ).values('lens').annotate(
-            qty=Sum('quantity_changed')
-        )
-        
-        # Debug: Print lens details being processed
-        print("\n=== DEBUG: Lens Details ===")
-        print(f"Total lenses with stock > 0 in store {store_branch_id}: {lens_details.count()}")
-        for stock in lens_details:
-            print(f"  - Lens ID: {stock.lens_id}, Qty: {stock.qty}, Branch: {stock.branch_id}")
-        
-        # Create a mapping of lens_id to lens details
-        lens_details_dict = {}
-        for stock in lens_details:
-            if stock.lens_id not in lens_details_dict:  # Only keep the first occurrence
-                lens_details_dict[stock.lens_id] = stock.lens
-        
-        print(f"DEBUG: Processed lens_details_dict: {list(lens_details_dict.keys())}")
-        
-        # Calculate stock levels for the store branch
-        current_branch_stocks = stock_history.filter(
-            branch_id=store_branch_id,
-            lens_id__in=lens_details_dict.keys()  # Only include lenses that exist in the store
-        ).values('lens').annotate(
-            current_branch_qty=Sum('quantity_changed')
-        )
-        current_branch_dict = {
-            item['lens']: max(0, item['current_branch_qty'])  # Ensure non-negative
-            for item in current_branch_stocks
-        }
-        print(f"DEBUG: current_branch_dict: {current_branch_dict}")
-        
-        # Calculate stock levels for all other branches
-        other_branches_stocks = stock_history.filter(
-            ~Q(branch_id=store_branch_id)
-        ).values('lens').annotate(
-            total_other_qty=Sum('quantity_changed')
-        )
-        
-        # Convert to dictionary for faster lookup
-        other_branches_dict = {
-            item['lens']: max(0, item['total_other_qty'])  # Ensure non-negative
-            for item in other_branches_stocks
-        }
-        
-        # Get sold quantities for each lens per branch in the specified date range
-        print(f"\n=== DEBUG: Fetching sold quantities from {start_date} to {end_date} for store: {store_branch_id}")
-        
-        # Get all order items for lenses in the specified date range
-        sold_quantities = OrderItem.objects.filter(
-            order__order_date__gte=start_date,
-            order__order_date__lte=end_date,
-            lens__isnull=False,
+        # Get sold quantities within date range by branch
+        sold_items = OrderItem.objects.filter(
+            lens_id__in=lens_ids,
             is_deleted=False,
             order__is_deleted=False,
-            order__is_refund=False
-        ).values('lens', 'order__branch').annotate(
-            total_sold=Sum('quantity')
-        )
+            order__is_refund=False,
+            order__order_date__gte=start_datetime,
+            order__order_date__lte=end_datetime
+        ).values('lens_id', 'order__branch_id').annotate(sold_count=Sum('quantity'))
         
-        # Convert to dictionary for faster lookup
-        sold_quantities_dict = {}
-        for item in sold_quantities:
-            if item['total_sold']:
-                lens_id = str(item['lens'])
-                branch_id = int(item['order__branch'])
-                if lens_id not in sold_quantities_dict:
-                    sold_quantities_dict[lens_id] = {}
-                sold_quantities_dict[lens_id][branch_id] = item['total_sold']
-        
-        # Get removed quantities for each lens in the date range
-        removed_quantities = LensStockHistory.objects.filter(
-            action='remove',
-            timestamp__range=(start_date, end_date)
-        ).values(
-            'lens',
-            'branch'
-        ).annotate(
-            total_removed=Sum('quantity_changed')
-        )
-        
-        # Convert to a nested dictionary: {lens_id: {branch_id: removed_count}}
-        removed_quantities_dict = {}
-        for item in removed_quantities:
-            lens_id = str(item['lens'])
-            branch_id = item['branch']
-            if lens_id not in removed_quantities_dict:
-                removed_quantities_dict[lens_id] = {}
-            removed_quantities_dict[lens_id][branch_id] = abs(item['total_removed'])  # Take absolute value
-        
-        # Get all branches except the store branch
-        from ..models import Branch
-        all_branches = Branch.objects.exclude(id=store_branch_id)
-        
-        # Get stock quantities for each branch for each lens
-        branch_stocks = {}
-        branch_transfers = {}
-        
-        for branch in all_branches:
-            # Current stock in branch
-            branch_stock = stock_history.filter(
-                branch_id=branch.id
-            ).values('lens').annotate(
-                qty=Sum('quantity_changed')
-            )
+        # Group sold quantities by lens_id and branch_id
+        sold_by_lens_branch = {}
+        for item in sold_items:
+            lens_id = item['lens_id']
+            branch_id = item['order__branch_id']
+            count = item['sold_count'] or 0
             
-            # Count of lenses received from store branch
-            received_from_store = LensStockHistory.objects.filter(
+            if lens_id not in sold_by_lens_branch:
+                sold_by_lens_branch[lens_id] = {}
+                
+            sold_by_lens_branch[lens_id][branch_id] = count
+        
+        # Calculate total sold by lens
+        sold_by_lens = {}
+        for lens_id, branch_sales in sold_by_lens_branch.items():
+            sold_by_lens[lens_id] = sum(branch_sales.values())
+        
+        # Get received stock (transfers to branch from store)
+        if store_branch_id:
+            received_stock = LensStockHistory.objects.filter(
+                lens_id__in=lens_ids,
                 branch_id=store_branch_id,
-                transfer_to=branch,
                 action='transfer',
-                timestamp__lte=end_date
-            ).values('lens').annotate(
-                received_count=Sum('quantity_changed')
-            )
+                timestamp__gte=start_datetime,
+                timestamp__lte=end_datetime
+            ).values('lens_id', 'transfer_to_id').annotate(received_count=Sum('quantity_changed'))
+        else:
+            # If no store_branch_id, get all transfers
+            received_stock = LensStockHistory.objects.filter(
+                lens_id__in=lens_ids,
+                action='transfer',
+                timestamp__gte=start_datetime,
+                timestamp__lte=end_datetime
+            ).values('lens_id', 'transfer_to_id').annotate(received_count=Sum('quantity_changed'))
             
-            # Store the received counts
-            for item in received_from_store:
-                lens_id = item['lens']
-                if lens_id not in branch_transfers:
-                    branch_transfers[lens_id] = []
-                branch_transfers[lens_id].append({
-                    'branch_id': branch.id,
-                    'branch_name': branch.branch_name,
-                    'received_from_store': item['received_count'] or 0
-                })
+        # Group received stock by lens_id and branch_id
+        received_by_lens_branch = {}
+        for item in received_stock:
+            lens_id = item['lens_id']
+            branch_id = item['transfer_to_id']
+            count = item['received_count'] or 0
             
-            # Store the current stock
-            for item in branch_stock:
-                lens_id = item['lens']
-                if lens_id not in branch_stocks:
-                    branch_stocks[lens_id] = []
-                branch_stocks[lens_id].append({
-                    'branch_id': branch.id,
-                    'branch_name': branch.branch_name,
-                    'qty': max(0, item['qty'])  # Ensure non-negative
-                })
+            if lens_id not in received_by_lens_branch:
+                received_by_lens_branch[lens_id] = {}
+                
+            received_by_lens_branch[lens_id][branch_id] = count
         
-        # Prepare the result
+        # Get removed stock (removals from any branch)
+        removed_stock = LensStockHistory.objects.filter(
+            lens_id__in=lens_ids,
+            action='remove',
+            timestamp__gte=start_datetime,
+            timestamp__lte=end_datetime
+        ).values('lens_id', 'branch_id').annotate(removed_count=Sum('quantity_changed'))
+        
+        # Group removed stock by lens_id and branch_id
+        removed_by_lens_branch = {}
+        for item in removed_stock:
+            lens_id = item['lens_id']
+            branch_id = item['branch_id']
+            count = abs(item['removed_count'] or 0)  # Make sure it's positive
+            
+            if lens_id not in removed_by_lens_branch:
+                removed_by_lens_branch[lens_id] = {}
+                
+            removed_by_lens_branch[lens_id][branch_id] = count
+        
+        # Calculate starting inventory for each lens at the store branch
+        starting_stock_by_lens = {}
+        if store_branch_id:
+            starting_stocks = LensStockHistory.objects.filter(
+                lens_id__in=lens_ids,
+                branch_id=store_branch_id,
+                timestamp__lt=start_datetime
+            ).values('lens_id').annotate(
+                starting_qty=Sum('quantity_changed')
+            )
+            for item in starting_stocks:
+                starting_stock_by_lens[item['lens_id']] = item['starting_qty'] or 0
+        
+        # Calculate additions (positive quantity changes in the period)
+        additions_by_lens = {}
+        if store_branch_id:
+            additions = LensStockHistory.objects.filter(
+                lens_id__in=lens_ids,
+                branch_id=store_branch_id,
+                timestamp__range=(start_datetime, end_datetime),
+                quantity_changed__gt=0
+            ).values('lens_id').annotate(
+                added=Sum('quantity_changed')
+            )
+            for item in additions:
+                additions_by_lens[item['lens_id']] = item['added'] or 0
+        
+        # Get powers for each lens
+        all_powers = LensPower.objects.filter(
+            lens_id__in=lens_ids
+        ).select_related('power').values(
+            'lens_id',
+            'power',
+            'value',
+            'side',
+            power_name=F('power__name')
+        )
+        
+        # Group powers by lens_id
+        powers_by_lens = {}
+        for power in all_powers:
+            lens_id = power['lens_id']
+            if lens_id not in powers_by_lens:
+                powers_by_lens[lens_id] = []
+            powers_by_lens[lens_id].append(power)
+        
+        # Build the result
         result = []
-        for stock in store_stocks:
-            lens_id = stock['lens']
-            lens = lens_details_dict.get(lens_id)
+        for lens_id in lens_ids:
+            lens = lens_dict.get(lens_id)
             if not lens:
                 continue
                 
-            qty = max(0, stock['qty'])  # Ensure non-negative
-            other_qty = max(0, other_branches_dict.get(lens_id, 0))
+            # Get branch data for this lens - include ALL branches
+            branches_data = []
             
-            # Get current stock from LensStock for all branches for this lens
-            lens_branches = []
-            
-            # Get all branches that have this lens in stock
-            current_stocks = LensStock.objects.filter(
-                lens_id=lens_id
-            ).select_related('branch')
-            
-            # Get all branches that received this lens from store (even if they have no current stock)
-            all_relevant_branches = set()
-            
-            # Add branches that have current stock
-            for stock in current_stocks:
-                all_relevant_branches.add((stock.branch.id, stock.branch.branch_name))
-            
-            # Add branches that received lenses from store (even if they have no current stock)
-            if lens_id in branch_transfers:
-                for transfer in branch_transfers[lens_id]:
-                    all_relevant_branches.add((transfer['branch_id'], transfer['branch_name']))
-            
-            # Create the branches array with complete information
-            for branch_id, branch_name in all_relevant_branches:
-                # Get current stock for this branch
-                current_qty = 0
-                current_stock = LensStock.objects.filter(
-                    lens_id=lens_id,
-                    branch_id=branch_id
-                ).first()
+            for branch in all_branches:
+                branch_id = branch.id
                 
-                if current_stock:
-                    current_qty = current_stock.qty
-                
-                # Initialize branch data with current stock, sold and removed quantities
+                # Always include each branch, regardless of activity
                 branch_data = {
                     'branch_id': branch_id,
-                    'branch_name': branch_name,
-                    'stock_count': max(0, current_qty),  # Current stock count in the branch
-                    'stock_received': 0,  # Total received from store
-                    'stock_removed': 0,  # Total removed from store
-                    'sold_qty': sold_quantities_dict.get(str(lens_id), {}).get(int(branch_id), 0),  # Sold in date range
+                    'branch_name': branch.branch_name,
+                    'stock_count': stock_by_lens_branch.get(lens_id, {}).get(branch_id, 0),
+                    'stock_received': received_by_lens_branch.get(lens_id, {}).get(branch_id, 0),
+                    'stock_removed': removed_by_lens_branch.get(lens_id, {}).get(branch_id, 0),
+                    'sold_qty': sold_by_lens_branch.get(lens_id, {}).get(branch_id, 0) or 0
                 }
                 
-                # Set removed quantity if exists
-                if str(lens_id) in removed_quantities_dict and branch_id in removed_quantities_dict[str(lens_id)]:
-                    branch_data['stock_removed'] = removed_quantities_dict[str(lens_id)][branch_id]
-                
-                # Update with received from store count if exists
-                if lens_id in branch_transfers:
-                    for transfer in branch_transfers[lens_id]:
-                        if transfer['branch_id'] == branch_id:
-                            received_qty = transfer['received_from_store']
-                            branch_data['stock_received'] = received_qty
-                            break
-                
-                lens_branches.append(branch_data)
+                branches_data.append(branch_data)
             
-            # Get current stock levels across all branches
-            all_branch_stock = LensStock.objects.filter(
-                lens_id=lens_id
-            ).aggregate(
-                total=Sum('qty')
-            )['total'] or 0
+            # Calculate stock values
+            store_branch_qty = store_stock_by_lens.get(lens_id, 0)
+            other_branches_qty = other_stock_by_lens.get(lens_id, 0)
+            total_qty = total_stock_by_lens.get(lens_id, 0)
             
-            # Get store branch quantity
-            store_qty = current_branch_dict.get(lens_id, 0)
-            other_qty = all_branch_stock - store_qty
-            
-            # Calculate starting inventory (stock at beginning of period)
-            starting_stock = LensStockHistory.objects.filter(
-                lens_id=lens_id,
-                branch_id=store_branch_id,
-                timestamp__lt=start_date
-            ).aggregate(
-                total=Sum('quantity_changed')
-            )['total'] or 0
-            
-            # Calculate additions (positive quantity changes in the period)
-            additions = LensStockHistory.objects.filter(
-                lens_id=lens_id,
-                branch_id=store_branch_id,
-                timestamp__range=(start_date, end_date),
-                quantity_changed__gt=0
-            ).aggregate(
-                total=Sum('quantity_changed')
-            )['total'] or 0
-            
-            # Get sales count for the period
-            sold_count = sum(sold_quantities_dict.get(str(lens_id), {}).values()) if str(lens_id) in sold_quantities_dict else 0
-            
-            # Get lens type and coating names
-            lens_type = lens.type.name if lens.type else ""
-            coating = lens.coating.name if lens.coating else ""
-            
-            # Get powers for this lens
-            powers = LensPower.objects.filter(lens=lens).select_related('power').values(
-                    'lens',
-                    'power',
-                    'value',
-                    'side',
-                    power_name=F('power__name')
-                )
             result.append({
                 'lens_id': lens_id,
-                'lens_type': lens_type,
-                'coating': coating,
+                'lens_type': lens.type.name if lens.type else "",
+                'coating': lens.coating.name if lens.coating else "",
                 'brand': lens.brand.name if lens.brand else "",
-                'starting_stock': starting_stock,
-                'additions': additions,
-                'sold_count': sold_count,
-                'ending_stock': store_qty,
-                'other_branches_qty': other_qty,
-                'total_available': all_branch_stock,
-                'powers': list(powers),
-                'as_of_date': end_date.date().isoformat(),
-                'branches': lens_branches
+                'starting_stock': starting_stock_by_lens.get(lens_id, 0),
+                'additions': additions_by_lens.get(lens_id, 0),
+                'store_branch_qty': store_branch_qty,
+                'other_branches_qty': other_branches_qty,
+                'total_qty': total_qty,
+                'total_available': total_qty,
+                'sold_count': sold_by_lens.get(lens_id, 0),
+                'ending_stock': store_branch_qty,  # Same as store_branch_qty
+                'powers': powers_by_lens.get(lens_id, []),  # Include lens powers
+                'as_of_date': end_datetime.date().isoformat(),
+                'branches': branches_data
             })
-            
-        return result
         
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        return Response(queryset)
+        return Response(result, status=200)
