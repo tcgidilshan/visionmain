@@ -1254,6 +1254,8 @@ class SafeTransaction(models.Model):
     reference_id = models.CharField(max_length=100, blank=True, null=True)  # Optional: links to invoice/expense/etc.
     date = models.DateField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    expense = models.ForeignKey(Expense, on_delete=models.CASCADE, related_name="expense_safe_transactions", null=True, blank=True)
+    bank_deposit = models.ForeignKey('BankDeposit', on_delete=models.CASCADE, related_name="deposit_safe_transactions", null=True, blank=True)
 
     def __str__(self):
         return f"{self.branch.branch_name} – {self.transaction_type} – LKR {self.amount} on {self.date}"

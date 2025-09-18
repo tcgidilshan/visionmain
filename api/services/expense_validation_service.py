@@ -46,6 +46,29 @@ class ExpenseValidationService:
             )
 
     @staticmethod
+    def validate_expense_update_limit(branch_id, amount, old_amount):
+        summary = DailyFinanceSummaryService.get_summary(branch_id)
+        today = date.today()
+
+        total_available = summary.get('cash_in_hand', 0) + summary.get('before_balance', 0)
+        
+        # Sum of today's expenses
+        total_expenses = Expense.objects.filter(
+            branch_id=branch_id,
+            created_at__date=today,
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        # Adjust total expenses by removing the old amount
+        adjusted_total_expenses = total_expenses - old_amount
+        
+        # Check if the new amount exceeds available funds
+        if (adjusted_total_expenses + amount) > total_available:
+            raise ValidationError(
+                "Expense exceeds available funds. "
+                f"Available: {total_available}, Attempted: {adjusted_total_expenses + amount}"
+            )
+
+    @staticmethod
     def get_total_payments_for_date(branch_id, date):
         """
         Returns the total of all payment methods for a given date and branch.

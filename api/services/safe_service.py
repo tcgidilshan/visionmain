@@ -7,7 +7,7 @@ from rest_framework.exceptions import ValidationError
 class SafeService:
     @staticmethod
     @transaction.atomic
-    def record_transaction(branch, amount, transaction_type, reason="", reference_id=None):
+    def record_transaction(branch, expense, amount, transaction_type, reason="", reference_id=None):
         """
         Records a transaction to the safe and updates the branch's safe balance.
         """
@@ -19,6 +19,7 @@ class SafeService:
 
         # Step 1: Create transaction
         SafeTransaction.objects.create(
+            expense=expense,
             branch=branch,
             transaction_type=transaction_type,
             amount=amount,

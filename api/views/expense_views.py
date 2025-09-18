@@ -55,6 +55,7 @@ class ExpenseCreateView(APIView):
                 if paid_source == "safe":
                     SafeService.record_transaction(
                         branch=expense.branch,
+                        expense=expense,
                         amount=expense.amount,
                         transaction_type='expense',
                         reason=f"{expense.main_category.name} - {expense.sub_category.name}",
@@ -139,7 +140,7 @@ class ExpenseUpdateView(APIView):
                             # Only the delta must be available
                             SafeService.validate_sufficient_balance(branch_id, new_amount - old_amount)
                     else:
-                        ExpenseValidationService.validate_expense_limit(branch_id, new_amount)
+                        ExpenseValidationService.validate_expense_update_limit(branch_id, new_amount, old_amount)
 
                     # Update expense
                     expense = serializer.save()

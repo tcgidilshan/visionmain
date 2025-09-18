@@ -1365,6 +1365,8 @@ class SafeTransactionSerializer(serializers.ModelSerializer):
             "reference_id",
             "date",
             "created_at",
+            "expense",
+            "bank_deposit"
         ]
         read_only_fields = ["date", "created_at"]
 
