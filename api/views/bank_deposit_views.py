@@ -1,5 +1,5 @@
 from rest_framework.views import APIView
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.filters import OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from ..models import BankDeposit
@@ -7,7 +7,7 @@ from ..serializers import BankDepositSerializer
 from ..services.safe_service import SafeService
 from rest_framework.response import Response
 from django.db import transaction
-
+from decimal import Decimal
 
 class BankDepositListCreateView(generics.ListCreateAPIView):
     queryset = BankDeposit.objects.select_related('bank_account').all()
@@ -34,9 +34,10 @@ class BankDepositListCreateView(generics.ListCreateAPIView):
         
         # Update safe balance by recording the transaction
         try:
-            SafeService.record_transaction(
+            SafeService.record_transaction_bank_deposit(
                 branch=deposit.branch,
                 amount=deposit.amount,
+                bank_deposit=deposit,
                 transaction_type="deposit",
                 reason=f"Bank deposit to {deposit.bank_account.bank_name}",
                 reference_id=f"bank-deposit-{deposit.id}"
@@ -56,6 +57,44 @@ class BankDepositRetrieveUpdateView(generics.RetrieveUpdateDestroyAPIView):
     queryset = BankDeposit.objects.select_related('bank_account').all()
     serializer_class = BankDepositSerializer
 
+    def put(self, request, pk):
+        try:
+            deposit = BankDeposit.objects.get(pk=pk)
+        except BankDeposit.DoesNotExist:
+            return Response({"error": "Bank deposit not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        old_amount = deposit.amount
+        serializer = BankDepositSerializer(deposit, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            new_amount = Decimal(str(serializer.validated_data.get('amount', deposit.amount)))
+            branch = serializer.validated_data.get('branch', deposit.branch)
+            
+            try:
+                with transaction.atomic():
+                    # Validate safe balance for the new amount (deposits reduce safe balance)
+                    if new_amount > old_amount:
+                        # Only the delta must be available in safe
+                        SafeService.validate_sufficient_balance(branch.id, new_amount - old_amount)
+                    
+                    # Update deposit
+                    deposit = serializer.save()
+                    
+                    # Update safe transaction with new amount
+                    SafeService.record_transaction_bank_deposit(
+                        branch=deposit.branch,
+                        bank_deposit=deposit,
+                        amount=new_amount,
+                        transaction_type="deposit",
+                        reason=f"Updated: Bank deposit to {deposit.bank_account.bank_name}",
+                        reference_id=f"bank-deposit-{deposit.id}"
+                    )
+                    
+                    return Response(BankDepositSerializer(deposit).data, status=status.HTTP_200_OK)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # Remove the separate confirmation view since deposits are now auto-confirmed
 # class BankDepositConfirmView(APIView):

@@ -1177,7 +1177,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
     sub_category_name = serializers.CharField(source='sub_category.name', read_only=True)
     class Meta:
         model = Expense
-        fields = ['id', 'branch', 'main_category', 'sub_category', 'amount', 'note','paid_source', 'paid_from_safe', 'created_at','main_category_name','sub_category_name','is_refund']
+        fields = ['id', 'branch', 'main_category', 'sub_category', 'amount', 'note','paid_source', 'paid_from_safe', 'created_at','main_category_name','sub_category_name','is_refund',]
 
 class ExpenseReturnSerializer(serializers.ModelSerializer):
     main_category_name = serializers.CharField(source='main_category.name', read_only=True)

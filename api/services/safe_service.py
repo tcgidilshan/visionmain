@@ -1,7 +1,7 @@
 from django.db import transaction
 from decimal import Decimal
 from ..models import SafeTransaction, SafeBalance
-from ..models import Sum
+from django.db.models import Sum
 from rest_framework.exceptions import ValidationError
 
 class SafeService:
@@ -9,7 +9,7 @@ class SafeService:
     @transaction.atomic
     def record_transaction(branch, expense, amount, transaction_type, reason="", reference_id=None):
         """
-        Records a transaction to the safe and updates the branch's safe balance.
+        Records or updates a transaction to the safe and updates the branch's safe balance.
         """
         # 💡 Always convert amount to Decimal safely
         if isinstance(amount, float):
@@ -17,15 +17,34 @@ class SafeService:
         elif isinstance(amount, str):
             amount = Decimal(amount)
 
-        # Step 1: Create transaction
-        SafeTransaction.objects.create(
+        # Check if a SafeTransaction already exists for this expense
+        existing_transaction = SafeTransaction.objects.filter(
             expense=expense,
-            branch=branch,
-            transaction_type=transaction_type,
-            amount=amount,
-            reason=reason,
-            reference_id=reference_id
-        )
+            branch=branch
+        ).first()
+
+        if existing_transaction:
+            # Update the existing transaction
+            old_amount = existing_transaction.amount
+            existing_transaction.amount = amount
+            existing_transaction.transaction_type = transaction_type
+            existing_transaction.reason = reason
+            existing_transaction.reference_id = reference_id
+            existing_transaction.save()
+
+            # Adjust balance by the difference
+            balance_adjustment = amount - old_amount
+        else:
+            # Create new transaction
+            SafeTransaction.objects.create(
+                expense=expense,
+                branch=branch,
+                transaction_type=transaction_type,
+                amount=amount,
+                reason=reason,
+                reference_id=reference_id
+            )
+            balance_adjustment = amount
 
         # Step 2: Get or create balance
         safe_balance, _ = SafeBalance.objects.get_or_create(branch=branch)
@@ -36,13 +55,68 @@ class SafeService:
 
         # Step 3: Update balance
         if transaction_type == SafeTransaction.TransactionType.INCOME:
-            safe_balance.balance += amount
+            safe_balance.balance += balance_adjustment
         else:
-            safe_balance.balance -= amount
+            safe_balance.balance -= balance_adjustment
 
         safe_balance.save()
         return safe_balance
     
+    @staticmethod
+    def record_transaction_bank_deposit(branch, bank_deposit, amount, transaction_type, reason="", reference_id=None):
+        """
+        Records or updates a transaction to the safe and updates the branch's safe balance.
+        """
+        # 💡 Always convert amount to Decimal safely
+        if isinstance(amount, float):
+            amount = Decimal(str(amount))
+        elif isinstance(amount, str):
+            amount = Decimal(amount)
+
+        # Check if a SafeTransaction already exists for this bank deposit
+        existing_transaction = SafeTransaction.objects.filter(
+            bank_deposit=bank_deposit,
+            branch=branch
+        ).first()
+
+        if existing_transaction:
+            # Update the existing transaction
+            old_amount = existing_transaction.amount
+            existing_transaction.amount = amount
+            existing_transaction.transaction_type = transaction_type
+            existing_transaction.reason = reason
+            existing_transaction.reference_id = reference_id
+            existing_transaction.save()
+
+            # Adjust balance by the difference
+            balance_adjustment = amount - old_amount
+        else:
+            # Create new transaction
+            SafeTransaction.objects.create(
+                bank_deposit=bank_deposit,
+                branch=branch,
+                transaction_type=transaction_type,
+                amount=amount,
+                reason=reason,
+                reference_id=reference_id
+            )
+            balance_adjustment = amount
+
+        # Step 2: Get or create balance
+        safe_balance, _ = SafeBalance.objects.get_or_create(branch=branch)
+
+        # Ensure balance is Decimal (safety net)
+        if isinstance(safe_balance.balance, float):
+            safe_balance.balance = Decimal(str(safe_balance.balance))
+
+        # Step 3: Update balance
+        if transaction_type == SafeTransaction.TransactionType.INCOME:
+            safe_balance.balance += balance_adjustment
+        else:
+            safe_balance.balance -= balance_adjustment
+
+        safe_balance.save()
+        return safe_balance
     @staticmethod
     def validate_sufficient_balance(branch_id, amount):
         try:

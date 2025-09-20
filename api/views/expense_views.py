@@ -150,6 +150,7 @@ class ExpenseUpdateView(APIView):
                         # Revert old expense from safe
                         SafeService.record_transaction(
                             branch=expense.branch,
+                            expense=expense,
                             amount=old_amount,
                             transaction_type='income',
                             reason=f"Revert: {expense.main_category.name} - {expense.sub_category.name}",
@@ -159,22 +160,23 @@ class ExpenseUpdateView(APIView):
                         # New expense from safe
                         SafeService.record_transaction(
                             branch=expense.branch,
+                              expense=expense,
                             amount=new_amount,
+                          
                             transaction_type='expense',
                             reason=f"{expense.main_category.name} - {expense.sub_category.name}",
                             reference_id=f"expense-{expense.id}"
                         )
                     elif old_paid_source == 'safe' and new_paid_source == 'safe':
-                        delta = new_amount - old_amount
-                        if delta != 0:
-                            txn_type = 'expense' if delta > 0 else 'income'
-                            SafeService.record_transaction(
-                                branch=expense.branch,
-                                amount=abs(delta),
-                                transaction_type=txn_type,
-                                reason=f"Adjustment: {expense.main_category.name} - {expense.sub_category.name}",
-                                reference_id=f"expense-{expense.id}"
-                            )
+                        # Update existing safe transaction with new amount
+                        SafeService.record_transaction(
+                            branch=expense.branch,
+                            expense=expense,
+                            amount=new_amount,
+                            transaction_type='expense',
+                            reason=f"{expense.main_category.name} - {expense.sub_category.name}",
+                            reference_id=f"expense-{expense.id}"
+                        )
 
                     return Response(ExpenseSerializer(expense).data, status=status.HTTP_200_OK)
 
