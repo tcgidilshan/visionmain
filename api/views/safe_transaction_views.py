@@ -24,7 +24,7 @@ class SafeTransactionView(APIView):
                 reference_id = serializer.validated_data.get("reference_id", None)
 
                 # Record using service
-                updated_balance = SafeService.record_transaction(
+                updated_balance = SafeService.record_general_transaction(
                     branch=branch,
                     amount=amount,
                     transaction_type=transaction_type,

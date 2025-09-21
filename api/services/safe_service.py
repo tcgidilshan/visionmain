@@ -117,6 +117,45 @@ class SafeService:
 
         safe_balance.save()
         return safe_balance
+
+    @staticmethod
+    @transaction.atomic
+    def record_general_transaction(branch, amount, transaction_type, reason="", reference_id=None):
+        """
+        Records a new general safe transaction (income / expense / deposit) without linking to expense or bank_deposit.
+        Automatically updates SafeBalance.
+        """
+        # Convert amount to Decimal safely
+        if isinstance(amount, float):
+            amount = Decimal(str(amount))
+        elif isinstance(amount, str):
+            amount = Decimal(amount)
+
+        # Create new transaction (no expense or bank_deposit)
+        SafeTransaction.objects.create(
+            branch=branch,
+            transaction_type=transaction_type,
+            amount=amount,
+            reason=reason,
+            reference_id=reference_id
+        )
+
+        # Get or create balance
+        safe_balance, _ = SafeBalance.objects.get_or_create(branch=branch)
+
+        # Ensure balance is Decimal
+        if isinstance(safe_balance.balance, float):
+            safe_balance.balance = Decimal(str(safe_balance.balance))
+
+        # Update balance
+        if transaction_type == SafeTransaction.TransactionType.INCOME:
+            safe_balance.balance += amount
+        else:
+            safe_balance.balance -= amount
+
+        safe_balance.save()
+        return safe_balance
+
     @staticmethod
     def validate_sufficient_balance(branch_id, amount):
         try:
