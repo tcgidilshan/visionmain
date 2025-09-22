@@ -216,6 +216,7 @@ class OrderPaymentService:
                         old_payment.is_edited = True
                         old_payment.save(update_fields=['user', 'admin'])
                         old_payment.delete()
+                        print("OLD DATE",old_payment.payment_date)
                         payment_data = {
                             "order": order.id,
                             "amount": amount,
@@ -229,11 +230,13 @@ class OrderPaymentService:
                             "admin": None,
                             
                         }
+                        print("Before serialization:", payment_data['payment_date'])
                         payment_serializer = OrderPaymentSerializer(data=payment_data)
                         payment_serializer.is_valid(raise_exception=True)
                         new_payment = payment_serializer.save()
                         payment_records.append(new_payment)
                         total_paid += amount
+                       
                     else:
                         # No change, keep the original (skip creating)
                         payment_records.append(old_payment)
@@ -249,11 +252,13 @@ class OrderPaymentService:
                     "payment_method_bank": payment_method_bank,
                     "payment_method": method,
                     "transaction_status": txn_status,
+                    "payment_date": timezone.now(),  # Add this line
                     "is_partial": False,
                     "is_final_payment": False,
                     "admin": None,
                     "user": None,
                 }
+                
                 payment_serializer = OrderPaymentSerializer(data=payment_data)
                 payment_serializer.is_valid(raise_exception=True)
                 new_payment = payment_serializer.save()

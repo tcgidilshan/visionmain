@@ -943,7 +943,7 @@ class OrderPayment(models.Model):
     ]
 
     order = models.ForeignKey(Order, related_name='orderpayment_set', on_delete=models.CASCADE)
-    payment_date = models.DateTimeField(auto_now_add=True)
+    payment_date = models.DateTimeField(auto_now_add=False)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
     transaction_status = models.CharField(max_length=20, choices=TRANSACTION_STATUS_CHOICES, default='pending')
