@@ -61,6 +61,9 @@ class FrameListCreateView(generics.ListCreateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Order by creation date descending (latest first)
+        frames = frames.order_by('-id')
+
         data = []
         
         if store_id:
@@ -382,7 +385,7 @@ class FrameFilterView(APIView):
                 "brand": frame.brand.id,
                 "code": frame.code.id,
                 "color": frame.color.id,
-                "image": frame.image.id,
+                "image": frame.image.id if frame.image else None,
                 "color_name": frame.color.name,
                 "price": str(frame.price),
                 "size": frame.size,

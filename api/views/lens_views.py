@@ -5,6 +5,7 @@ from django.db import transaction
 from ..models import Lens, LensStock, LensPower,LensStockHistory
 from ..serializers import LensSerializer, LensStockSerializer, LensPowerSerializer
 from ..services.branch_protection_service import BranchProtectionsService
+from ..services.lens_uniqueness_service import LensUniquenessService
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 
@@ -57,6 +58,9 @@ class LensListCreateView(generics.ListCreateAPIView):
                 {"error": "Invalid status filter. Use 'active', 'inactive', or 'all'."},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        # Order by creation date descending (latest first)
+        lenses = lenses.order_by('-id')
 
         data = []
         
@@ -114,32 +118,8 @@ class LensListCreateView(generics.ListCreateAPIView):
         coating_id = lens_data.get('coating')
         brand_id = lens_data.get('brand')
 
-        # 🔥 STEP 2: Search existing lenses with same type + coating + brand
-        existing_lenses = Lens.objects.filter(
-            type_id=type_id,
-            coating_id=coating_id,
-            brand_id=brand_id
-        )
-
-        # 🔥 STEP 3: Prepare incoming power set
-        incoming_power_set = set(
-            (power['side'], str(power['value']), power['power'])  # side, value as string, power_id
-            for power in powers_data
-        )
-
-        # 🔥 STEP 4: Check against each existing lens
-        for existing_lens in existing_lenses:
-            existing_powers = existing_lens.lens_powers.all()
-
-            existing_power_set = set(
-                (p.side, str(p.value), p.power_id)  # side, value as string, power_id
-                for p in existing_powers
-            )
-
-            if incoming_power_set == existing_power_set:
-                raise ValidationError(
-                    "A lens with the same type, coating, brand, and powers already exists."
-                )
+        # 🔥 STEP 2: Check uniqueness
+        LensUniquenessService.check_lens_uniqueness(type_id, coating_id, brand_id, powers_data)
 
         # ✅ STEP 5: Save Lens
         lens_serializer = self.get_serializer(data=lens_data)
@@ -238,26 +218,7 @@ class LensRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
 
             # Check for duplicate lens (excluding current one) only if we have powers data
             if powers_data:
-                existing_lenses = Lens.objects.filter(
-                    type_id=type_id,
-                    coating_id=coating_id,
-                    brand_id=brand_id
-                ).exclude(id=lens_id)
-
-                incoming_power_set = set(
-                    (power['side'], str(power['value']), power['power'])
-                    for power in powers_data
-                )
-
-                for existing_lens in existing_lenses:
-                    existing_power_set = set(
-                        (p.side, str(p.value), p.power_id)
-                        for p in existing_lens.lens_powers.all()
-                    )
-                    if incoming_power_set == existing_power_set:
-                        raise ValidationError(
-                            "Another lens with the same type, coating, brand, and powers already exists."
-                        )
+                LensUniquenessService.check_lens_uniqueness(type_id, coating_id, brand_id, powers_data, exclude_lens_id=lens_id)
 
         # If lens data is being updated, validate and save it
         if lens_data:
