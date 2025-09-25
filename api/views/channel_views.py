@@ -400,6 +400,8 @@ class ChannelUpdateView(APIView):
                 amount = payment['amount']
                 payment_method = payment['payment_method']
                 payment_method_bank = payment.get('payment_method_bank')
+                payment_date = payment.get('payment_date')
+
                 
                 if payment_id and payment_id in existing_payment_dict:
                     # Existing payment - check if data changed
@@ -425,6 +427,7 @@ class ChannelUpdateView(APIView):
                             "amount": amount,
                             "payment_method": payment_method,
                             "payment_method_bank": payment_method_bank,
+                            "payment_date": payment_date,
                             "is_final": False
                         }
                         payment_serializer = ChannelPaymentSerializer(data=payment_data)
@@ -442,6 +445,7 @@ class ChannelUpdateView(APIView):
                         "appointment": appointment.id,
                         "amount": amount,
                         "payment_method": payment_method,
+                        "payment_date": timezone.now(),
                         "payment_method_bank": payment_method_bank,
                         "is_final": False
                     }

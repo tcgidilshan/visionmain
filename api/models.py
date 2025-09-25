@@ -961,6 +961,7 @@ class OrderPayment(models.Model):
         blank=True,
         related_name='order_payments'
     )  
+    updated_at = models.DateTimeField(auto_now=True)
     def __str__(self):
         return f"Payment for Order {self.order.id} - Amount: {self.amount}"
 
@@ -1102,7 +1103,7 @@ class ChannelPayment(models.Model):
     ]
 
     appointment = models.ForeignKey('Appointment', on_delete=models.CASCADE, related_name='payments')
-    payment_date = models.DateTimeField(auto_now_add=True)
+    payment_date = models.DateTimeField(auto_now_add=False)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
     is_final = models.BooleanField(default=False)
