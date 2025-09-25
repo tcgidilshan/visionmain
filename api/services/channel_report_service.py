@@ -1,6 +1,6 @@
 from datetime import datetime
 from django.db.models import Sum, Q, F
-from api.models import Appointment, ChannelPayment
+from api.models import Appointment, ChannelPayment, PaymentMethodBanks
 from ..services.time_zone_convert_service import TimezoneConverterService
 
 class ChannelReportService:
@@ -21,6 +21,13 @@ class ChannelReportService:
         except (ValueError, TypeError) as e:
             raise ValueError("Invalid payment date format. Use YYYY-MM-DD.")
 
+        # Get all active payment method banks for this branch (credit card banks only)
+        branch_banks = PaymentMethodBanks.objects.filter(
+            branch_id=branch_id,
+            payment_method='credit_card',
+            is_active=True
+        ).values_list('name', flat=True)
+
         # Step 2: Group by appointment
         results = {}
         for payment in payments:
@@ -39,8 +46,10 @@ class ChannelReportService:
                     'appointment_id': payment.appointment_id,
                     'is_deleted':payment.appointment.is_deleted,
                     'is_refund':payment.appointment.is_refund,
-                  
                 }
+                # Initialize all branch banks with 0
+                for bank_name in branch_banks:
+                    results[appt_id][bank_name] = 0
 
             method = payment.payment_method
             if method == 'cash':
@@ -52,5 +61,10 @@ class ChannelReportService:
 
             results[appt_id]["total_paid"] += float(payment.amount)
             results[appt_id]["balance"] = results[appt_id]["total_due"] - results[appt_id]["total_paid"]
+            
+            # Add bank total if payment has a bank
+            if payment.payment_method_bank:
+                bank_name = payment.payment_method_bank.name
+                results[appt_id][bank_name] += float(payment.amount)
 
         return list(results.values())
