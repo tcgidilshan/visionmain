@@ -1,6 +1,6 @@
 from datetime import datetime, time
 from django.db.models import Sum, Q
-from api.models import Invoice, OrderPayment,Appointment, ChannelPayment, SolderingPayment, SolderingOrder,SolderingInvoice
+from api.models import Invoice, OrderPayment,Appointment, ChannelPayment, SolderingPayment, SolderingOrder,SolderingInvoice, PaymentMethodBanks
 from django.utils import timezone
 from api.services.time_zone_convert_service import TimezoneConverterService
 from django.db.models.functions import TruncDate
@@ -43,6 +43,13 @@ class InvoiceReportService:
         )
         # print(f"Found {payments.count()} payments")
 
+        # Get all active payment method banks for this branch (credit card banks only, to match frontend)
+        branch_banks = PaymentMethodBanks.objects.filter(
+            branch_id=branch_id,
+            payment_method='credit_card',
+            is_active=True
+        ).values_list('name', flat=True)
+        
         # Organize payments by order
         # print("\n=== Processing Payments ===")
         payments_by_order = {}
@@ -58,9 +65,17 @@ class InvoiceReportService:
                     "online_transfer": 0,
                     "total": 0
                 }
+                # Initialize all branch banks with 0
+                for bank_name in branch_banks:
+                    payments_by_order[oid][bank_name] = 0
 
             payments_by_order[oid][payment.payment_method] += float(payment.amount)
             payments_by_order[oid]["total"] += float(payment.amount)
+            
+            # Add bank total if payment has a bank
+            if payment.payment_method_bank:
+                bank_name = payment.payment_method_bank.name
+                payments_by_order[oid][bank_name] += float(payment.amount)
 
         # Debug: Print the payments_by_order keys (order IDs)
         # print(f"\nOrders with payments: {list(payments_by_order.keys())}")
@@ -84,7 +99,7 @@ class InvoiceReportService:
         for invoice in invoice_qs:
             order_id = invoice.order_id
             payment_data = payments_by_order.get(order_id, {})
-
+          
             data = {
                 "invoice_id": invoice.id,
                 "invoice_number": invoice.invoice_number,
@@ -100,6 +115,11 @@ class InvoiceReportService:
                 "is_deleted": invoice.is_deleted,
                 "is_refund": invoice.order.is_refund
             }
+
+            # Add bank totals as separate keys
+            for key, value in payment_data.items():
+                if key not in ["cash", "credit_card", "online_transfer", "total"]:
+                    data[key] = value
 
             results.append(data)
 
@@ -139,9 +159,17 @@ class InvoiceReportService:
                     "online_transfer": 0,
                     "total": 0
                 }
+                # Initialize all branch banks with 0
+                for bank_name in branch_banks:
+                    soldering_payments_by_order[oid][bank_name] = 0
 
             soldering_payments_by_order[oid][payment.payment_method] += float(payment.amount)
             soldering_payments_by_order[oid]["total"] += float(payment.amount)
+            
+            # Add bank total if payment has a bank
+            if payment.payment_method_bank:
+                bank_name = payment.payment_method_bank.name
+                soldering_payments_by_order[oid][bank_name] += float(payment.amount)
 
         # Get all soldering invoices where related order has at least 1 payment on that date
         soldering_invoice_qs = SolderingInvoice.objects.select_related("order").filter(
@@ -156,7 +184,7 @@ class InvoiceReportService:
         for invoice in soldering_invoice_qs:
             order_id = invoice.order_id
             payment_data = soldering_payments_by_order.get(order_id, {})
-
+            print("Invoice ID:", payment_data)
             data = {
                 "invoice_id": invoice.id,
                 "invoice_number": invoice.invoice_number,
@@ -170,6 +198,11 @@ class InvoiceReportService:
                 "total_payment": payment_data.get("total", 0),
                 "balance": float(invoice.order.price) - payment_data.get("total", 0)
             }
+
+            # Add bank totals as separate keys
+            for key, value in payment_data.items():
+                if key not in ["cash", "credit_card", "online_transfer", "total"]:
+                    data[key] = value
 
             results.append(data)
         return results
