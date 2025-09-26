@@ -82,6 +82,7 @@ from .views.customer_report_views import CustomerLocationStatisticsView,Customer
 from .views.order_feedback import OrderFeedbackCreateView, OrderFeedbackByInvoiceView
 from .views.daily_money_report_view import DailyMoneyReportView
 from .views.profile_views import ProfileView
+from .views.refraction_report import RefractionReportView
 
 # from .views import CustomAuthToken
 
@@ -331,5 +332,6 @@ urlpatterns = [
     path("payment-method/banks/<int:pk>/", PaymentMethodBanksDetailView.as_view(), name="payment-method-banks-detail"),
     path('profile/', ProfileView.as_view(), name='profile'),
     path('reports/daily-money/', DailyMoneyReportView.as_view(), name='daily-money-report'),
+    path('reports/refraction/', RefractionReportView.as_view(), name='refraction-report'),
 ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
