@@ -1664,3 +1664,12 @@ class PaymentMethodBanksSerializer(serializers.ModelSerializer):
             'branch_name',
             'is_active'
         ]
+
+
+class PaymentReportSerializer(serializers.Serializer):
+    bank_id = serializers.IntegerField(source='payment_method_bank__id', allow_null=True)
+    bank_name = serializers.CharField(source='payment_method_bank__name', allow_null=True)
+    invoice_type = serializers.CharField(source='order__invoice__invoice_type')
+    total_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    payment_method = serializers.CharField()
+    refraction_id = serializers.IntegerField(source='order__refraction_id', allow_null=True)

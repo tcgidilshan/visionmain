@@ -17,9 +17,11 @@ class OrderPaymentService:
         total_payment = 0
         for payment_data in payments_data:
             payment_data['order'] = order.id
+            payment_data['payment_date'] = timezone.now()  # Add payment_date set to now
 
             # Determine if this payment is partial
             payment_data['is_partial'] = total_payment + payment_data['amount'] < order.total_price
+
 
             # Validate and save each payment
             order_payment_serializer = OrderPaymentSerializer(data=payment_data)

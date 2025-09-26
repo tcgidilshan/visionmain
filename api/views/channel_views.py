@@ -94,6 +94,7 @@ class ChannelAppointmentView(APIView):
                     "appointment": appointment.id,
                     "amount": payment['amount'],
                     "payment_method": payment['payment_method'],
+                    'payment_date': timezone.now(),
                     "payment_method_bank": payment.get('payment_method_bank'),
                     "is_final": False
                 }
