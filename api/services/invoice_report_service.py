@@ -86,7 +86,7 @@ class InvoiceReportService:
             Q(invoice_date__range=(start_datetime, end_datetime))
         ).filter(
             order__branch_id=branch_id,
-            order__is_refund=False
+            # order__is_refund=False
             # is_deleted=False,
             # order__is_deleted=False
         )
@@ -257,7 +257,7 @@ class InvoiceReportService:
             
   
         # Get all factory invoices in the date range for the branch
-        invoices = Invoice.objects.select_related(
+        invoices = Invoice.all_objects.select_related(
             'order', 'order__customer', 'order__refraction'
         ).annotate(
             invoice_date_only=TruncDate('invoice_date')
@@ -265,8 +265,8 @@ class InvoiceReportService:
             invoice_type='factory',
             invoice_date__range=(start_datetime, end_datetime),
             order__branch_id=branch_id,
-            is_deleted=False,
-            order__is_deleted=False
+            # is_deleted=False,
+            # order__is_deleted=False
         ).order_by('invoice_date')
         
         
@@ -295,7 +295,10 @@ class InvoiceReportService:
         total_invoice_amount = 0
         total_paid_amount = 0
         total_balance = 0
-        total_invoice_count = invoices.count() 
+        total_refund_amount = 0
+        total_refund_paid_amount = 0
+        total_refund_balance = 0
+        total_invoice_count = 0 
         
         for invoice in invoices:
             order = invoice.order
@@ -315,10 +318,18 @@ class InvoiceReportService:
             paid_amount = payments_dict.get(order.id, 0)
             balance = total_amount - paid_amount
             
-            # Add to totals
-            total_invoice_amount += total_amount
-            total_paid_amount += paid_amount
-            total_balance += balance
+            # Check if refund or deleted
+            is_refund_or_deleted = order.is_refund or invoice.is_deleted or order.is_deleted
+            
+            if is_refund_or_deleted:
+                total_refund_amount += total_amount
+                total_refund_paid_amount += paid_amount
+                total_refund_balance += balance
+            else:
+                total_invoice_amount += total_amount
+                total_paid_amount += paid_amount
+                total_balance += balance
+                total_invoice_count += 1
             
             # Add order to results
             orders.append({
@@ -333,7 +344,9 @@ class InvoiceReportService:
                 'total_amount': total_amount,
                 'paid_amount': paid_amount,
                 'balance': balance,
-                'bill': total_amount  # For backward compatibility
+                'bill': total_amount,  # For backward compatibility
+                'is_refund': order.is_refund,
+                'is_deleted': invoice.is_deleted or order.is_deleted
             })
         
         return {
@@ -342,7 +355,10 @@ class InvoiceReportService:
                 'total_invoice_count': total_invoice_count, 
                 'total_invoice_amount': total_invoice_amount,
                 'total_paid_amount': total_paid_amount,
-                'total_balance': total_balance
+                'total_balance': total_balance,
+                'total_refund_amount': total_refund_amount,
+                'total_refund_paid_amount': total_refund_paid_amount,
+                'total_refund_balance': total_refund_balance
             }
         }
         
