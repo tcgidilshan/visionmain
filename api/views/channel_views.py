@@ -240,7 +240,7 @@ class DoctorAppointmentTimeListView(APIView):
                 doctor_id=doctor_id,
                 branch_id=branch_id,
                 date=date,
-                status__in=[Schedule.StatusChoices.AVAILABLE, Schedule.StatusChoices.BOOKED]
+                status__in=[Schedule.StatusChoices.AVAILABLE, Schedule.StatusChoices.BOOKED, Schedule.StatusChoices.DOCTOR]
             ).select_related('doctor', 'branch').first()
             
             if not schedule:
