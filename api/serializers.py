@@ -1078,7 +1078,13 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
     #get mni invoice number 
     mnt_number = serializers.SerializerMethodField()
     
-    
+    # Order deletion and refund status
+    order_is_deleted = serializers.BooleanField(source='order.is_deleted', read_only=True)
+    order_deleted_at = serializers.DateTimeField(source='order.deleted_at', read_only=True)
+    order_is_refund = serializers.BooleanField(source='order.is_refund', read_only=True)
+    order_refunded_at = serializers.DateTimeField(source='order.refunded_at', read_only=True)
+    is_deleted = serializers.BooleanField(read_only=True)
+    deleted_at = serializers.DateTimeField(read_only=True)
     
     class Meta:
         model = Invoice
@@ -1104,7 +1110,15 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
             'urgent',
             'fitting_status',
             'fitting_status_updated_date',
-            'mnt_number'
+            'mnt_number',
+            # Order deletion and refund status fields
+            'order_is_deleted',
+            'order_deleted_at',
+            'order_is_refund',
+            'order_refunded_at',
+            # Invoice deletion status
+            'is_deleted',
+            'deleted_at'
         ]
   
     def get_mnt_number(self, obj):
@@ -1330,6 +1344,7 @@ class SingleRepaymentSerializer(serializers.Serializer):
     payment_method = serializers.ChoiceField(choices=ChannelPayment.PAYMENT_METHOD_CHOICES)
     payment_method_bank = serializers.IntegerField(allow_null=True, required=False)  # Add this line
     is_final = serializers.BooleanField(required=False, default=False)
+    payment_date = serializers.DateTimeField(required=False)
 
 class MultipleRepaymentSerializer(serializers.Serializer):
     payments = SingleRepaymentSerializer(many=True)

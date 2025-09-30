@@ -10,10 +10,14 @@ from django.db.models import Sum
 from ..models import PaymentMethodBanks
 class ChannelPaymentService:
     @staticmethod
-    def create_repayment(appointment, amount, method, payment_method_bank=None):
+    def create_repayment(appointment, amount, method, payment_method_bank=None, payment_date=None):
         # Prevent if already finalized
         if appointment.payments.filter(is_final=True).exists():
             raise ValueError("Final payment has already been made.")
+        
+        # Use current date/time if payment_date is not provided
+        if payment_date is None:
+            payment_date = timezone.now()
 
         if amount is None:
             # Auto-calculate remaining amount
@@ -44,7 +48,8 @@ class ChannelPaymentService:
             amount=amount,
             payment_method=method,
             is_final=is_final,
-            payment_method_bank=bank_instance
+            payment_method_bank=bank_instance,
+            payment_date=payment_date
         )
 
         if is_final:

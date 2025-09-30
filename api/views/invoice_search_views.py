@@ -57,14 +57,11 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
     pagination_class = PaginationService
 
     def get_queryset(self):
-        queryset = OrderItem.objects.filter(
-            external_lens__isnull=False,
-            is_deleted=False,
-            order__is_deleted=False
+        # Use all_objects to include soft-deleted items
+        queryset = OrderItem.all_objects.filter(
+            external_lens__isnull=False
         ).select_related(
             'order__invoice', 'order__branch'
-        ).filter(
-            order__invoice__is_deleted=False
         ).order_by('-order__invoice__invoice_date')
 
         invoice_number = self.request.query_params.get('invoice_number')
@@ -152,9 +149,9 @@ class InvoiceNumberSearchView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        invoice = Invoice.objects.filter(
-            invoice_number=invoice_number,
-            is_deleted=False
+        # Use all_objects to include soft-deleted and refunded invoices
+        invoice = Invoice.all_objects.filter(
+            invoice_number=invoice_number
         ).first()
 
         if not invoice:

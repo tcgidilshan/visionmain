@@ -99,7 +99,8 @@ class InvoiceService:
         Returns:
             QuerySet of matching invoices
         """
-        qs = Invoice.objects.filter(invoice_type='factory', is_deleted=False)  # exclude deleted invoices
+        # Use all_objects to include soft-deleted invoices
+        qs = Invoice.all_objects.filter(invoice_type='factory')
 
         # Handle branch filtering
         if branch_id:

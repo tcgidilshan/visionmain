@@ -6,6 +6,7 @@ from rest_framework import status
 from ..models import Appointment
 from ..services.channel_payment_service import ChannelPaymentService
 from ..serializers import MultipleRepaymentSerializer,ChannelPaymentSerializer
+from django.utils import timezone
 
 class ChannelRepaymentView(APIView):
     def post(self, request, *args, **kwargs):
@@ -17,11 +18,15 @@ class ChannelRepaymentView(APIView):
                 try:
                     appointment = Appointment.objects.get(id=payment_data['appointment_id'])
 
+                    # Get payment_date from request or use current time
+                    payment_date = payment_data.get('payment_date', timezone.now())
+                    
                     payment = ChannelPaymentService.create_repayment(
                         appointment=appointment,
                         amount=payment_data.get('amount'),
                         method=payment_data['payment_method'],
-                        payment_method_bank=payment_data.get('payment_method_bank')  # Use .get() instead of direct access
+                        payment_method_bank=payment_data.get('payment_method_bank'),  # Use .get() instead of direct access
+                        payment_date=payment_date
                     )
 
                     results.append({

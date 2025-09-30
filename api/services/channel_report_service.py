@@ -46,6 +46,7 @@ class ChannelReportService:
                     'appointment_id': payment.appointment_id,
                     'is_deleted':payment.appointment.is_deleted,
                     'is_refund':payment.appointment.is_refund,
+                    'created_at': payment.appointment.created_at.isoformat() if payment.appointment.created_at else None,
                 }
                 # Initialize all branch banks with 0
                 for bank_name in branch_banks:
