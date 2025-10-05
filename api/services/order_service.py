@@ -1,4 +1,4 @@
-from ..models import Order,Frame,OrderProgress, OtherItem,OrderItem, LensStock, LensCleanerStock, FrameStock,Lens,LensCleaner,Frame,ExternalLens,OtherItemStock,BusSystemSetting, HearingItem, HearingItemStock
+from ..models import Order,Frame,OrderProgress, OtherItem,OrderItem, LensStock, LensCleanerStock, FrameStock,Lens,LensCleaner,Frame,ExternalLens,OtherItemStock,BusSystemSetting, HearingItem, HearingItemStock, Expense, ExpenseMainCategory, ExpenseSubCategory
 from ..serializers import OrderSerializer, OrderItemSerializer, ExternalLensSerializer
 from django.db import transaction
 from ..services.order_payment_service import OrderPaymentService
@@ -178,7 +178,7 @@ class OrderService:
 
     @staticmethod
     @transaction.atomic
-    def update_order(order, order_data, order_items_data, payments_data,admin_id,user_id):
+    def update_order(order, order_data, order_items_data, payments_data, admin_id, user_id):
         if order.is_deleted:
             raise ValidationError("This order has been deleted and cannot be modified.")
 
@@ -461,6 +461,100 @@ class OrderService:
             # Final: Deduct lens stock if on_hold → False
             if transitioning_off_hold:
                 StockValidationService.adjust_stocks(lens_stock_updates)
+
+            # Handle Refund Logic: Process items marked with is_refund=True
+            refund_items = [item for item in order_items_data if item.get('is_refund', False) and item.get('id')]
+            if refund_items:
+                # Soft delete refunded items and restore stock
+                refund_item_ids = [item['id'] for item in refund_items]
+                refunded_order_items = OrderItem.objects.filter(
+                    id__in=refund_item_ids,
+                    order=order,
+                    is_deleted=False
+                )
+                
+                total_refund_amount = 0
+                for item in refunded_order_items:
+                    # Restore stock quantities based on item type (only if not on_hold)
+                    if not item.is_non_stock:
+                        stock = None
+                        stock_type = None
+                        
+                        # Determine stock type and get stock object
+                        if item.lens:
+                            stock = LensStock.objects.select_for_update().filter(
+                                lens=item.lens, 
+                                branch=order.branch
+                            ).first()
+                            stock_type = "lens"
+                        elif item.frame:
+                            stock = FrameStock.objects.select_for_update().filter(
+                                frame=item.frame, 
+                                branch=order.branch
+                            ).first()
+                            stock_type = "frame"
+                        elif item.other_item:
+                            stock = OtherItemStock.objects.select_for_update().filter(
+                                other_item=item.other_item, 
+                                branch=order.branch
+                            ).first()
+                            stock_type = "other_item"
+                        elif item.lens_cleaner:
+                            stock = LensCleanerStock.objects.select_for_update().filter(
+                                lens_cleaner=item.lens_cleaner, 
+                                branch=order.branch
+                            ).first()
+                            stock_type = "lens_cleaner"
+                        elif item.hearing_item:
+                            stock = HearingItemStock.objects.select_for_update().filter(
+                                hearing_item=item.hearing_item, 
+                                branch=order.branch
+                            ).first()
+                            stock_type = "hearing_item"
+                        
+                        # Restore stock quantity (add back the refunded quantity)
+                        if stock:
+                            stock.qty += item.quantity
+                            stock.save()
+                    
+                    # Soft delete the item
+                    item.is_deleted = True
+                    item.is_refund = True
+                    item.deleted_at = timezone.now()
+                    if admin_id:
+                        from ..models import CustomUser
+                        item.admin = CustomUser.objects.get(pk=admin_id)
+                    if user_id:
+                        from ..models import CustomUser
+                        item.user = CustomUser.objects.get(pk=user_id)
+                    item.save()
+                    total_refund_amount += item.subtotal
+
+                # Create Expense record for refund
+                if total_refund_amount > 0:
+                    main_category_id = order_data.get('main_category', 1)
+                    sub_category_id = order_data.get('sub_category', 2)
+                    
+                    try:
+                        main_category = ExpenseMainCategory.objects.get(pk=main_category_id)
+                        sub_category = ExpenseSubCategory.objects.get(pk=sub_category_id, main_category=main_category)
+                    except (ExpenseMainCategory.DoesNotExist, ExpenseSubCategory.DoesNotExist):
+                        raise ValueError("Invalid expense category for refund")
+
+                    # Get invoice number for note
+                    invoice_number = order.invoice.invoice_number if hasattr(order, 'invoice') and order.invoice else f"Order #{order.pk}"
+
+                    Expense.objects.create(
+                        paid_source='safe',
+                        branch=order.branch,
+                        main_category=main_category,
+                        sub_category=sub_category,
+                        amount=total_refund_amount,
+                        note=f"Refund for Invoice {invoice_number} - {len(refund_items)} item(s) refunded",
+                        paid_from_safe=False,
+                        is_refund=True,
+                        order_refund=order
+                    )
 
             # Process Payments
             total_payment = OrderPaymentService.append_on_change_payments_for_order(order, payments_data,admin_id,user_id)

@@ -890,6 +890,7 @@ class OrderItem(models.Model):
     is_non_stock = models.BooleanField(default=False)  # Mark Non-Stock Items
     note = models.TextField(blank=True, null=True)
     is_deleted = models.BooleanField(default=False)
+    is_refund = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
     # In OrderItem model:
     user = models.ForeignKey(
@@ -1187,6 +1188,7 @@ class Expense(models.Model):
     paid_from_safe = models.BooleanField(default=True) 
     created_at = models.DateTimeField(auto_now_add=True)
     is_refund=models.BooleanField(default=False)
+    order_refund = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='expense_refunds', null=True, blank=True)
 
 class ExpenseReturn(models.Model):
     SOURCE_CHOICES = [

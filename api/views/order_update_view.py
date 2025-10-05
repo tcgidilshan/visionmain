@@ -50,8 +50,8 @@ class OrderUpdateView(APIView):
                 print(f"Order {order.id} on_hold status changing: {current_on_hold} → {new_on_hold}")
             
             # Step 3: Update Order 
-            # The updated update_order method now handles different stock behavior based on on_hold status
-            updated_order = OrderService.update_order(order, order_data, order_items_data, payments_data,admin_id,user_id)
+            # The updated update_order method now handles different stock behavior based on on_hold status and refunds
+            updated_order = OrderService.update_order(order, order_data, order_items_data, payments_data, admin_id, user_id)
             
             # Now log only if update succeeded
             OrderAuditLogService.log_order_changes(
