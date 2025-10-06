@@ -527,6 +527,7 @@ class Order(models.Model):
     sub_total = models.DecimalField(max_digits=10, decimal_places=2)
     discount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
+    total_payment= models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     sales_staff_code = models.ForeignKey(CustomUser,related_name='orders',on_delete=models.CASCADE, null=True, blank=True)
     order_remark = models.TextField(null=True, blank=True)  # New field
 

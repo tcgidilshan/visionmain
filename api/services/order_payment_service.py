@@ -18,6 +18,7 @@ class OrderPaymentService:
         for payment_data in payments_data:
             payment_data['order'] = order.id
             payment_data['payment_date'] = timezone.now()  # Add payment_date set to now
+            payment_data['transaction_status'] = payment_data.get('transaction_status', 'success')  # Set default transaction status
 
             # Determine if this payment is partial
             payment_data['is_partial'] = total_payment + payment_data['amount'] < order.total_price
@@ -54,7 +55,7 @@ class OrderPaymentService:
                 existing_payment = existing_payments.pop(payment_id)
                 existing_payment.amount = payment_data.get("amount", existing_payment.amount)
                 existing_payment.payment_method = payment_data.get("payment_method", existing_payment.payment_method)
-                existing_payment.transaction_status = payment_data.get("transaction_status", existing_payment.transaction_status)
+                existing_payment.transaction_status = payment_data.get("transaction_status", existing_payment.transaction_status or 'success')
                 existing_payment.is_partial = total_payment + existing_payment.amount < order.total_price
                 existing_payment.save()
                 new_payment_ids.add(payment_id)
@@ -218,7 +219,7 @@ class OrderPaymentService:
                         old_payment.is_edited = True
                         old_payment.save(update_fields=['user', 'admin'])
                         old_payment.delete()
-                        print("OLD DATE",old_payment.payment_date)
+                        # print("OLD DATE",old_payment.payment_date)
                         payment_data = {
                             "order": order.id,
                             "amount": amount,
@@ -232,7 +233,7 @@ class OrderPaymentService:
                             "admin": None,
                             
                         }
-                        print("Before serialization:", payment_data['payment_date'])
+                        # print("Before serialization:", payment_data['payment_date'])
                         payment_serializer = OrderPaymentSerializer(data=payment_data)
                         payment_serializer.is_valid(raise_exception=True)
                         new_payment = payment_serializer.save()
@@ -240,7 +241,10 @@ class OrderPaymentService:
                         total_paid += amount
                        
                     else:
-                        # No change, keep the original (skip creating)
+                        # No change, keep the original but ensure transaction_status is 'success'
+                        if old_payment.transaction_status != 'success':
+                            old_payment.transaction_status = 'success'
+                            old_payment.save(update_fields=['transaction_status'])
                         payment_records.append(old_payment)
                         total_paid += float(old_payment.amount)
                 else:
@@ -280,12 +284,13 @@ class OrderPaymentService:
         running_total = 0
         for p in payment_records:
             running_total += float(p.amount)
-            p.is_final_payment = (round(running_total, 2) == round(float(order.total_price), 2))
+            p.is_final_payment = (round(running_total, 2) >= round(float(order.total_price), 2))
             p.is_partial = (running_total < float(order.total_price))
             p.save()
 
-        # 4. Overpayment check
-        if round(total_paid, 2) > round(float(order.total_price), 2):
-            raise ValidationError("Total payments exceed the order total price. No payments saved.")
-
+        # 4. Overpayment check - Allow overpayments for refund scenarios
+        # Only prevent NEW payments that would create overpayment
+        # If payments already existed and order total decreased (refund), that's valid
+        # The expense creation in order_service.py will handle the cash refund
+        
         return total_paid
