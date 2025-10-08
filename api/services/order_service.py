@@ -463,27 +463,41 @@ class OrderService:
             if transitioning_off_hold:
                 StockValidationService.adjust_stocks(lens_stock_updates)
 
-            # Handle Refund Logic: Process items marked with is_refund=True
-            # Calculate refund amount BEFORE processing payments
-            refund_items = [item for item in order_items_data if item.get('is_refund', False) and item.get('id')]
+            # Handle Refund Logic: Recalculate order totals from ALL current items
+            # This ensures new items are included in the calculation
+            
+            # Get all current non-deleted order items
+            current_order_items = OrderItem.objects.filter(
+                order=order,
+                is_deleted=False
+            )
+            
+            # Recalculate subtotal from ALL active items (excluding refunded ones)
+            new_subtotal = Decimal('0.00')
             total_refund_amount = Decimal('0.00')
+            refund_items = [item for item in order_items_data if item.get('is_refund', False) and item.get('id')]
+            refund_item_ids = [item['id'] for item in refund_items] if refund_items else []
+            
+            for item in current_order_items:
+                if item.pk in refund_item_ids or item.is_refund:
+                    # Track refunded items but don't add to subtotal
+                    total_refund_amount += item.subtotal
+                else:
+                    # Only non-refunded items count toward subtotal
+                    new_subtotal += item.subtotal
+            
+            # Update order totals with recalculated values
+            order.sub_total = new_subtotal
+            order.total_price = new_subtotal - (order.discount or Decimal('0.00'))
+            order.save()
             
             if refund_items:
-                # Calculate total refund amount first
-                refund_item_ids = [item['id'] for item in refund_items]
+                # Get refunded order items for stock restoration
                 refunded_order_items = OrderItem.objects.filter(
                     id__in=refund_item_ids,
                     order=order,
                     is_deleted=False
                 )
-                
-                for item in refunded_order_items:
-                    total_refund_amount += item.subtotal
-                
-                # Update order totals BEFORE payment validation
-                order.sub_total = order.sub_total - total_refund_amount
-                order.total_price = order.sub_total - (order.discount or Decimal('0.00'))
-                order.save()
                 
                 # Now restore stock and soft delete items
                 for item in refunded_order_items:
@@ -578,20 +592,21 @@ class OrderService:
                     # Join descriptions with commas
                     items_description = ", ".join(refund_descriptions)
 
-                    # Calculate new order total after refund
-                    new_order_total = order.total_price  # Already updated above
+                    # Calculate new order total after refund (already updated above)
+                    new_order_total = order.total_price
                     
-                    # Get total payments for this order (existing payments before the new update)
-                    total_payments = OrderPayment.objects.filter(
+                    # Get EXISTING payments (before processing new payments in this update)
+                    existing_payments = OrderPayment.objects.filter(
                         order=order,
                         is_deleted=False
                     ).aggregate(
                         total=Sum('amount')
                     )['total'] or Decimal('0.00')
                     
-                    # Calculate actual cash refund amount (overpayment)
-                    if new_order_total < total_payments:
-                        cash_refund_amount = total_payments - new_order_total
+                    # Calculate cash refund: how much customer overpaid for the NEW order total
+                    # Example: Customer paid 700, new total is 400, refund = 700 - 400 = 300
+                    if existing_payments > new_order_total:
+                        cash_refund_amount = existing_payments - new_order_total
                     else:
                         cash_refund_amount = Decimal('0.00')
                     
