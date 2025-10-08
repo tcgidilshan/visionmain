@@ -15,6 +15,7 @@ from django.shortcuts import get_object_or_404
 from ..services.soft_delete_service import OrderSoftDeleteService
 # from ..services.order_payment_service import refund_order  # adjust as needed
 from rest_framework.exceptions import ValidationError
+from decimal import Decimal
 
 class OrderCreateView(APIView):
     @transaction.atomic
@@ -90,6 +91,10 @@ class OrderCreateView(APIView):
                 #     raise ValueError("At least one order payment is required.")
 
                 total_payment = OrderPaymentService.process_payments(order, payments_data)
+
+                # 🔹 Step 9: Store total payment in order
+                order.total_payment = Decimal(str(total_payment))
+                order.save(update_fields=['total_payment'])
 
                 # 🔹 Step 8: Validate payment amount
                 if total_payment > order.total_price:

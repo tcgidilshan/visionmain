@@ -59,7 +59,7 @@ class LoginView(APIView):
                 httponly=True,
                 secure=True,  # Set to True in production
                 samesite="None",
-                max_age=60*60*24*30  # 1 day
+                max_age=60*60*24*7  # 7 days
             )
             
             response.set_cookie(
@@ -157,7 +157,7 @@ class AdminRegistrationView(APIView):
             user_code=user_code,
         )
         admin_user.is_staff = True  # ✅ Admin permissions
-        admin_user.is_superuser = True  # ✅ Optional: Give superuser rights
+        admin_user.is_superuser = False  # ✅ Optional: Give superuser rights
         admin_user.save()
 
         # ✅ Assign user to all branches
@@ -176,6 +176,65 @@ class AdminRegistrationView(APIView):
                     "last_name": admin_user.last_name,
                     "mobile": admin_user.mobile,
                     "user_code": admin_user.user_code,
+                    "role": "Admin",
+                    "branches_assigned": [branch.id for branch in all_branches]
+                }
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+class SuperuserRegistrationView(APIView):
+    permission_classes = [AllowAny]  # Modify this as needed for extra security
+
+    def post(self, request):
+        username = request.data.get("username")
+        password = request.data.get("password")
+        email = request.data.get("email")
+        first_name = request.data.get("first_name", "")
+        last_name = request.data.get("last_name", "")
+        mobile = request.data.get("mobile", None)
+        user_code = request.data.get("user_code", None)
+
+        if not username or not password or not email or not user_code:
+            return Response({"error": "Username, password, email, and user_code are required!"}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(username=username).exists():
+            return Response({"error": "Username already exists!"}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "Email already exists!"}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(user_code=user_code).exists():
+            return Response({"error": "User code already exists!"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ✅ Create a superuser
+        superuser = User.objects.create_user(
+            username=username,
+            password=password,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            mobile=mobile,
+            user_code=user_code,
+        )
+        superuser.is_staff = True  # ✅ Superusers also have staff permissions
+        superuser.is_superuser = True  # ✅ Superuser rights
+        superuser.save()
+
+        # ✅ Assign superuser to all branches
+        all_branches = Branch.objects.all()
+        user_branches = [UserBranch(user=superuser, branch=branch) for branch in all_branches]
+        UserBranch.objects.bulk_create(user_branches)  # ✅ Efficient batch insert
+
+        return Response(
+            {
+                "message": "Superuser registered successfully!",
+                "user": {
+                    "id": superuser.id,
+                    "username": superuser.username,
+                    "email": superuser.email,
+                    "first_name": superuser.first_name,
+                    "last_name": superuser.last_name,
+                    "mobile": superuser.mobile,
+                    "user_code": superuser.user_code,
+                    "role": "Superuser",
                     "branches_assigned": [branch.id for branch in all_branches]
                 }
             },

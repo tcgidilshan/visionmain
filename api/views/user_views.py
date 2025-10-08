@@ -39,10 +39,37 @@ class UpdateUserView(generics.UpdateAPIView):
     """
     API View to update a user's details.
     """
+    permission_classes = [IsAuthenticated]
 
     def put(self, request, user_id):
         try:
+            # ✅ Check permissions
+            if not request.user.is_superuser and not request.user.is_staff:
+                return Response({"error": "You do not have permission to update users."}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = CustomUser.objects.get(id=user_id)
+            
+            # ✅ Admin can only update regular users
+            if request.user.is_staff and not request.user.is_superuser:
+                if user.is_staff or user.is_superuser:
+                    return Response({"error": "Admins can only update regular user profiles."}, status=status.HTTP_403_FORBIDDEN)
+            
             data = request.data
+            
+            # ✅ Handle role changes (only superuser can do this)
+            if "role" in data and request.user.is_superuser:
+                role = data.get("role")
+                if role == "Superuser":
+                    user.is_superuser = True
+                    user.is_staff = True
+                elif role == "Admin":
+                    user.is_superuser = False
+                    user.is_staff = True
+                elif role == "User":
+                    user.is_superuser = False
+                    user.is_staff = False
+                user.save()
+            
             user = UserService.update_user(
                 user_id=user_id,
                 username=data.get("username"),
@@ -65,6 +92,7 @@ class UpdateUserView(generics.UpdateAPIView):
                         "mobile": user.mobile,
                         "first_name": user.first_name,
                         "last_name": user.last_name,
+                        "role": "Superuser" if user.is_superuser else ("Admin" if user.is_staff else "User"),
                         "branches_assigned": [ub.branch.id for ub in user.user_branches.all()]
                     }
                 },
@@ -102,6 +130,8 @@ class GetAllUsersView(APIView):
                     "id": user.id,
                     "username": user.username,
                     "email": user.email,
+                    "user_code": user.user_code,
+                    "role": "Superuser" if user.is_superuser else ("Admin" if user.is_staff else "User"),
                     "is_staff": user.is_staff,
                     "is_superuser": user.is_superuser,
                     "branches": branch_details,  # ✅ Add branch list
@@ -112,11 +142,16 @@ class GetAllUsersView(APIView):
 class GetSingleUserView(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request, user_id):
-        # ✅ Check if the user is a superuser
-        if not request.user.is_superuser:
+        # ✅ Check permissions based on role
+        if not request.user.is_superuser and not request.user.is_staff:
             return Response({"error": "You do not have permission to access this resource."}, status=status.HTTP_403_FORBIDDEN)
 
         user = CustomUser.objects.get(id=user_id)
+        
+        # ✅ Admin can only view regular users
+        if request.user.is_staff and not request.user.is_superuser:
+            if user.is_staff or user.is_superuser:
+                return Response({"error": "Admins can only view regular user profiles."}, status=status.HTTP_403_FORBIDDEN)
 
         branches = UserBranch.objects.filter(user_id=user.id).select_related("branch")
 
@@ -137,6 +172,7 @@ class GetSingleUserView(APIView):
             "mobile": user.mobile,
             "email": user.email,
             "user_code": user.user_code,
+            "role": "Superuser" if user.is_superuser else ("Admin" if user.is_staff else "User"),
             "is_staff": user.is_staff,
             "is_superuser": user.is_superuser,
             "branches": branch_details

@@ -99,6 +99,10 @@ class InvoiceReportService:
         for invoice in invoice_qs:
             order_id = invoice.order_id
             payment_data = payments_by_order.get(order_id, {})
+            
+            # Use order.total_payment which accounts for refund expenses
+            # total_payment = sum(OrderPayments) - sum(Expenses)
+            total_payment = float(invoice.order.total_payment or 0)
           
             data = {
                 "invoice_id": invoice.id,
@@ -110,8 +114,8 @@ class InvoiceReportService:
                 "total_cash_payment": payment_data.get("cash", 0),
                 "total_credit_card_payment": payment_data.get("credit_card", 0),
                 "total_online_payment": payment_data.get("online_transfer", 0),
-                "total_payment": payment_data.get("total", 0),
-                "balance": float(invoice.order.total_price) - payment_data.get("total", 0),
+                "total_payment": total_payment,
+                "balance": float(invoice.order.total_price) - total_payment,
                 "is_deleted": invoice.is_deleted,
                 "is_refund": invoice.order.is_refund
             }
@@ -184,7 +188,12 @@ class InvoiceReportService:
         for invoice in soldering_invoice_qs:
             order_id = invoice.order_id
             payment_data = soldering_payments_by_order.get(order_id, {})
-            print("Invoice ID:", payment_data)
+            
+            # Use order.total_payment which accounts for refund expenses (if applicable to soldering)
+            # total_payment = sum(SolderingPayments) - sum(Expenses)
+            # Note: SolderingOrder might not have total_payment field, fallback to payment_data total
+            total_payment = float(getattr(invoice.order, 'total_payment', None) or payment_data.get("total", 0))
+            
             data = {
                 "invoice_id": invoice.id,
                 "invoice_number": invoice.invoice_number,
@@ -195,8 +204,8 @@ class InvoiceReportService:
                 "total_cash_payment": payment_data.get("cash", 0),
                 "total_credit_card_payment": payment_data.get("credit_card", 0),
                 "total_online_payment": payment_data.get("online_transfer", 0),
-                "total_payment": payment_data.get("total", 0),
-                "balance": float(invoice.order.price) - payment_data.get("total", 0)
+                "total_payment": total_payment,
+                "balance": float(invoice.order.price) - total_payment
             }
 
             # Add bank totals as separate keys

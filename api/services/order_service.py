@@ -1,6 +1,7 @@
-from ..models import Order,Frame,OrderProgress, OtherItem,OrderItem, LensStock, LensCleanerStock, FrameStock,Lens,LensCleaner,Frame,ExternalLens,OtherItemStock,BusSystemSetting, HearingItem, HearingItemStock
+from ..models import Order,Frame,OrderProgress, OtherItem,OrderItem, LensStock, LensCleanerStock, FrameStock,Lens,LensCleaner,Frame,ExternalLens,OtherItemStock,BusSystemSetting, HearingItem, HearingItemStock, Expense, ExpenseMainCategory, ExpenseSubCategory, OrderPayment
 from ..serializers import OrderSerializer, OrderItemSerializer, ExternalLensSerializer
 from django.db import transaction
+from django.db.models import Sum
 from ..services.order_payment_service import OrderPaymentService
 from ..services.external_lens_service import ExternalLensService
 from rest_framework.exceptions import ValidationError
@@ -178,7 +179,7 @@ class OrderService:
 
     @staticmethod
     @transaction.atomic
-    def update_order(order, order_data, order_items_data, payments_data,admin_id,user_id):
+    def update_order(order, order_data, order_items_data, payments_data, admin_id, user_id):
         if order.is_deleted:
             raise ValidationError("This order has been deleted and cannot be modified.")
 
@@ -462,10 +463,201 @@ class OrderService:
             if transitioning_off_hold:
                 StockValidationService.adjust_stocks(lens_stock_updates)
 
-            # Process Payments
-            total_payment = OrderPaymentService.append_on_change_payments_for_order(order, payments_data,admin_id,user_id)
-            if total_payment > order.total_price:
-                raise ValueError("Total payments exceed the order total price.")
+            # Handle Refund Logic: Recalculate order totals from ALL current items
+            # This ensures new items are included in the calculation
+            
+            # Get all current non-deleted order items
+            current_order_items = OrderItem.objects.filter(
+                order=order,
+                is_deleted=False
+            )
+            
+            # Recalculate subtotal from ALL active items (excluding refunded ones)
+            new_subtotal = Decimal('0.00')
+            total_refund_amount = Decimal('0.00')
+            refund_items = [item for item in order_items_data if item.get('is_refund', False) and item.get('id')]
+            refund_item_ids = [item['id'] for item in refund_items] if refund_items else []
+            
+            for item in current_order_items:
+                if item.pk in refund_item_ids or item.is_refund:
+                    # Track refunded items but don't add to subtotal
+                    total_refund_amount += item.subtotal
+                else:
+                    # Only non-refunded items count toward subtotal
+                    new_subtotal += item.subtotal
+            
+            # Update order totals with recalculated values
+            order.sub_total = new_subtotal
+            order.total_price = new_subtotal - (order.discount or Decimal('0.00'))
+            order.save()
+            
+            if refund_items:
+                # Get refunded order items for stock restoration
+                refunded_order_items = OrderItem.objects.filter(
+                    id__in=refund_item_ids,
+                    order=order,
+                    is_deleted=False
+                )
+                
+                # Now restore stock and soft delete items
+                for item in refunded_order_items:
+                    # Restore stock quantities based on item type (only if not on_hold)
+                    if not item.is_non_stock:
+                        stock = None
+                        stock_type = None
+                        
+                        # Determine stock type and get stock object
+                        if item.lens:
+                            stock = LensStock.objects.select_for_update().filter(
+                                lens=item.lens, 
+                                branch=order.branch
+                            ).first()
+                            stock_type = "lens"
+                        elif item.frame:
+                            stock = FrameStock.objects.select_for_update().filter(
+                                frame=item.frame, 
+                                branch=order.branch
+                            ).first()
+                            stock_type = "frame"
+                        elif item.other_item:
+                            stock = OtherItemStock.objects.select_for_update().filter(
+                                other_item=item.other_item, 
+                                branch=order.branch
+                            ).first()
+                            stock_type = "other_item"
+                        elif item.lens_cleaner:
+                            stock = LensCleanerStock.objects.select_for_update().filter(
+                                lens_cleaner=item.lens_cleaner, 
+                                branch=order.branch
+                            ).first()
+                            stock_type = "lens_cleaner"
+                        elif item.hearing_item:
+                            stock = HearingItemStock.objects.select_for_update().filter(
+                                hearing_item=item.hearing_item, 
+                                branch=order.branch
+                            ).first()
+                            stock_type = "hearing_item"
+                        
+                        # Restore stock quantity (add back the refunded quantity)
+                        if stock:
+                            stock.qty += item.quantity
+                            stock.save()
+                    
+                    # Soft delete the item
+                    item.is_deleted = True
+                    item.is_refund = True
+                    item.deleted_at = timezone.now()
+                    if admin_id:
+                        from ..models import CustomUser
+                        item.admin = CustomUser.objects.get(pk=admin_id)
+                    if user_id:
+                        from ..models import CustomUser
+                        item.user = CustomUser.objects.get(pk=user_id)
+                    item.save()
+
+                # Calculate actual cash refund amount based on overpayment
+                if total_refund_amount > 0:
+                    main_category_id = order_data.get('main_category', 1)
+                    sub_category_id = order_data.get('sub_category', 2)
+                    
+                    try:
+                        main_category = ExpenseMainCategory.objects.get(pk=main_category_id)
+                        sub_category = ExpenseSubCategory.objects.get(pk=sub_category_id, main_category=main_category)
+                    except (ExpenseMainCategory.DoesNotExist, ExpenseSubCategory.DoesNotExist):
+                        raise ValueError("Invalid expense category for refund")
+
+                    # Get invoice number for note
+                    invoice_number = order.invoice.invoice_number if hasattr(order, 'invoice') and order.invoice else f"Order #{order.pk}"
+
+                    # Build descriptive refund items list
+                    refund_descriptions = []
+                    for item in refunded_order_items:
+                        qty = item.quantity
+                        if item.external_lens:
+                            item_type = f"{qty} External Lens" if qty == 1 else f"{qty} External Lenses"
+                        elif item.lens:
+                            item_type = f"{qty} In-Stock Lens" if qty == 1 else f"{qty} In-Stock Lenses"
+                        elif item.frame:
+                            item_type = f"{qty} Frame" if qty == 1 else f"{qty} Frames"
+                        elif item.lens_cleaner:
+                            item_type = f"{qty} Lens Cleaner" if qty == 1 else f"{qty} Lens Cleaners"
+                        elif item.other_item:
+                            item_type = f"{qty} Other Item" if qty == 1 else f"{qty} Other Items"
+                        elif item.hearing_item:
+                            item_type = f"{qty} Hearing Item" if qty == 1 else f"{qty} Hearing Items"
+                        else:
+                            item_type = f"{qty} Item" if qty == 1 else f"{qty} Items"
+                        refund_descriptions.append(item_type)
+                    
+                    # Join descriptions with commas
+                    items_description = ", ".join(refund_descriptions)
+
+                    # Calculate new order total after refund (already updated above)
+                    new_order_total = order.total_price
+                    
+                    # Get EXISTING payments (before processing new payments in this update)
+                    existing_payments = OrderPayment.objects.filter(
+                        order=order,
+                        is_deleted=False
+                    ).aggregate(
+                        total=Sum('amount')
+                    )['total'] or Decimal('0.00')
+                    
+                    # Get PREVIOUS refunds already given (critical fix for multiple refunds)
+                    previous_refunds = Expense.objects.filter(
+                        order_refund=order,
+                        is_refund=True
+                    ).aggregate(
+                        total=Sum('amount')
+                    )['total'] or Decimal('0.00')
+                    
+                    # Calculate cash refund: how much customer overpaid for the NEW order total
+                    # Formula: existing_payments - previous_refunds - new_order_total
+                    # Example 1: Paid 700, refunded 0, new total 400 → refund = 700 - 0 - 400 = 300
+                    # Example 2: Paid 400, refunded 50, new total 200 → refund = 400 - 50 - 200 = 150
+                    net_payments = existing_payments - previous_refunds
+                    if net_payments > new_order_total:
+                        cash_refund_amount = net_payments - new_order_total
+                    else:
+                        cash_refund_amount = Decimal('0.00')
+                    
+                    # Create expense record with actual cash refund amount
+                    # Always create expense even with 0 amount for audit trail
+                    Expense.objects.create(
+                        paid_source='cash',
+                        branch=order.branch,
+                        main_category=main_category,
+                        sub_category=sub_category,
+                        amount=cash_refund_amount,
+                        note=f"Refund for Invoice {invoice_number} - {items_description}",
+                        paid_from_safe=False,
+                        is_refund=True,
+                        order_refund=order
+                    )
+
+            # Process Payments (now order.total_price is already updated with refund deduction)
+            OrderPaymentService.append_on_change_payments_for_order(order, payments_data,admin_id,user_id)
+            
+            # Calculate total_payment as sum of OrderPayments minus sum of Expenses
+            total_payments = OrderPayment.objects.filter(
+                order=order,
+                is_deleted=False
+            ).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0.00')
+            
+            total_expenses = Expense.objects.filter(
+                order_refund=order
+            ).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0.00')
+            
+            order.total_payment = total_payments - total_expenses
+            order.save(update_fields=['total_payment'])
+            
+            # Note: Overpayment validation removed to allow refund scenarios
+            # When items are refunded, existing payments may exceed new order total
+            # The expense creation logic above handles cash refunds for overpayments
 
             return order
 

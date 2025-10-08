@@ -155,7 +155,7 @@ class InvoiceService:
             if is_frame_only is not None:
                 filters["order__is_frame_only"] = int(is_frame_only)
 
-            invoice = Invoice.objects.select_related(
+            invoice = Invoice.all_objects.select_related(
                 "order__customer", "order__refraction"
             ).get(**filters)
 

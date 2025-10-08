@@ -44,6 +44,9 @@ class FrameOnlyOrderCreateView(APIView):
 
                     total_paid = OrderPaymentService.process_payments(order, prepared_payments)
 
+                    # Store total payment in order
+                    order.total_payment = Decimal(str(total_paid)) if total_paid else Decimal('0.00')
+
                     if total_paid >= order.total_price:
                         order.status = 'paid'
                     elif total_paid > 0:
@@ -74,13 +77,24 @@ class FrameOnlyOrderUpdateView(APIView):
 
             # 2️⃣ Handle payments separately
             payments_data = request.data.get("payments", [])
+            admin_id = request.data.get("admin_id")
+            user_id = request.data.get("user_id")
+            
             if payments_data:
                 # 🔧 Convert all 'amount' fields to Decimal
                 for p in payments_data:
                     if "amount" in p:
                         p["amount"] = Decimal(str(p["amount"]))
 
-                total_paid = OrderPaymentService.update_process_payments(updated_order, payments_data)
+                total_paid = OrderPaymentService.update_process_payments(
+                    updated_order, 
+                    payments_data, 
+                    admin_id, 
+                    user_id
+                )
+
+                # Store total payment in order
+                updated_order.total_payment = Decimal(str(total_paid)) if total_paid else Decimal('0.00')
 
                 if total_paid >= updated_order.total_price:
                     updated_order.status = "paid"

@@ -104,12 +104,8 @@ class HearingOrderReportView(APIView):
                 order = invoice.order
                 order_items = order.order_items.all()
                 
-                # Calculate total payments for this order
-                total_payments = sum(
-                    payment.amount 
-                    for payment in order.orderpayment_set.all()
-                    if not payment.is_deleted
-                )
+                # Use total_payment from order
+                total_paid = float(order.total_payment) if order.total_payment else 0.0
                 
                 # Filter items based on date range if dates were provided
                 items_data = []
@@ -151,8 +147,8 @@ class HearingOrderReportView(APIView):
                         'subtotal': float(order.sub_total),
                         'discount': float(order.discount) if order.discount else 0.0,
                         'total_price': float(order.total_price),
-                        'total_paid': float(total_payments),
-                        'balance': float(order.total_price - total_payments),
+                        'total_paid': total_paid,
+                        'balance': float(order.total_price) - total_paid,
                         'items': items_data,
                         'order_remark': order.order_remark or ''
                     })
@@ -175,9 +171,9 @@ class HearingOrderReportView(APIView):
             
             if last_service:
                 return {
-                    'last_service_date': last_service.last_service_date.isoformat(),
-                    'scheduled_service_date': last_service.scheduled_service_date.isoformat(),
-                    'price': float(last_service.price)
+                    'last_service_date': last_service.last_service_date.isoformat() if last_service.last_service_date else None,
+                    'scheduled_service_date': last_service.scheduled_service_date.isoformat() if last_service.scheduled_service_date else None,
+                    'price': float(last_service.price) if last_service.price else 0.0
                 }
             return None
         except Exception:
@@ -276,12 +272,8 @@ class HearingOrderReminderReportView(APIView):
                 order = invoice.order
                 order_items = order.order_items.all()
                 
-                # Calculate total payments for this order
-                total_payments = sum(
-                    payment.amount 
-                    for payment in order.orderpayment_set.all()
-                    if not payment.is_deleted
-                )
+                # Use total_payment from order
+                total_paid = float(order.total_payment) if order.total_payment else 0.0
                 
                 # Filter items based on date range if dates were provided
                 items_data = []
@@ -323,9 +315,9 @@ class HearingOrderReminderReportView(APIView):
                         'branch_name': order.branch.branch_name,
                         'subtotal': float(order.sub_total),
                         'discount': float(order.discount) if order.discount else 0.0,
-                        'total_price': float(order.total_price),
-                        'total_paid': float(total_payments),
-                        'balance': float(order.total_price - total_payments),
+                        'total_price': float(order.total_payment),
+                        'total_paid': total_paid,
+                        'balance': float(order.total_price) - float(order.total_payment),
                         'items': items_data,
                         'order_remark': order.order_remark or ''
                     })
@@ -443,11 +435,8 @@ class HearingOrderReportByOrderDateView(APIView):
             for invoice in page:
                 order = invoice.order
                 order_items = order.order_items.all()
-                total_payments = sum(
-                    payment.amount
-                    for payment in order.orderpayment_set.all()
-                    if not payment.is_deleted
-                )
+                # Use total_payment from order
+                total_paid = float(order.total_payment) if order.total_payment else 0.0
                 items_data = []
                 for item in order_items:
                     if item.hearing_item:
@@ -477,8 +466,8 @@ class HearingOrderReportByOrderDateView(APIView):
                         'subtotal': float(order.sub_total),
                         'discount': float(order.discount) if order.discount else 0.0,
                         'total_price': float(order.total_price),
-                        'total_paid': float(total_payments),
-                        'balance': float(order.total_price - total_payments),
+                        'total_paid': total_paid,
+                        'balance': float(order.total_price) - total_paid,
                         'items': items_data,
                         'order_remark': order.order_remark or ''
                     })

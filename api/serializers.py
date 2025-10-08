@@ -569,6 +569,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'hearing_item',
             'next_service_date',
             'last_reminder_at',
+            'is_refund'
         ]
 
 
@@ -684,6 +685,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'sub_total',
             'discount',
             'total_price',
+            'total_payment',
             'order_items',
             'order_payments',
             'sales_staff_code',
@@ -816,8 +818,10 @@ class InvoiceSerializer(serializers.ModelSerializer):
     customer = serializers.PrimaryKeyRelatedField(source='order.customer', read_only=True)  #  Fetch customer ID
     customer_details = PatientSerializer(source='order.customer', read_only=True)  #  Full customer details
     order_details = OrderSerializer(source='order', read_only=True)  #  Full order details
+    order_expenses = serializers.SerializerMethodField()  # Order-related expenses
     refraction_details = serializers.SerializerMethodField()
     refraction_number = serializers.CharField(source='order.refraction.refraction_number', read_only=True)
+    
     
     class Meta:
         model = Invoice
@@ -832,7 +836,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'invoice_number',
             'invoice_date',
             'order_details',  #  Full order details (optional)
-              #  NEW fields for tracking factory invoice progress
+            'order_expenses',  # Order-related expenses
             'refraction_number',
         ]
 
@@ -844,6 +848,11 @@ class InvoiceSerializer(serializers.ModelSerializer):
             except RefractionDetails.DoesNotExist:
                 pass
         return None
+
+    def get_order_expenses(self, obj):
+        """Get all expenses related to this order."""
+        expenses = obj.order.expense_refunds.all()
+        return ExpenseSerializer(expenses, many=True).data
 
 class DoctorSerializer(serializers.ModelSerializer):
     class Meta:
@@ -1043,7 +1052,13 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
     max_digits=10,  # Use the same as your model
     decimal_places=2,  # Use the same as your model
     read_only=True
-)
+    )
+    total_payment = serializers.DecimalField(
+    source='order.total_payment',
+    max_digits=10,  # Use the same as your model
+    decimal_places=2,  # Use the same as your model
+    read_only=True
+    )
     fitting_on_collection = serializers.BooleanField(
         source='order.fitting_on_collection', read_only=True
     )
@@ -1097,6 +1112,7 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
             'invoice_number',
             'invoice_date',
             'total_price',
+            'total_payment',
             'whatsapp_sent',
             'arrival_status',
             'fitting_on_collection',
@@ -1294,6 +1310,7 @@ class FrameOnlyOrderSerializer(serializers.Serializer):
     sub_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     discount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0.00)
     total_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+
     order_remark = serializers.CharField(required=False, allow_blank=True)
     progress_status = serializers.ChoiceField(
     choices=[
@@ -1433,6 +1450,10 @@ class ExternalLensOrderItemSerializer(serializers.ModelSerializer):
     total_price = serializers.CharField(
         source='order.total_price', read_only=True
     )
+    total_payment = serializers.CharField(
+        source='order.total_payment', read_only=True
+    )
+
     fitting_on_collection = serializers.BooleanField(
         source='order.fitting_on_collection', read_only=True
     )
@@ -1447,7 +1468,7 @@ class ExternalLensOrderItemSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'external_lens', 'quantity', 'price_per_unit', 'subtotal',
             'order_id', 'invoice_number', 'invoice_date', 'branch_name','customer_name',
-            'total_price', 'fitting_on_collection', 'on_hold', 'payments','urgent',
+            'total_price','total_payment', 'fitting_on_collection', 'on_hold', 'payments','urgent',
             'progress_status','whatsapp_sent','arrival_status'
         ]
     def get_payments(self, obj):
