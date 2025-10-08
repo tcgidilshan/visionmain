@@ -2,7 +2,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-from ..models import Order,Invoice,OrderProgress  # Assuming Order model exists
+from django.db.models import Sum
+from decimal import Decimal
+from ..models import Order,Invoice,OrderProgress,OrderPayment,Expense  # Assuming Order model exists
 from ..serializers import OrderPaymentSerializer
 from ..services.order_payment_service import OrderPaymentService  # Assuming service function is in OrderService
 
@@ -50,13 +52,31 @@ class PaymentView(APIView):
             # ✅ Process payments using the service function
             total_payment = OrderPaymentService.append_on_change_payments_for_order(order, payments_data,admin_id,user_id)
 
+            # ✅ Update order.total_payment = sum(OrderPayments) - sum(Expenses)
+            total_payments = OrderPayment.objects.filter(
+                order=order,
+                is_deleted=False
+            ).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0.00')
+            
+            total_expenses = Expense.objects.filter(
+                order_refund=order
+            ).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0.00')
+            
+            order.total_payment = total_payments - total_expenses
+            order.save(update_fields=['total_payment'])
+
             # ✅ Return updated order payment details
             updated_payments = order.orderpayment_set.all()
             response_serializer = OrderPaymentSerializer(updated_payments, many=True)
             
             return Response({
                 "message": "Payments updated successfully.",
-                "total_payment": total_payment,
+                "total_payment": float(order.total_payment),
+                "balance": float(order.total_price - order.total_payment),
                 "updated_payments": response_serializer.data
             }, status=status.HTTP_200_OK)
 
