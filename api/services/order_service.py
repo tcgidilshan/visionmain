@@ -603,10 +603,21 @@ class OrderService:
                         total=Sum('amount')
                     )['total'] or Decimal('0.00')
                     
+                    # Get PREVIOUS refunds already given (critical fix for multiple refunds)
+                    previous_refunds = Expense.objects.filter(
+                        order_refund=order,
+                        is_refund=True
+                    ).aggregate(
+                        total=Sum('amount')
+                    )['total'] or Decimal('0.00')
+                    
                     # Calculate cash refund: how much customer overpaid for the NEW order total
-                    # Example: Customer paid 700, new total is 400, refund = 700 - 400 = 300
-                    if existing_payments > new_order_total:
-                        cash_refund_amount = existing_payments - new_order_total
+                    # Formula: existing_payments - previous_refunds - new_order_total
+                    # Example 1: Paid 700, refunded 0, new total 400 → refund = 700 - 0 - 400 = 300
+                    # Example 2: Paid 400, refunded 50, new total 200 → refund = 400 - 50 - 200 = 150
+                    net_payments = existing_payments - previous_refunds
+                    if net_payments > new_order_total:
+                        cash_refund_amount = net_payments - new_order_total
                     else:
                         cash_refund_amount = Decimal('0.00')
                     
