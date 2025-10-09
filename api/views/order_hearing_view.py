@@ -8,6 +8,7 @@ from ..services.order_payment_service import OrderPaymentService
 from ..models import HearingItem, CustomUser,Order
 from ..services.audit_log_service import OrderAuditLogService
 from ..services.order_service import OrderService
+from decimal import Decimal
 
 class HearingOrderCreateView(APIView):
     """
@@ -73,6 +74,9 @@ class HearingOrderCreateView(APIView):
                 # Process payments if any
                 if payments_data:
                     total_paid = OrderPaymentService.process_payments(order, payments_data)
+                    
+                    # Store total payment in order
+                    order.total_payment = Decimal(str(total_paid)) if total_paid else Decimal('0.00')
                     
                     # Update order status based on payments
                     if total_paid >= order.total_price:
