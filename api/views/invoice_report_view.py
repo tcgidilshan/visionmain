@@ -47,11 +47,19 @@ class FactoryOrderReportView(APIView):
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
         branch_id = request.query_params.get('branch_id')
+        filter_type = request.query_params.get('filter_type', 'payment_date')  # Default to payment_date
         
         # Validate required parameters
         if not all([start_date, end_date, branch_id]):
             return Response(
                 {"error": "start_date, end_date, and branch_id are required parameters"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Validate filter_type
+        if filter_type not in ['payment_date', 'invoice_date', 'all']:
+            return Response(
+                {"error": "filter_type must be 'payment_date', 'invoice_date', or 'all'"},
                 status=status.HTTP_400_BAD_REQUEST
             )
             
@@ -63,7 +71,8 @@ class FactoryOrderReportView(APIView):
             report_data = InvoiceReportService.get_factory_order_report(
                 start_date_str=start_date,
                 end_date_str=end_date,
-                branch_id=branch_id
+                branch_id=branch_id,
+                filter_type=filter_type
             )
             
             return Response({
@@ -92,6 +101,7 @@ class NormalOrderReportView(APIView):
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
         branch_id = request.query_params.get('branch_id')
+        filter_type = request.query_params.get('filter_type', 'payment_date')  # Default to payment_date
 
         
         # Validate required parameters
@@ -101,6 +111,13 @@ class NormalOrderReportView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
          
+        # Validate filter_type
+        if filter_type not in ['payment_date', 'invoice_date', 'all']:
+            return Response(
+                {"error": "filter_type must be 'payment_date', 'invoice_date', or 'all'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
         try:
             # Convert branch_id to integer
             branch_id = int(branch_id)
@@ -109,7 +126,8 @@ class NormalOrderReportView(APIView):
             report_data = InvoiceReportService.get_normal_order_report(
                 start_date_str=start_date,
                 end_date_str=end_date,
-                branch_id=branch_id
+                branch_id=branch_id,
+                filter_type=filter_type
             )
             
             return Response({
@@ -199,6 +217,60 @@ class SolderingOrderReportView(APIView):
                 start_date_str=start_date,
                 end_date_str=end_date,
                 branch_id=branch_id
+            )
+            
+            return Response({
+                "success": True,
+                "data": report_data
+            }, status=status.HTTP_200_OK)
+            
+        except ValueError as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class HearingOrderReportView(APIView):
+    """
+    API endpoint to generate hearing order reports.
+    """
+    
+    def get(self, request, format=None):
+        # Get query parameters with defaults
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        branch_id = request.query_params.get('branch_id')
+        filter_type = request.query_params.get('filter_type', 'payment_date')  # Default to payment_date
+        
+        # Validate required parameters
+        if not all([start_date, end_date, branch_id]):
+            return Response(
+                {"error": "start_date, end_date, and branch_id are required parameters"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Validate filter_type
+        if filter_type not in ['payment_date', 'invoice_date', 'all']:
+            return Response(
+                {"error": "filter_type must be 'payment_date', 'invoice_date', or 'all'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            # Convert branch_id to integer
+            branch_id = int(branch_id)
+            
+            # Generate the report
+            report_data = InvoiceReportService.get_hearing_order_report(
+                start_date_str=start_date,
+                end_date_str=end_date,
+                branch_id=branch_id,
+                filter_type=filter_type
             )
             
             return Response({

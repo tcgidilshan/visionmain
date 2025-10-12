@@ -217,7 +217,7 @@ class InvoiceReportService:
         return results
     
     @staticmethod
-    def get_factory_order_report(start_date_str, end_date_str, branch_id):
+    def get_factory_order_report(start_date_str, end_date_str, branch_id, filter_type='payment_date'):
         """
         Generate a detailed factory order report filtered by date range and branch.
         
@@ -225,6 +225,7 @@ class InvoiceReportService:
             start_date_str (str): Start date in YYYY-MM-DD format
             end_date_str (str): End date in YYYY-MM-DD format
             branch_id (int): Branch ID to filter by
+            filter_type (str): Type of filtering - 'payment_date', 'invoice_date', or 'all'
             
         Returns:
             dict: {
@@ -261,33 +262,57 @@ class InvoiceReportService:
         if start_datetime > end_datetime:
             raise ValueError("Start date cannot be after end date.")
         
-    # for inv in Invoice.objects.all():
-    #     print(f"id={inv.id}, invoice_type={inv.invoice_type}, invoice_date={inv.invoice_date}, branch_id={inv.order.branch_id}, is_deleted={inv.is_deleted}, order_is_deleted={inv.order.is_deleted}")
+        # Get invoices based on filter type
+        if filter_type == 'invoice_date':
+            # Original logic: filter by invoice date
+            invoices = Invoice.all_objects.select_related(
+                'order', 'order__customer', 'order__refraction'
+            ).filter(
+                invoice_type='factory',
+                invoice_date__range=(start_datetime, end_datetime),
+                order__branch_id=branch_id,
+                # is_deleted=False,
+                # order__is_deleted=False
+            ).order_by('invoice_date')
+        elif filter_type == 'payment_date':
+            # Current logic: filter by payment date
+            payments = OrderPayment.objects.filter(
+                payment_date__range=(start_datetime, end_datetime),
+                order__branch_id=branch_id
+            ).select_related('order')
             
-  
-        # Get all factory invoices in the date range for the branch
-        invoices = Invoice.all_objects.select_related(
-            'order', 'order__customer', 'order__refraction'
-        ).annotate(
-            invoice_date_only=TruncDate('invoice_date')
-        ).filter(
-            invoice_type='factory',
-            invoice_date__range=(start_datetime, end_datetime),
-            order__branch_id=branch_id,
-            # is_deleted=False,
-            # order__is_deleted=False
-        ).order_by('invoice_date')
+            order_ids = payments.values_list('order_id', flat=True).distinct()
+            
+            invoices = Invoice.all_objects.select_related(
+                'order', 'order__customer', 'order__refraction'
+            ).filter(
+                order_id__in=order_ids,
+                invoice_type='factory',
+                order__branch_id=branch_id,
+                # is_deleted=False,
+                # order__is_deleted=False
+            ).order_by('invoice_date')
+        elif filter_type == 'all':
+            # Combined logic: invoices with payments in date range OR invoices created in date range
+            payments = OrderPayment.objects.filter(
+                payment_date__range=(start_datetime, end_datetime),
+                order__branch_id=branch_id
+            ).select_related('order')
+            
+            payment_order_ids = payments.values_list('order_id', flat=True).distinct()
+            
+            invoices = Invoice.all_objects.select_related(
+                'order', 'order__customer', 'order__refraction'
+            ).filter(
+                Q(order_id__in=payment_order_ids) |  # Orders with payments in date range
+                Q(invoice_type='factory', invoice_date__range=(start_datetime, end_datetime)),  # OR invoices created in date range
+                order__branch_id=branch_id,
+                # is_deleted=False,
+                # order__is_deleted=False
+            ).distinct().order_by('invoice_date')
+        else:
+            raise ValueError("Invalid filter_type. Must be 'payment_date', 'invoice_date', or 'all'")
         
-        
-        # Get all payments for these orders
-        order_ids = invoices.values_list('order_id', flat=True)
-        payments = OrderPayment.objects.filter(
-            order_id__in=order_ids
-        ).values('order_id').annotate(
-            total_paid=Sum('amount')
-        )
-
-        # print(f"invoices: {invoices}")
         # Get all payments for these orders
         order_ids = invoices.values_list('order_id', flat=True)
         payments = OrderPayment.objects.filter(
@@ -324,7 +349,7 @@ class InvoiceReportService:
             
             # Calculate payment totals
             total_amount = float(order.total_price)
-            paid_amount = payments_dict.get(order.id, 0)
+            paid_amount = float(order.total_payment)
             balance = total_amount - paid_amount
             
             # Check if refund or deleted
@@ -372,7 +397,7 @@ class InvoiceReportService:
         }
         
     @staticmethod
-    def get_normal_order_report(start_date_str, end_date_str, branch_id):
+    def get_normal_order_report(start_date_str, end_date_str, branch_id, filter_type='payment_date'):
         """
         Generate a detailed normal order report filtered by date range and branch.
         
@@ -380,6 +405,7 @@ class InvoiceReportService:
             start_date_str (str): Start date in YYYY-MM-DD format
             end_date_str (str): End date in YYYY-MM-DD format
             branch_id (int): Branch ID to filter by
+            filter_type (str): Type of filtering - 'payment_date', 'invoice_date', or 'all'
             
         Returns:
             dict: {
@@ -423,16 +449,56 @@ class InvoiceReportService:
         # for inv in Invoice.objects.all():
         #     print(f"idz={inv.id}, invoice_type={inv.invoice_type}, invoice_date={inv.invoice_date}, branch_id={inv.order.branch_id}, is_deleted={inv.is_deleted}, order_is_deleted={inv.order.is_deleted}")
         
-        # Get all normal invoices in the date range for the branch
-        invoices = Invoice.objects.select_related(
-            'order', 'order__customer', 'order__refraction'
-        ).filter(
-            invoice_type='normal',  # Changed from 'factory' to 'manual' for normal orders
-            invoice_date__range=(start_datetime, end_datetime),
-            order__branch_id=branch_id,
-            is_deleted=False,
-            order__is_deleted=False
-        ).order_by('invoice_date')
+        # Get invoices based on filter type
+        if filter_type == 'invoice_date':
+            # Original logic: filter by invoice date
+            invoices = Invoice.objects.select_related(
+                'order', 'order__customer', 'order__refraction'
+            ).filter(
+                invoice_type='normal',
+                invoice_date__range=(start_datetime, end_datetime),
+                order__branch_id=branch_id,
+                is_deleted=False,
+                order__is_deleted=False
+            ).order_by('invoice_date')
+        elif filter_type == 'payment_date':
+            # Filter by payment date
+            payments = OrderPayment.objects.filter(
+                payment_date__range=(start_datetime, end_datetime),
+                order__branch_id=branch_id
+            ).select_related('order')
+            
+            order_ids = payments.values_list('order_id', flat=True).distinct()
+            
+            invoices = Invoice.objects.select_related(
+                'order', 'order__customer', 'order__refraction'
+            ).filter(
+                order_id__in=order_ids,
+                invoice_type='normal',
+                order__branch_id=branch_id,
+                is_deleted=False,
+                order__is_deleted=False
+            ).order_by('invoice_date')
+        elif filter_type == 'all':
+            # Combined logic: invoices with payments in date range OR invoices created in date range
+            payments = OrderPayment.objects.filter(
+                payment_date__range=(start_datetime, end_datetime),
+                order__branch_id=branch_id
+            ).select_related('order')
+            
+            payment_order_ids = payments.values_list('order_id', flat=True).distinct()
+            
+            invoices = Invoice.objects.select_related(
+                'order', 'order__customer', 'order__refraction'
+            ).filter(
+                Q(order_id__in=payment_order_ids) |  # Orders with payments in date range
+                Q(invoice_type='normal', invoice_date__range=(start_datetime, end_datetime)),  # OR invoices created in date range
+                order__branch_id=branch_id,
+                is_deleted=False,
+                order__is_deleted=False
+            ).distinct().order_by('invoice_date')
+        else:
+            raise ValueError("Invalid filter_type. Must be 'payment_date', 'invoice_date', or 'all'")
         
         # Get all payments for these orders
         order_ids = invoices.values_list('order_id', flat=True)
@@ -473,7 +539,7 @@ class InvoiceReportService:
             
             # Calculate payment totals
             total_amount = float(order.total_price)
-            paid_amount = payments_dict.get(order.id, 0)
+            paid_amount = float(order.total_payment)
             balance = total_amount - paid_amount
             
             # Add to totals
@@ -737,5 +803,194 @@ class InvoiceReportService:
                 'total_balance': total_balance
             }
         }
+    
+    @staticmethod
+    def get_hearing_order_report(start_date_str, end_date_str, branch_id, filter_type='payment_date'):
+        """
+        Generate a detailed hearing order report filtered by date range and branch.
         
+        Args:
+            start_date_str (str): Start date in YYYY-MM-DD format
+            end_date_str (str): End date in YYYY-MM-DD format
+            branch_id (int): Branch ID to filter by
+            filter_type (str): Type of filtering - 'payment_date', 'invoice_date', or 'all'
+            
+        Returns:
+            dict: {
+                'orders': [
+                    {
+                        'refraction_number': str,
+                        'invoice_number': str,
+                        'date': str (YYYY-MM-DD),
+                        'time': str (HH:MM:SS),
+                        'customer_name': str,
+                        'nic': str,
+                        'address': str,
+                        'mobile_number': str,
+                        'total_amount': float,
+                        'paid_amount': float,
+                        'balance': float,
+                        'bill': float  # Same as total_amount for backward compatibility
+                    },
+                    ...
+                ],
+                'summary': {
+                    'total_invoice_amount': float,
+                    'total_paid_amount': float,
+                    'total_balance': float
+                }
+            }
+        """
+        try:
+            start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date_str, end_date_str)
+            
+        except ValueError:
+            raise ValueError("Invalid date format. Use YYYY-MM-DD.")
+            
+        if start_datetime > end_datetime:
+            raise ValueError("Start date cannot be after end date.")
+        
+        # Get invoices based on filter type
+        if filter_type == 'invoice_date':
+            # Original logic: filter by invoice date
+            invoices = Invoice.all_objects.select_related(
+                'order', 'order__customer', 'order__refraction'
+            ).filter(
+                invoice_type='hearing',
+                invoice_date__range=(start_datetime, end_datetime),
+                order__branch_id=branch_id,
+                # is_deleted=False,
+                # order__is_deleted=False
+            ).order_by('invoice_date')
+        elif filter_type == 'payment_date':
+            # Filter by payment date
+            payments = OrderPayment.objects.filter(
+                payment_date__range=(start_datetime, end_datetime),
+                order__branch_id=branch_id
+            ).select_related('order')
+            
+            order_ids = payments.values_list('order_id', flat=True).distinct()
+            
+            invoices = Invoice.all_objects.select_related(
+                'order', 'order__customer', 'order__refraction'
+            ).filter(
+                order_id__in=order_ids,
+                invoice_type='hearing',
+                order__branch_id=branch_id,
+                # is_deleted=False,
+                # order__is_deleted=False
+            ).order_by('invoice_date')
+        elif filter_type == 'all':
+            # Combined logic: invoices with payments in date range OR invoices created in date range
+            payments = OrderPayment.objects.filter(
+                payment_date__range=(start_datetime, end_datetime),
+                order__branch_id=branch_id
+            ).select_related('order')
+            
+            payment_order_ids = payments.values_list('order_id', flat=True).distinct()
+            
+            invoices = Invoice.all_objects.select_related(
+                'order', 'order__customer', 'order__refraction'
+            ).filter(
+                Q(order_id__in=payment_order_ids) |  # Orders with payments in date range
+                Q(invoice_type='hearing', invoice_date__range=(start_datetime, end_datetime)),  # OR invoices created in date range
+                order__branch_id=branch_id,
+                # is_deleted=False,
+                # order__is_deleted=False
+            ).distinct().order_by('invoice_date')
+        else:
+            raise ValueError("Invalid filter_type. Must be 'payment_date', 'invoice_date', or 'all'")
+        
+        # Get all payments for these orders
+        order_ids = invoices.values_list('order_id', flat=True)
+        payments = OrderPayment.objects.filter(
+            order_id__in=order_ids
+        ).values('order_id').annotate(
+            total_paid=Sum('amount')
+        )
+
+        # print(f"invoices: {invoices}")
+        # Get all payments for these orders
+        order_ids = invoices.values_list('order_id', flat=True)
+        payments = OrderPayment.objects.filter(
+            order_id__in=order_ids
+        ).values('order_id').annotate(
+            total_paid=Sum('amount')
+        )
+        
+        # Create a dictionary of order_id to total_paid
+        payments_dict = {p['order_id']: float(p['total_paid'] or 0) for p in payments}
+        
+        # Prepare the report data
+        orders = []
+        total_invoice_amount = 0
+        total_paid_amount = 0
+        total_balance = 0
+        total_refund_amount = 0
+        total_refund_paid_amount = 0
+        total_refund_balance = 0
+        total_invoice_count = 0 
+        
+        for invoice in invoices:
+            order = invoice.order
+            customer = order.customer
+            refraction = order.refraction
+            
+            # Get customer details from refraction if available, otherwise from patient
+            
+            # refraction_number = refraction. or ''
+            customer_name = customer.name
+            nic = customer.nic or ''
+            address = customer.address or ''
+            mobile_number = customer.phone_number or ''
+            
+            # Calculate payment totals
+            total_amount = float(order.total_price)
+            paid_amount = float(order.total_payment)
+            balance = total_amount - paid_amount
+            
+            # Check if refund or deleted
+            is_refund_or_deleted = order.is_refund or invoice.is_deleted or order.is_deleted
+            
+            if is_refund_or_deleted:
+                total_refund_amount += total_amount
+                total_refund_paid_amount += paid_amount
+                total_refund_balance += balance
+            else:
+                total_invoice_amount += total_amount
+                total_paid_amount += paid_amount
+                total_balance += balance
+                total_invoice_count += 1
+           
+            # Add order to results
+            orders.append({
+                # 'refraction_number': refraction_number,
+                'invoice_number': invoice.invoice_number or '',
+                'date': invoice.invoice_date.strftime("%Y-%m-%d"),
+                'time': invoice.invoice_date.strftime("%H:%M:%S"),
+                'customer_name': customer_name,
+                'nic': nic or '',
+                'address': address or '',
+                'mobile_number': mobile_number or '',
+                'total_amount': total_amount,
+                'paid_amount': paid_amount,
+                'balance': balance,
+                'bill': total_amount,  # For backward compatibility
+                'is_refund': order.is_refund,
+                'is_deleted': invoice.is_deleted or order.is_deleted
+            })
+        
+        return {
+            'orders': orders,
+            'summary': {
+                'total_invoice_count': total_invoice_count, 
+                'total_invoice_amount': total_invoice_amount,
+                'total_paid_amount': total_paid_amount,
+                'total_balance': total_balance,
+                'total_refund_amount': total_refund_amount,
+                'total_refund_paid_amount': total_refund_paid_amount,
+                'total_refund_balance': total_refund_balance
+            }
+        }
+
 

@@ -73,7 +73,7 @@ from .views import (
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
     LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
     RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
-    HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView
+    HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView,HearingOrderReportView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -313,6 +313,7 @@ urlpatterns = [
     path('reports/normal-orders/', NormalOrderReportView.as_view(), name='normal-order-report'),
     path('reports/channel-orders/', ChannelOrderReportView.as_view(), name='channel-order-report'),
     path('reports/soldering-orders/', SolderingOrderReportView.as_view(), name='soldering-order-report'),
+    path('reports/hearing-orders/', HearingOrderReportView.as_view(), name='hearing-order-report'),
     path('reports/best-customers/', BestCustomersReportView.as_view(), name='best-customers-report'),
     path('reports/employee-history/', EmployeeHistoryReportView.as_view(), name='employee-history-report'),
     path('reports/payment-method/', PaymentSummaryReportView.as_view(), name='payment-summary-report'),
