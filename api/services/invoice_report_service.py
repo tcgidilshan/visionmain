@@ -643,7 +643,7 @@ class InvoiceReportService:
         #desing how you need refudn ,delete handle
 
     @staticmethod
-    def get_channel_order_report(start_date_str, end_date_str, branch_id):
+    def get_channel_order_report(start_date_str, end_date_str, branch_id, filter_type='all'):
         """
         Generate a detailed channel order report filtered by date range and branch.
         
@@ -651,6 +651,7 @@ class InvoiceReportService:
             start_date_str (str): Start date in YYYY-MM-DD format
             end_date_str (str): End date in YYYY-MM-DD format
             branch_id (int): Branch ID to filter by
+            filter_type (str): Type of filtering - 'payment_date', 'invoice_date', or 'all'
             
         Returns:
             dict: {
@@ -674,30 +675,95 @@ class InvoiceReportService:
                     'total_invoice_count': int,
                     'total_invoice_amount': float,
                     'total_paid_amount': float,
-                    'total_balance': float
+                    'total_balance': float,
+                    'total_refund_paid_amount': float,
+                    'total_refund_balance': float
                 }
             }
         """
         try:
             start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date_str, end_date_str)
+            
         except ValueError:
             raise ValueError("Invalid date format. Use YYYY-MM-DD.")
             
         if start_datetime > end_datetime:
             raise ValueError("Start date cannot be after end date.")
+        
+        # Get appointments based on filter type
+        if filter_type == 'invoice_date':
+            # Only appointments created in date range OR deleted/refunded in date range
+            appointments = Appointment.all_objects.select_related(
+                'patient',
+            ).filter(
+                Q(created_at__range=(start_datetime, end_datetime))|
+                Q(created_at__range=(start_datetime, end_datetime), deleted_at__range=(start_datetime, end_datetime))|
+                Q(created_at__range=(start_datetime, end_datetime), refunded_at__range=(start_datetime, end_datetime)),
+                branch_id=branch_id,
+                # is_deleted=False,
+            ).order_by('created_at')
+            print(f"Channel appointments found by invoice_date: {appointments}")
+        elif filter_type == 'payment_date':
+            # Filter by payment date OR appointments refunded/deleted in date range
+            payments = ChannelPayment.objects.filter(
+                payment_date__range=(start_datetime, end_datetime),
+                appointment__branch_id=branch_id
+            ).select_related('appointment')
             
-        # Get all appointments in the date range for the branch
-        appointments = Appointment.objects.select_related('patient').filter(
-            created_at__range=(start_datetime, end_datetime),
-            branch_id=branch_id,
-            is_deleted=False
-        ).order_by('created_at', 'time')
+            payment_appointment_ids = payments.values_list('appointment_id', flat=True).distinct()
+            
+            # Also get appointments that were refunded or deleted in this date range
+            refunded_deleted_appointments = Appointment.all_objects.filter(
+                Q(refunded_at__range=(start_datetime, end_datetime)) |
+                Q(deleted_at__range=(start_datetime, end_datetime)),
+                branch_id=branch_id
+            ).values_list('id', flat=True).distinct()
+            
+            all_appointment_ids = set(payment_appointment_ids) | set(refunded_deleted_appointments)
+            
+            appointments = Appointment.all_objects.select_related(
+                'patient'
+            ).filter(
+                id__in=all_appointment_ids,
+                branch_id=branch_id,
+                # is_deleted=False,
+            ).order_by('created_at')
+        elif filter_type == 'all':
+            # Intersection logic: appointments with payments in date range AND created in date range
+            # PLUS appointments that were refunded/deleted in date range
+            payments = ChannelPayment.objects.filter(
+                payment_date__range=(start_datetime, end_datetime),
+                appointment__branch_id=branch_id
+            ).select_related('appointment')
+            
+            payment_appointment_ids = payments.values_list('appointment_id', flat=True).distinct()
+            
+            # Get appointments that were refunded or deleted in this date range
+            refunded_deleted_appointments = Appointment.all_objects.filter(
+                Q(refunded_at__range=(start_datetime, end_datetime)) |
+                Q(deleted_at__range=(start_datetime, end_datetime)),
+                branch_id=branch_id
+            ).values_list('id', flat=True).distinct()
+            
+            # Combine payment appointments and refunded/deleted appointments
+            all_appointment_ids = set(payment_appointment_ids) | set(refunded_deleted_appointments)
+            
+            appointments = Appointment.all_objects.select_related(
+                'patient'
+            ).filter(
+                Q(created_at__range=(start_datetime, end_datetime))|
+                Q(deleted_at__range=(start_datetime, end_datetime))|
+                Q(refunded_at__range=(start_datetime, end_datetime)),
+                branch_id=branch_id,
+                # is_deleted=False,
+            ).distinct().order_by('created_at')
+        else:
+            raise ValueError("Invalid filter_type. Must be 'payment_date', 'invoice_date', or 'all'")
         
         # Get all payments for these appointments
-        appointment_ids = list(appointments.values_list('id', flat=True))
+        appointment_ids = appointments.values_list('id', flat=True)
         payments = ChannelPayment.objects.filter(
-            appointment_id__in=appointment_ids,
-            is_deleted=False
+            appointment_id__in=appointment_ids
         ).values('appointment_id').annotate(
             total_paid=Sum('amount')
         )
@@ -710,20 +776,38 @@ class InvoiceReportService:
         total_invoice_amount = 0
         total_paid_amount = 0
         total_balance = 0
-        total_invoice_count = appointments.count()
+        total_refund_paid_amount = 0
+        total_refund_balance = 0
+        total_invoice_count = 0 
         
         for appointment in appointments:
             patient = appointment.patient
+    
+            
+            # Get customer details from patient
+            customer_name = patient.name if patient else ''
+            address = patient.address if patient and hasattr(patient, 'address') else ''
+            mobile_number = patient.phone_number if patient and hasattr(patient, 'phone_number') else ''
             
             # Calculate payment totals
             total_amount = float(appointment.amount or 0)
+            
+            
             paid_amount = payments_dict.get(appointment.id, 0)
+            
             balance = total_amount - paid_amount
             
-            # Add to totals
-            total_invoice_amount += total_amount
-            total_paid_amount += paid_amount
-            total_balance += balance
+            # Check if refund or deleted
+            is_refund_or_deleted = appointment.is_refund or appointment.is_deleted
+            
+            if is_refund_or_deleted:
+                total_refund_paid_amount += paid_amount
+                total_refund_balance += balance
+            else:
+                total_invoice_amount += total_amount
+                total_paid_amount += paid_amount
+                total_balance += balance
+                total_invoice_count += 1
             
             # Add appointment to results
             orders.append({
@@ -731,24 +815,29 @@ class InvoiceReportService:
                 'channel_number': str(appointment.channel_no or ''),
                 'date': appointment.date.strftime("%Y-%m-%d") if appointment.date else '',
                 'time': appointment.time.strftime("%H:%M:%S") if appointment.time else '',
-                'customer_name': patient.name if patient else '',
-                'address': patient.address if patient and hasattr(patient, 'address') else '',
-                'mobile_number': patient.phone_number if patient and hasattr(patient, 'phone_number') else '',
+                'customer_name': customer_name,
+                'address': address,
+                'mobile_number': mobile_number,
                 'total_amount': total_amount,
                 'paid_amount': paid_amount,
                 'balance': balance,
-                'bill': total_amount  # Same as total_amount for consistency
+                'bill': total_amount,  # For backward compatibility
+                'is_refund': appointment.is_refund,
+                'is_deleted': appointment.is_deleted
             })
         
         return {
             'orders': orders,
             'summary': {
-                'total_invoice_count': total_invoice_count,
+                'total_invoice_count': total_invoice_count, 
                 'total_invoice_amount': total_invoice_amount,
                 'total_paid_amount': total_paid_amount,
-                'total_balance': total_balance
+                'total_balance': total_balance,
+                'total_refund_paid_amount': total_refund_paid_amount,
+                'total_refund_balance': total_refund_balance
             }
         }
+        #desing how you need refudn ,delete handle
     
     @staticmethod
     def get_soldering_order_report(start_date_str, end_date_str, branch_id):

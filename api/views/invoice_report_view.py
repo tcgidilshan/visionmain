@@ -156,11 +156,19 @@ class ChannelOrderReportView(APIView):
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
         branch_id = request.query_params.get('branch_id')
+        filter_type = request.query_params.get('filter_type', 'payment_date')  # Default to payment_date
         
         # Validate required parameters
         if not all([start_date, end_date, branch_id]):
             return Response(
                 {"error": "start_date, end_date, and branch_id are required parameters"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Validate filter_type
+        if filter_type not in ['payment_date', 'invoice_date', 'all']:
+            return Response(
+                {"error": "filter_type must be 'payment_date', 'invoice_date', or 'all'"},
                 status=status.HTTP_400_BAD_REQUEST
             )
             
@@ -172,7 +180,8 @@ class ChannelOrderReportView(APIView):
             report_data = InvoiceReportService.get_channel_order_report(
                 start_date_str=start_date,
                 end_date_str=end_date,
-                branch_id=branch_id
+                branch_id=branch_id,
+                filter_type=filter_type
             )
             
             return Response({
