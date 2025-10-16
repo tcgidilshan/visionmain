@@ -217,15 +217,15 @@ class InvoiceReportService:
         return results
     
     @staticmethod
-    def get_factory_order_report(start_date_str, end_date_str, branch_id, filter_type='all'):
+    def get_factory_order_report(start_date_str, end_date_str, branch_id):
         """
         Generate a detailed factory order report filtered by date range and branch.
+        Filter by invoice_date only.
         
         Args:
             start_date_str (str): Start date in YYYY-MM-DD format
             end_date_str (str): End date in YYYY-MM-DD format
             branch_id (int): Branch ID to filter by
-            filter_type (str): Type of filtering - 'payment_date', 'invoice_date', or 'all'
             
         Returns:
             dict: {
@@ -262,81 +262,17 @@ class InvoiceReportService:
         if start_datetime > end_datetime:
             raise ValueError("Start date cannot be after end date.")
         
-        # Get invoices based on filter type
-        if filter_type == 'invoice_date':
-            # Changed from OR logic to AND logic: only normal invoices that meet ALL conditions
-            invoices = Invoice.all_objects.select_related(
-                'order', 'order__customer',
-            ).filter(
-                Q(invoice_type='factory', invoice_date__range=(start_datetime, end_datetime))|
-                 Q(invoice_type='factory', invoice_date__range=(start_datetime, end_datetime), order__deleted_at__range=(start_datetime, end_datetime))|
-                 Q(invoice_type='factory', invoice_date__range=(start_datetime, end_datetime),order__refunded_at__range=(start_datetime, end_datetime)),
-                # is_deleted=False,
-                # order__is_deleted=False
-            ).order_by('invoice_date')
-            print(f"Factory invoices found by invoice_date: {invoices}")
-        elif filter_type == 'payment_date':
-            # Filter by payment date OR orders refunded/deleted in date range
-            payments = OrderPayment.objects.filter(
-                payment_date__range=(start_datetime, end_datetime),
-                order__branch_id=branch_id
-            ).select_related('order')
-            
-            payment_order_ids = payments.values_list('order_id', flat=True).distinct()
-            
-            # Also get orders that were refunded or deleted in this date range
-            refunded_deleted_orders = Order.all_objects.filter(
-                Q(expense_refunds__is_refund=True, expense_refunds__created_at__range=(start_datetime, end_datetime)) | 
-                Q(refunded_at__range=(start_datetime, end_datetime)) |
-                Q(deleted_at__range=(start_datetime, end_datetime)),
-                branch_id=branch_id
-            ).values_list('id', flat=True).distinct()
-            
-            all_order_ids = set(payment_order_ids) | set(refunded_deleted_orders)
-            
-            invoices = Invoice.all_objects.select_related(
-                'order', 'order__customer', 'order__refraction'
-            ).filter(
-                order_id__in=all_order_ids,
-                invoice_type='factory',
-                order__branch_id=branch_id,
-                # is_deleted=False,
-                # order__is_deleted=False
-            ).order_by('invoice_date')
-        elif filter_type == 'all':
-            # Intersection logic: invoices with payments in date range AND created in date range
-            # PLUS orders that were refunded/deleted in date range
-            payments = OrderPayment.objects.filter(
-                payment_date__range=(start_datetime, end_datetime),
-                order__branch_id=branch_id,
-                order__invoice__invoice_type='factory'
-            ).select_related('order')
-            
-            payment_order_ids = payments.values_list('order_id', flat=True).distinct()
-            
-            # Get orders that were refunded or deleted in this date range
-            refunded_deleted_orders = Order.all_objects.filter(
-                Q(expense_refunds__is_refund=True, expense_refunds__created_at__range=(start_datetime, end_datetime)) | 
-                Q(refunded_at__range=(start_datetime, end_datetime)) |
-                Q(deleted_at__range=(start_datetime, end_datetime)),
-                branch_id=branch_id
-            ).values_list('id', flat=True).distinct()
-            
-            # Combine payment orders and refunded/deleted orders
-            all_order_ids = set(payment_order_ids) | set(refunded_deleted_orders)
-            
-            invoices = Invoice.all_objects.select_related(
-                'order', 'order__customer', 'order__refraction'
-            ).filter(
-                Q(invoice_type='factory', invoice_date__range=(start_datetime, end_datetime))|
-                 Q(invoice_type='factory',  order__deleted_at__range=(start_datetime, end_datetime))|
-                 Q(invoice_type='factory', order__refunded_at__range=(start_datetime, end_datetime)),
-                order__branch_id=branch_id,
-                # is_deleted=False,
-                # order__is_deleted=False
-            ).distinct().order_by('invoice_date')
-        else:
-            raise ValueError("Invalid filter_type. Must be 'payment_date', 'invoice_date', or 'all'")
+        # Get invoices filtered by invoice_date only
+        invoices = Invoice.all_objects.select_related(
+            'order', 'order__customer',
+        ).filter(
+            Q(invoice_type='factory', invoice_date__range=(start_datetime, end_datetime))|
+             Q(invoice_type='factory', invoice_date__range=(start_datetime, end_datetime), order__deleted_at__range=(start_datetime, end_datetime))|
+             Q(invoice_type='factory', invoice_date__range=(start_datetime, end_datetime),order__refunded_at__range=(start_datetime, end_datetime)),
+            order__branch_id=branch_id,
+            # is_deleted=False,
+            # order__is_deleted=False
+        ).order_by('invoice_date')
         
         # Get all payments for these orders
         order_ids = invoices.values_list('order_id', flat=True)
@@ -428,15 +364,15 @@ class InvoiceReportService:
         }
         #desing how you need refudn ,delete handle 
     @staticmethod
-    def get_normal_order_report(start_date_str, end_date_str, branch_id, filter_type='all'):
+    def get_normal_order_report(start_date_str, end_date_str, branch_id):
         """
         Generate a detailed normal order report filtered by date range and branch.
+        Filter by invoice_date only.
         
         Args:
             start_date_str (str): Start date in YYYY-MM-DD format
             end_date_str (str): End date in YYYY-MM-DD format
             branch_id (int): Branch ID to filter by
-            filter_type (str): Type of filtering - 'payment_date', 'invoice_date', or 'all'
             
         Returns:
             dict: {
@@ -476,81 +412,18 @@ class InvoiceReportService:
         if start_datetime > end_datetime:
             raise ValueError("Start date cannot be after end date.")
         
-        # Get invoices based on filter type
-        if filter_type == 'invoice_date':
-            # Changed from OR logic to AND logic: only normal invoices that meet ALL conditions
-            invoices = Invoice.all_objects.select_related(
-                'order', 'order__customer',
-            ).filter(
-                Q(invoice_type='normal', invoice_date__range=(start_datetime, end_datetime))|
-                 Q(invoice_type='normal', invoice_date__range=(start_datetime, end_datetime), order__deleted_at__range=(start_datetime, end_datetime))|
-                 Q(invoice_type='normal', invoice_date__range=(start_datetime, end_datetime),order__refunded_at__range=(start_datetime, end_datetime)),
-                # is_deleted=False,
-                # order__is_deleted=False
-            ).order_by('invoice_date')
-            print(f"Normal invoices found by invoice_date: {invoices}")
-        elif filter_type == 'payment_date':
-            # Filter by payment date OR orders refunded/deleted in date range
-            payments = OrderPayment.objects.filter(
-                payment_date__range=(start_datetime, end_datetime),
-                order__branch_id=branch_id
-            ).select_related('order')
-            
-            payment_order_ids = payments.values_list('order_id', flat=True).distinct()
-            
-            # Also get orders that were refunded or deleted in this date range
-            refunded_deleted_orders = Order.all_objects.filter(
-                Q(expense_refunds__is_refund=True, expense_refunds__created_at__range=(start_datetime, end_datetime)) | 
-                Q(refunded_at__range=(start_datetime, end_datetime)) |
-                Q(deleted_at__range=(start_datetime, end_datetime)),
-                branch_id=branch_id
-            ).values_list('id', flat=True).distinct()
-            
-            all_order_ids = set(payment_order_ids) | set(refunded_deleted_orders)
-            
-            invoices = Invoice.all_objects.select_related(
-                'order', 'order__customer', 'order__refraction'
-            ).filter(
-                order_id__in=all_order_ids,
-                invoice_type='normal',
-                order__branch_id=branch_id,
-                # is_deleted=False,
-                # order__is_deleted=False
-            ).order_by('invoice_date')
-        elif filter_type == 'all':
-            # Intersection logic: invoices with payments in date range AND created in date range
-            # PLUS orders that were refunded/deleted in date range
-            payments = OrderPayment.objects.filter(
-                payment_date__range=(start_datetime, end_datetime),
-                order__branch_id=branch_id,
-                order__invoice__invoice_type='normal'
-            ).select_related('order')
-            
-            payment_order_ids = payments.values_list('order_id', flat=True).distinct()
-            
-            # Get orders that were refunded or deleted in this date range
-            refunded_deleted_orders = Order.all_objects.filter(
-                Q(expense_refunds__is_refund=True, expense_refunds__created_at__range=(start_datetime, end_datetime)) | 
-                Q(refunded_at__range=(start_datetime, end_datetime)) |
-                Q(deleted_at__range=(start_datetime, end_datetime)),
-                branch_id=branch_id
-            ).values_list('id', flat=True).distinct()
-            
-            # Combine payment orders and refunded/deleted orders
-            all_order_ids = set(payment_order_ids) | set(refunded_deleted_orders)
-            
-            invoices = Invoice.all_objects.select_related(
-                'order', 'order__customer', 'order__refraction'
-            ).filter(
-                Q(invoice_type='normal', invoice_date__range=(start_datetime, end_datetime))|
-                 Q(invoice_type='normal',  order__deleted_at__range=(start_datetime, end_datetime))|
-                 Q(invoice_type='normal', order__refunded_at__range=(start_datetime, end_datetime)),
-                order__branch_id=branch_id,
-                # is_deleted=False,
-                # order__is_deleted=False
-            ).distinct().order_by('invoice_date')
-        else:
-            raise ValueError("Invalid filter_type. Must be 'payment_date', 'invoice_date', or 'all'")
+        # Get invoices filtered by invoice_date only
+        invoices = Invoice.all_objects.select_related(
+            'order', 'order__customer',
+        ).filter(
+            Q(invoice_type='normal', invoice_date__range=(start_datetime, end_datetime))|
+             Q(invoice_type='normal', invoice_date__range=(start_datetime, end_datetime), order__deleted_at__range=(start_datetime, end_datetime))|
+             Q(invoice_type='normal', invoice_date__range=(start_datetime, end_datetime),order__refunded_at__range=(start_datetime, end_datetime)),
+            order__branch_id=branch_id,
+            # is_deleted=False,
+            # order__is_deleted=False
+        ).order_by('invoice_date')
+        print(f"Normal invoices found by invoice_date: {invoices}")
         
         # Get all payments for these orders
         order_ids = invoices.values_list('order_id', flat=True)
@@ -643,15 +516,15 @@ class InvoiceReportService:
         #desing how you need refudn ,delete handle
 
     @staticmethod
-    def get_channel_order_report(start_date_str, end_date_str, branch_id, filter_type='all'):
+    def get_channel_order_report(start_date_str, end_date_str, branch_id):
         """
         Generate a detailed channel order report filtered by date range and branch.
+        Filter by created_at (invoice date) only.
         
         Args:
             start_date_str (str): Start date in YYYY-MM-DD format
             end_date_str (str): End date in YYYY-MM-DD format
             branch_id (int): Branch ID to filter by
-            filter_type (str): Type of filtering - 'payment_date', 'invoice_date', or 'all'
             
         Returns:
             dict: {
@@ -690,75 +563,17 @@ class InvoiceReportService:
         if start_datetime > end_datetime:
             raise ValueError("Start date cannot be after end date.")
         
-        # Get appointments based on filter type
-        if filter_type == 'invoice_date':
-            # Only appointments created in date range OR deleted/refunded in date range
-            appointments = Appointment.all_objects.select_related(
-                'patient',
-            ).filter(
-                Q(created_at__range=(start_datetime, end_datetime))|
-                Q(created_at__range=(start_datetime, end_datetime), deleted_at__range=(start_datetime, end_datetime))|
-                Q(created_at__range=(start_datetime, end_datetime), refunded_at__range=(start_datetime, end_datetime)),
-                branch_id=branch_id,
-                # is_deleted=False,
-            ).order_by('created_at')
-            print(f"Channel appointments found by invoice_date: {appointments}")
-        elif filter_type == 'payment_date':
-            # Filter by payment date OR appointments refunded/deleted in date range
-            payments = ChannelPayment.objects.filter(
-                payment_date__range=(start_datetime, end_datetime),
-                appointment__branch_id=branch_id
-            ).select_related('appointment')
-            
-            payment_appointment_ids = payments.values_list('appointment_id', flat=True).distinct()
-            
-            # Also get appointments that were refunded or deleted in this date range
-            refunded_deleted_appointments = Appointment.all_objects.filter(
-                Q(refunded_at__range=(start_datetime, end_datetime)) |
-                Q(deleted_at__range=(start_datetime, end_datetime)),
-                branch_id=branch_id
-            ).values_list('id', flat=True).distinct()
-            
-            all_appointment_ids = set(payment_appointment_ids) | set(refunded_deleted_appointments)
-            
-            appointments = Appointment.all_objects.select_related(
-                'patient'
-            ).filter(
-                id__in=all_appointment_ids,
-                branch_id=branch_id,
-                # is_deleted=False,
-            ).order_by('created_at')
-        elif filter_type == 'all':
-            # Intersection logic: appointments with payments in date range AND created in date range
-            # PLUS appointments that were refunded/deleted in date range
-            payments = ChannelPayment.objects.filter(
-                payment_date__range=(start_datetime, end_datetime),
-                appointment__branch_id=branch_id
-            ).select_related('appointment')
-            
-            payment_appointment_ids = payments.values_list('appointment_id', flat=True).distinct()
-            
-            # Get appointments that were refunded or deleted in this date range
-            refunded_deleted_appointments = Appointment.all_objects.filter(
-                Q(refunded_at__range=(start_datetime, end_datetime)) |
-                Q(deleted_at__range=(start_datetime, end_datetime)),
-                branch_id=branch_id
-            ).values_list('id', flat=True).distinct()
-            
-            # Combine payment appointments and refunded/deleted appointments
-            all_appointment_ids = set(payment_appointment_ids) | set(refunded_deleted_appointments)
-            
-            appointments = Appointment.all_objects.select_related(
-                'patient'
-            ).filter(
-                Q(created_at__range=(start_datetime, end_datetime))|
-                Q(deleted_at__range=(start_datetime, end_datetime))|
-                Q(refunded_at__range=(start_datetime, end_datetime)),
-                branch_id=branch_id,
-                # is_deleted=False,
-            ).distinct().order_by('created_at')
-        else:
-            raise ValueError("Invalid filter_type. Must be 'payment_date', 'invoice_date', or 'all'")
+        # Get appointments filtered by created_at only
+        appointments = Appointment.all_objects.select_related(
+            'patient',
+        ).filter(
+            Q(created_at__range=(start_datetime, end_datetime))|
+            Q(created_at__range=(start_datetime, end_datetime), deleted_at__range=(start_datetime, end_datetime))|
+            Q(created_at__range=(start_datetime, end_datetime), refunded_at__range=(start_datetime, end_datetime)),
+            branch_id=branch_id,
+            # is_deleted=False,
+        ).order_by('created_at')
+        print(f"Channel appointments found by invoice_date: {appointments}")
         
         # Get all payments for these appointments
         appointment_ids = appointments.values_list('id', flat=True)
@@ -963,15 +778,15 @@ class InvoiceReportService:
         }
     
     @staticmethod
-    def get_hearing_order_report(start_date_str, end_date_str, branch_id, filter_type='all'):
+    def get_hearing_order_report(start_date_str, end_date_str, branch_id):
         """
         Generate a detailed hearing order report filtered by date range and branch.
+        Filter by invoice_date only.
         
         Args:
             start_date_str (str): Start date in YYYY-MM-DD format
             end_date_str (str): End date in YYYY-MM-DD format
             branch_id (int): Branch ID to filter by
-            filter_type (str): Type of filtering - 'payment_date', 'invoice_date', or 'all'
             
         Returns:
             dict: {
@@ -1010,81 +825,18 @@ class InvoiceReportService:
         if start_datetime > end_datetime:
             raise ValueError("Start date cannot be after end date.")
         
-        # Get invoices based on filter type
-        if filter_type == 'invoice_date':
-            # Changed from OR logic to AND logic: only hearing invoices that meet ALL conditions
-            invoices = Invoice.all_objects.select_related(
-                'order', 'order__customer',
-            ).filter(
-                Q(invoice_type='hearing', invoice_date__range=(start_datetime, end_datetime))|
-                 Q(invoice_type='hearing', invoice_date__range=(start_datetime, end_datetime), order__deleted_at__range=(start_datetime, end_datetime))|
-                 Q(invoice_type='hearing', invoice_date__range=(start_datetime, end_datetime),order__refunded_at__range=(start_datetime, end_datetime)),
-                # is_deleted=False,
-                # order__is_deleted=False
-            ).order_by('invoice_date')
-            print(f"Hearing invoices found by invoice_date: {invoices}")
-        elif filter_type == 'payment_date':
-            # Filter by payment date OR orders refunded/deleted in date range
-            payments = OrderPayment.objects.filter(
-                payment_date__range=(start_datetime, end_datetime),
-                order__branch_id=branch_id
-            ).select_related('order')
-            
-            payment_order_ids = payments.values_list('order_id', flat=True).distinct()
-            
-            # Also get orders that were refunded or deleted in this date range
-            refunded_deleted_orders = Order.all_objects.filter(
-                Q(expense_refunds__is_refund=True, expense_refunds__created_at__range=(start_datetime, end_datetime)) | 
-                Q(refunded_at__range=(start_datetime, end_datetime)) |
-                Q(deleted_at__range=(start_datetime, end_datetime)),
-                branch_id=branch_id
-            ).values_list('id', flat=True).distinct()
-            
-            all_order_ids = set(payment_order_ids) | set(refunded_deleted_orders)
-            
-            invoices = Invoice.all_objects.select_related(
-                'order', 'order__customer', 'order__refraction'
-            ).filter(
-                order_id__in=all_order_ids,
-                invoice_type='hearing',
-                order__branch_id=branch_id,
-                # is_deleted=False,
-                # order__is_deleted=False
-            ).order_by('invoice_date')
-        elif filter_type == 'all':
-            # Intersection logic: invoices with payments in date range AND created in date range
-            # PLUS orders that were refunded/deleted in date range
-            payments = OrderPayment.objects.filter(
-                payment_date__range=(start_datetime, end_datetime),
-                order__branch_id=branch_id,
-                order__invoice__invoice_type='hearing'
-            ).select_related('order')
-            
-            payment_order_ids = payments.values_list('order_id', flat=True).distinct()
-            
-            # Get orders that were refunded or deleted in this date range
-            refunded_deleted_orders = Order.all_objects.filter(
-                Q(expense_refunds__is_refund=True, expense_refunds__created_at__range=(start_datetime, end_datetime)) | 
-                Q(refunded_at__range=(start_datetime, end_datetime)) |
-                Q(deleted_at__range=(start_datetime, end_datetime)),
-                branch_id=branch_id
-            ).values_list('id', flat=True).distinct()
-            
-            # Combine payment orders and refunded/deleted orders
-            all_order_ids = set(payment_order_ids) | set(refunded_deleted_orders)
-            
-            invoices = Invoice.all_objects.select_related(
-                'order', 'order__customer', 'order__refraction'
-            ).filter(
-                Q(invoice_type='hearing', invoice_date__range=(start_datetime, end_datetime))|
-                 Q(invoice_type='hearing',  order__deleted_at__range=(start_datetime, end_datetime))|
-                 Q(invoice_type='hearing', order__refunded_at__range=(start_datetime, end_datetime)),
-                order__branch_id=branch_id,
-                # is_deleted=False,
-                # order__is_deleted=False
-            ).distinct().order_by('invoice_date')
-        else:
-            raise ValueError("Invalid filter_type. Must be 'payment_date', 'invoice_date', or 'all'")
+        # Get invoices filtered by invoice_date only
+        invoices = Invoice.all_objects.select_related(
+            'order', 'order__customer',
+        ).filter(
+            Q(invoice_type='hearing', invoice_date__range=(start_datetime, end_datetime))|
+             Q(invoice_type='hearing', invoice_date__range=(start_datetime, end_datetime), order__deleted_at__range=(start_datetime, end_datetime))|
+             Q(invoice_type='hearing', invoice_date__range=(start_datetime, end_datetime),order__refunded_at__range=(start_datetime, end_datetime)),
+            order__branch_id=branch_id,
+            # is_deleted=False,
+            # order__is_deleted=False
+        ).order_by('invoice_date')
+        print(f"Hearing invoices found by invoice_date: {invoices}")
         
         # Get all payments for these orders
         order_ids = invoices.values_list('order_id', flat=True)
