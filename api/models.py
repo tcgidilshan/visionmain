@@ -12,6 +12,7 @@ from django.db import IntegrityError
 from django.utils.timezone import now
 from .services.image_uploard_service import compress_image_to_webp
 import uuid
+import os
 from django.db.models.functions import TruncDate
 from decimal import Decimal
 class Item(models.Model):
@@ -302,6 +303,32 @@ class FrameImage(models.Model):
             if new_image:
                 self.image.save(new_image.name, new_image, save=False)
         super().save(*args, **kwargs)
+    
+    def delete(self, *args, **kwargs):
+        # Store the image path and folder before deletion
+        if self.image:
+            image_path = self.image.path if hasattr(self.image, 'path') else None
+            image_folder = os.path.dirname(image_path) if image_path else None
+            
+            # Delete the file from storage
+            if image_path and os.path.exists(image_path):
+                try:
+                    os.remove(image_path)
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Error deleting image file {image_path}: {str(e)}")
+            
+            # Try to remove the UUID folder if it's empty
+            if image_folder and os.path.exists(image_folder):
+                try:
+                    os.rmdir(image_folder)
+                except OSError:
+                    # Directory not empty or doesn't exist, that's fine
+                    pass
+        
+        # Call the parent delete method to remove the database record
+        super().delete(*args, **kwargs)
 
 class OrderImage(models.Model):
     def get_upload_path(instance, filename):
@@ -1025,7 +1052,7 @@ class Schedule(models.Model):
         self.save()
 
     class Meta:
-        unique_together = ('doctor', 'branch', 'date', 'start_time','status','is_deleted') 
+        unique_together = ('doctor', 'branch', 'date', 'start_time','status' ) 
 
     def __str__(self):
         return f"{self.doctor} - {self.date} ({self.start_time}) - {self.status}"
