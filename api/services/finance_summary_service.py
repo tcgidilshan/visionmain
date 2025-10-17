@@ -370,7 +370,7 @@ class DailyFinanceSummaryService:
         return {
             "branch": branch_id,
             "date": str(date),
-            "today_order_payments": today_order_payments_online_transfer+today_order_payments_credit_card+today_order_payments_cash,
+            "today_order_payments": today_order_payments_online_transfer+today_order_payments_credit_card+today_order_payments_cash+today_soldering_payments_online_transfer+today_soldering_payments_credit_card+today_soldering_payments_cash,
             "today_channel_payments": today_channel_payments_online_transfer+today_channel_payments_credit_card+today_channel_payments_cash,
             "today_soldering_payments": today_soldering_payments_online_transfer+today_soldering_payments_credit_card+today_soldering_payments_cash,
             "today_other_income": today_other_income,

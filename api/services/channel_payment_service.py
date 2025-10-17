@@ -82,9 +82,10 @@ class ChannelPaymentService:
         )
         # Step 2: Enrich expense data
         expense_data['amount'] = str(total_amount)
-        expense_data['note'] = f"Refund for cancelled appointment #{appointment.id}"
+        expense_data['note'] = f"Refund invoice - {appointment.invoice_number}"
         expense_data['paid_source'] = "cash"
         expense_data['is_refund'] = True
+        expense_data['paid_from_safe'] =False
 
         # Step 3: Create expense
         serializer = ExpenseSerializer(data=expense_data)

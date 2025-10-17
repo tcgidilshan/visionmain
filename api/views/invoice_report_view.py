@@ -40,10 +40,11 @@ class InvoiceReportView(APIView):
 class FactoryOrderReportView(APIView):
     """
     API endpoint to generate factory order reports.
+    Filters by invoice_date only.
     """
     
     def get(self, request, format=None):
-        # Get query parameters with defaults
+        # Get query parameters
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
         branch_id = request.query_params.get('branch_id')
@@ -85,14 +86,14 @@ class FactoryOrderReportView(APIView):
 class NormalOrderReportView(APIView):
     """
     API endpoint to generate normal order reports.
+    Filters by invoice_date only.
     """
     
     def get(self, request, format=None):
-        # Get query parameters with defaults
+        # Get query parameters
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
         branch_id = request.query_params.get('branch_id')
-
         
         # Validate required parameters
         if not all([start_date, end_date, branch_id]):
@@ -100,7 +101,7 @@ class NormalOrderReportView(APIView):
                 {"error": "start_date, end_date, and branch_id are required parameters"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-         
+            
         try:
             # Convert branch_id to integer
             branch_id = int(branch_id)
@@ -131,10 +132,11 @@ class NormalOrderReportView(APIView):
 class ChannelOrderReportView(APIView):
     """
     API endpoint to generate channel order reports.
+    Filters by created_at (invoice date) only.
     """
     
     def get(self, request, format=None):
-        # Get query parameters with defaults
+        # Get query parameters
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
         branch_id = request.query_params.get('branch_id')
@@ -196,6 +198,52 @@ class SolderingOrderReportView(APIView):
             
             # Generate the report
             report_data = InvoiceReportService.get_soldering_order_report(
+                start_date_str=start_date,
+                end_date_str=end_date,
+                branch_id=branch_id
+            )
+            
+            return Response({
+                "success": True,
+                "data": report_data
+            }, status=status.HTTP_200_OK)
+            
+        except ValueError as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class HearingOrderReportView(APIView):
+    """
+    API endpoint to generate hearing order reports.
+    Filters by invoice_date only.
+    """
+    
+    def get(self, request, format=None):
+        # Get query parameters
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        branch_id = request.query_params.get('branch_id')
+        
+        # Validate required parameters
+        if not all([start_date, end_date, branch_id]):
+            return Response(
+                {"error": "start_date, end_date, and branch_id are required parameters"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            # Convert branch_id to integer
+            branch_id = int(branch_id)
+            
+            # Generate the report
+            report_data = InvoiceReportService.get_hearing_order_report(
                 start_date_str=start_date,
                 end_date_str=end_date,
                 branch_id=branch_id
