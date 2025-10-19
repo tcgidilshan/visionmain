@@ -3,6 +3,7 @@ from rest_framework import generics, status,filters
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from ..services.pagination_service import PaginationService
+from ..services.time_zone_convert_service import TimezoneConverterService
 from ..models import DoctorClaimInvoice,DoctorClaimChannel
 
 class DoctorClaimInvoiceListCreateView(generics.ListCreateAPIView):
@@ -23,10 +24,10 @@ class DoctorClaimInvoiceListCreateView(generics.ListCreateAPIView):
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
         
-        if start_date:
-            queryset = queryset.filter(created_at__date__gte=start_date)
-        if end_date:
-            queryset = queryset.filter(created_at__date__lte=end_date)
+        start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
+        
+        if start_datetime and end_datetime:
+            queryset = queryset.filter(created_at__range=[start_datetime, end_datetime])
             
         return queryset    
 
@@ -101,10 +102,10 @@ class DoctorClaimChannelListCreateView(generics.ListCreateAPIView):
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
         
-        if start_date:
-            queryset = queryset.filter(created_at__date__gte=start_date)
-        if end_date:
-            queryset = queryset.filter(created_at__date__lte=end_date)
+        start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
+        
+        if start_datetime and end_datetime:
+            queryset = queryset.filter(created_at__range=[start_datetime, end_datetime])
             
         return queryset    
     

@@ -9,13 +9,17 @@ class ChannelReportService:
     def get_channel_payments_by_date_and_branch(payment_date, branch_id):
         """
         Fetch and summarize all channel payments on a specific date and branch.
+        Includes soft-deleted and refunded appointments.
         """
 
         # Step 1: Filter ChannelPayments with timezone handling
         try:
-            start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(payment_date,None)
-            payments = ChannelPayment.objects.filter(
-                (Q(payment_date__range=(start_datetime, end_datetime)) |  Q(appointment__deleted_at__range=(start_datetime, end_datetime))),
+            start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(payment_date, None)
+            # Use all_objects to include soft-deleted payments
+            payments = ChannelPayment.all_objects.filter(
+                (Q(payment_date__range=(start_datetime, end_datetime)) | 
+                 Q(appointment__deleted_at__range=(start_datetime, end_datetime)) |
+                 Q(appointment__refunded_at__range=(start_datetime, end_datetime))),
                 appointment__branch_id=branch_id
             ).select_related('appointment')
         except (ValueError, TypeError) as e:
@@ -44,9 +48,11 @@ class ChannelReportService:
                     "total_due": float(payment.appointment.amount),  # channeling_fee
                     "balance": 0,
                     'appointment_id': payment.appointment_id,
-                    'is_deleted':payment.appointment.is_deleted,
-                    'is_refund':payment.appointment.is_refund,
+                    'is_deleted': payment.appointment.is_deleted,
+                    'is_refund': payment.appointment.is_refund,
                     'created_at': payment.appointment.created_at.isoformat() if payment.appointment.created_at else None,
+                    'deleted_at': payment.appointment.deleted_at.isoformat() if payment.appointment.deleted_at else None,
+                    'refunded_at': payment.appointment.refunded_at.isoformat() if payment.appointment.refunded_at else None,
                 }
                 # Initialize all branch banks with 0
                 for bank_name in branch_banks:

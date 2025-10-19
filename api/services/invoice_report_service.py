@@ -293,10 +293,11 @@ class InvoiceReportService:
         total_refund_paid_amount = 0
         total_refund_balance = 0
         total_invoice_count = 0 
-        # provided date range sum of expence order refunds 
+        # provided date range sum of expence order refunds for FACTORY orders only
         refund_amount = Expense.objects.filter(
             created_at__range=(start_datetime, end_datetime),
-            order_refund__isnull=False
+            order_refund__isnull=False,
+            order_refund__invoice__invoice_type='factory'
         ).aggregate(Sum('amount'))['amount__sum'] or 0
         total_refund_paid_amount += float(refund_amount)
         print(f"Refund amount in date range: {refund_amount}")
@@ -444,10 +445,11 @@ class InvoiceReportService:
         total_refund_paid_amount = 0
         total_refund_balance = 0
         total_invoice_count = 0 
-        # provided date range sum of expence order refunds 
+        # provided date range sum of expence order refunds for NORMAL orders only
         refund_amount = Expense.objects.filter(
             created_at__range=(start_datetime, end_datetime),
-            order_refund__isnull=False
+            order_refund__isnull=False,
+            order_refund__invoice__invoice_type='normal'
         ).aggregate(Sum('amount'))['amount__sum'] or 0
         total_refund_paid_amount += float(refund_amount)
         print(f"Refund amount in date range: {refund_amount}")
@@ -859,10 +861,11 @@ class InvoiceReportService:
         total_refund_paid_amount = 0
         total_refund_balance = 0
         total_invoice_count = 0 
-        # provided date range sum of expence order refunds 
+        # provided date range sum of expence order refunds for HEARING orders only
         refund_amount = Expense.objects.filter(
             created_at__range=(start_datetime, end_datetime),
-            order_refund__isnull=False
+            order_refund__isnull=False,
+            order_refund__invoice__invoice_type='hearing'
         ).aggregate(Sum('amount'))['amount__sum'] or 0
         total_refund_paid_amount += float(refund_amount)
         # print(f"Refund amount in date range: {refund_amount}")
