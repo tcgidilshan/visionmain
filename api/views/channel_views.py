@@ -145,7 +145,8 @@ class ChannelListView(ListAPIView):
 
     
 class AppointmentRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Appointment.objects.select_related('doctor', 'patient', 'schedule').prefetch_related('payments')  # Use the correct related_name
+    # Use all_objects to include soft-deleted appointments
+    queryset = Appointment.all_objects.select_related('doctor', 'patient', 'schedule').prefetch_related('payments')
     serializer_class = AppointmentDetailSerializer
 
     def put(self, request, *args, **kwargs):
@@ -164,10 +165,15 @@ class AppointmentRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView)
         serializer.save()
 
     def delete(self, request, *args, **kwargs):
-        """Handle appointment delete"""
-        instance = self.get_object()
-        self.perform_destroy(instance)
-        return Response({"message": "Appointment deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+        """Handle appointment soft delete"""
+        appointment_id = kwargs.get('pk')
+        try:
+            result = ChannelSoftDeleteService.soft_delete_channel(appointment_id)
+            return Response(result, status=status.HTTP_200_OK)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 class DoctorScheduleTransferView(APIView):
     def post(self, request, *args, **kwargs):

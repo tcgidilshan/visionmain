@@ -20,18 +20,17 @@ class FittingStatusReportView(APIView):
         if not branch_id:
             return Response({'error': 'branch_id parameter is required.'}, status=400)
 
-        date_str = request.query_params.get('date')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
         fitting_status = request.query_params.get('fitting_status')
 
         orders_qs = Order.objects.filter(is_deleted=False, branch_id=branch_id)
 
-        # Date filter
-        if date_str:
-            try:
-                target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-                orders_qs = orders_qs.filter(order_date__date=target_date)
-            except ValueError:
-                return Response({'error': 'Invalid date format, use YYYY-MM-DD'}, status=400)
+        # Date range filter using TimezoneConverterService
+        if start_date or end_date:
+            start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
+            if start_datetime and end_datetime:
+                orders_qs = orders_qs.filter(order_date__range=[start_datetime, end_datetime])
 
         # Fitting status filter: skip "Pending" by default
         if fitting_status is not None and fitting_status.strip() != "":
@@ -55,10 +54,12 @@ class FittingStatusReportView(APIView):
             order_items__is_non_stock=False,
             order_items__is_deleted=False
         ).distinct().count()
-        non_stock_order_ids = [
-            o.id for o in orders_qs if not o.order_items.filter(is_non_stock=False, is_deleted=False).exists()
-        ]
-        non_stock_lens_orders_count = len(non_stock_order_ids)
+        
+        # Non-stock orders: orders that have at least one non-stock item
+        non_stock_lens_orders_count = orders_qs.filter(
+            order_items__is_non_stock=True,
+            order_items__is_deleted=False
+        ).distinct().count()
 
         invoice_qs = Invoice.objects.filter(
             order__in=orders_qs,

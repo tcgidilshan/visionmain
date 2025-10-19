@@ -22,8 +22,11 @@ class HearingOrderReportView(APIView):
         end_date = request.query_params.get('end_date')
         branch_id = request.query_params.get('branch_id')
         
+        print(f"DEBUG: Received parameters - start_date: {start_date}, end_date: {end_date}, branch_id: {branch_id}")
+        
         # Validate required parameters
         if not all([start_date, end_date, branch_id]):
+            print(f"DEBUG: Missing required parameters - start_date: {start_date}, end_date: {end_date}, branch_id: {branch_id}")
             return Response(
                 {"error": "start_date, end_date, and branch_id are required parameters"},
                 status=status.HTTP_400_BAD_REQUEST
@@ -32,13 +35,17 @@ class HearingOrderReportView(APIView):
         try:
             # Convert branch_id to integer
             branch_id = int(branch_id)
+            print(f"DEBUG: Converted branch_id to int: {branch_id}")
             
             # Generate the report
+            print(f"DEBUG: Calling InvoiceReportService.get_hearing_order_report with start_date_str={start_date}, end_date_str={end_date}, branch_id={branch_id}")
             report_data = InvoiceReportService.get_hearing_order_report(
                 start_date_str=start_date,
                 end_date_str=end_date,
                 branch_id=branch_id
             )
+            
+            print(f"DEBUG: Service returned data: {report_data}")
             
             return Response({
                 "success": True,
@@ -46,11 +53,13 @@ class HearingOrderReportView(APIView):
             }, status=status.HTTP_200_OK)
             
         except ValueError as e:
+            print(f"DEBUG: ValueError occurred: {e}")
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
         except Exception as e:
+            print(f"DEBUG: Exception occurred: {e}")
             return Response(
                 {"error": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
