@@ -825,18 +825,20 @@ class InvoiceReportService:
         if start_datetime > end_datetime:
             raise ValueError("Start date cannot be after end date.")
         
-        # Get invoices filtered by invoice_date only
+        # Get invoices filtered by next_service_date for hearing orders
         invoices = Invoice.all_objects.select_related(
             'order', 'order__customer',
         ).filter(
-            Q(invoice_type='hearing', invoice_date__range=(start_datetime, end_datetime))|
-             Q(invoice_type='hearing', invoice_date__range=(start_datetime, end_datetime), order__deleted_at__range=(start_datetime, end_datetime))|
-             Q(invoice_type='hearing', invoice_date__range=(start_datetime, end_datetime),order__refunded_at__range=(start_datetime, end_datetime)),
+            invoice_type='hearing',
             order__branch_id=branch_id,
             # is_deleted=False,
             # order__is_deleted=False
-        ).order_by('invoice_date')
-        print(f"Hearing invoices found by invoice_date: {invoices}")
+        ).filter(
+            Q(order__order_items__next_service_date__range=(start_datetime.date(), end_datetime.date())) |
+            Q(order__order_items__next_service_date__range=(start_datetime.date(), end_datetime.date()), order__deleted_at__range=(start_datetime, end_datetime)) |
+            Q(order__order_items__next_service_date__range=(start_datetime.date(), end_datetime.date()), order__refunded_at__range=(start_datetime, end_datetime))
+        ).distinct().order_by('invoice_date')
+        # print(f"Hearing invoices found by next_service_date: {invoices}")
         
         # Get all payments for these orders
         order_ids = invoices.values_list('order_id', flat=True)
@@ -863,7 +865,7 @@ class InvoiceReportService:
             order_refund__isnull=False
         ).aggregate(Sum('amount'))['amount__sum'] or 0
         total_refund_paid_amount += float(refund_amount)
-        print(f"Refund amount in date range: {refund_amount}")
+        # print(f"Refund amount in date range: {refund_amount}")
         for invoice in invoices:
             order = invoice.order
             customer = order.customer
@@ -876,6 +878,22 @@ class InvoiceReportService:
             nic = customer.nic or ''
             address = customer.address or ''
             mobile_number = customer.phone_number or ''
+            
+            # Get next service date and last service date from order items
+            next_service_date = None
+            last_service_date = None
+            
+            order_items = order.order_items.filter(hearing_item__isnull=False)
+            if order_items.exists():
+                # Get the earliest next_service_date
+                item_with_next_service = order_items.filter(next_service_date__isnull=False).order_by('next_service_date').first()
+                if item_with_next_service:
+                    next_service_date = item_with_next_service.next_service_date.strftime("%Y-%m-%d")
+                
+                # Get the most recent last_reminder_at as proxy for last service date
+                item_with_last_reminder = order_items.filter(last_reminder_at__isnull=False).order_by('-last_reminder_at').first()
+                if item_with_last_reminder:
+                    last_service_date = item_with_last_reminder.last_reminder_at.strftime("%Y-%m-%d")
             
             # Calculate payment totals
             total_amount = float(order.total_price)
@@ -899,18 +917,31 @@ class InvoiceReportService:
             
             # Add order to results
             orders.append({
-                # 'refraction_number': refraction_number,
                 'invoice_number': invoice.invoice_number or '',
-                'date': invoice.invoice_date.strftime("%Y-%m-%d"),
-                'time': invoice.invoice_date.strftime("%H:%M:%S"),
+                'invoice_date': invoice.invoice_date.isoformat(),
+                'order_id': order.id,
                 'customer_name': customer_name,
-                'nic': nic or '',
-                'address': address or '',
-                'mobile_number': mobile_number or '',
-                'total_amount': total_amount,
-                'paid_amount': paid_amount,
+                'customer_phone': mobile_number or '',
+                'extra_phone_number': order.customer.extra_phone_number or '',
+                'total_price': total_amount,
+                'total_paid': paid_amount,
                 'balance': balance,
-                'bill': total_amount,  # For backward compatibility
+                'order_remark': order.order_remark or '',
+                'items': [
+                    {
+                        'order_item_id': item.id,
+                        'item_name': item.hearing_item.name if item.hearing_item else '',
+                        'serial_no': item.serial_no or '',
+                        'next_service_date': item.next_service_date.isoformat() if item.next_service_date else None,
+                        'last_reminder_at': item.last_reminder_at.isoformat() if item.last_reminder_at else None,
+                        'last_service': {
+                            'last_service_date': item.last_reminder_at.strftime("%Y-%m-%d") if item.last_reminder_at else None,
+                            'scheduled_service_date': item.next_service_date.isoformat() if item.next_service_date else None,
+                            'price': float(order.total_price)
+                        }
+                    }
+                    for item in order.order_items.filter(hearing_item__isnull=False)
+                ],
                 'is_refund': order.is_refund,
                 'is_deleted': invoice.is_deleted or order.is_deleted
             })
