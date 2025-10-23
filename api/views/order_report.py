@@ -30,7 +30,13 @@ class FittingStatusReportView(APIView):
         if start_date or end_date:
             start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
             if start_datetime and end_datetime:
-                orders_qs = orders_qs.filter(fitting_status_updated_date__range=[start_datetime, end_datetime])
+                # Use __gte and __lte instead of __range for better inclusivity
+                # Also exclude orders where fitting_status_updated_date is null
+                orders_qs = orders_qs.filter(
+                    fitting_status_updated_date__isnull=False,
+                    fitting_status_updated_date__gte=start_datetime,
+                    fitting_status_updated_date__lte=end_datetime
+                )
 
         # Fitting status filter: skip "Pending" by default
         if fitting_status is not None and fitting_status.strip() != "":
