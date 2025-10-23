@@ -26,11 +26,11 @@ class FittingStatusReportView(APIView):
 
         orders_qs = Order.objects.filter(is_deleted=False, branch_id=branch_id)
 
-        # Date range filter using TimezoneConverterService
+        # Date range filter using TimezoneConverterService on fitting_status_updated_date
         if start_date or end_date:
             start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
             if start_datetime and end_datetime:
-                orders_qs = orders_qs.filter(order_date__range=[start_datetime, end_datetime])
+                orders_qs = orders_qs.filter(fitting_status_updated_date__range=[start_datetime, end_datetime])
 
         # Fitting status filter: skip "Pending" by default
         if fitting_status is not None and fitting_status.strip() != "":
@@ -50,14 +50,16 @@ class FittingStatusReportView(APIView):
         damage_count = orders_qs.filter(fitting_status='damage').count()
         fitting_ok_count = orders_qs.filter(fitting_status='fitting_ok').count()
         fitting_not_ok_count = orders_qs.filter(fitting_status='not_fitting').count()
+        
+        # Stock lens orders: orders that have at least one item where lens is not null
         stock_lens_orders_count = orders_qs.filter(
-            order_items__is_non_stock=False,
+            order_items__lens__isnull=False,
             order_items__is_deleted=False
         ).distinct().count()
         
-        # Non-stock orders: orders that have at least one non-stock item
+        # Non-stock lens orders: orders that have at least one item where external_lens is not null
         non_stock_lens_orders_count = orders_qs.filter(
-            order_items__is_non_stock=True,
+            order_items__external_lens__isnull=False,
             order_items__is_deleted=False
         ).distinct().count()
 
