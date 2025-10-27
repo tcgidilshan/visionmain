@@ -14,12 +14,15 @@ class CreateUserView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         try:
             data = request.data
+            mobile = data.get("mobile")
+            if not mobile:
+                return Response({"error": "Mobile number is required"}, status=status.HTTP_400_BAD_REQUEST)
             user_data = UserService.create_user(
                 username=data.get("username"),
                 email=data.get("email"),
                 password=data.get("password"),
                 user_code=data.get("user_code"),
-                mobile=data.get("mobile"),
+                mobile=mobile,
                 first_name=data.get("first_name", ""),
                 last_name=data.get("last_name", ""),
                 branch_ids=data.get("branch_ids", [])  # ✅ Accept multiple branches as a list
@@ -70,6 +73,11 @@ class UpdateUserView(generics.UpdateAPIView):
                     user.is_staff = False
                 user.save()
             
+            # ✅ Handle is_active changes (only superuser can deactivate)
+            if "is_active" in data and request.user.is_superuser:
+                user.is_active = data["is_active"]
+                user.save()
+            
             user = UserService.update_user(
                 user_id=user_id,
                 username=data.get("username"),
@@ -93,6 +101,7 @@ class UpdateUserView(generics.UpdateAPIView):
                         "first_name": user.first_name,
                         "last_name": user.last_name,
                         "role": "Superuser" if user.is_superuser else ("Admin" if user.is_staff else "User"),
+                        "is_active": user.is_active,
                         "branches_assigned": [ub.branch.id for ub in user.user_branches.all()]
                     }
                 },
@@ -134,6 +143,7 @@ class GetAllUsersView(APIView):
                     "role": "Superuser" if user.is_superuser else ("Admin" if user.is_staff else "User"),
                     "is_staff": user.is_staff,
                     "is_superuser": user.is_superuser,
+                    "is_active": user.is_active,
                     "branches": branch_details,  # ✅ Add branch list
                 })
 
@@ -146,7 +156,7 @@ class GetSingleUserView(APIView):
         if not request.user.is_superuser and not request.user.is_staff:
             return Response({"error": "You do not have permission to access this resource."}, status=status.HTTP_403_FORBIDDEN)
 
-        user = CustomUser.objects.get(id=user_id)
+        user = CustomUser.objects.filter(is_active=True).get(id=user_id)
         
         # ✅ Admin can only view regular users
         if request.user.is_staff and not request.user.is_superuser:
@@ -175,6 +185,7 @@ class GetSingleUserView(APIView):
             "role": "Superuser" if user.is_superuser else ("Admin" if user.is_staff else "User"),
             "is_staff": user.is_staff,
             "is_superuser": user.is_superuser,
+            "is_active": user.is_active,
             "branches": branch_details
         })
     

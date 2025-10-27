@@ -48,13 +48,18 @@ class BankDeposit(models.Model):
     note = models.TextField(blank=True, null=True)
 
 class CustomUser(AbstractUser):
-    mobile = models.CharField(max_length=15, blank=True, null=True)
+    mobile = models.CharField(max_length=15, unique=True)
     user_code = models.CharField(max_length=10, null=True, blank=True) 
     reset_token = models.CharField(max_length=100, blank=True, null=True)
     reset_token_expiry = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.username} ({self.user_code})"
+    
+    def delete(self, *args, **kwargs):
+        """Soft delete by setting is_active to False"""
+        self.is_active = False
+        self.save()
     
 #refractions
 class Refraction(models.Model):

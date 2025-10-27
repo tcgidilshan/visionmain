@@ -13,10 +13,14 @@ class UserService:
         """
         if CustomUser.objects.filter(username=username).exists():
             raise ValueError("Username already exists")
-        if CustomUser.objects.filter(email=email).exists():
+        if email and CustomUser.objects.filter(email=email).exists():
             raise ValueError("Email already exists")
         if CustomUser.objects.filter(user_code=user_code).exists():
             raise ValueError("User code already exists")
+        if not mobile:
+            raise ValueError("Mobile number is required")
+        if CustomUser.objects.filter(mobile=mobile).exists():
+            raise ValueError("Mobile number already exists")
 
         # ✅ Create user
         user = CustomUser.objects.create_user(
@@ -77,6 +81,8 @@ class UserService:
             user.user_code = user_code
 
         if mobile is not None:
+            if CustomUser.objects.filter(mobile=mobile).exclude(id=user_id).exists():
+                raise ValueError("Mobile number already exists")
             user.mobile = mobile
 
         if first_name is not None:
@@ -89,15 +95,19 @@ class UserService:
 
         # ✅ Handle branch reassignment if `branch_ids` is provided
         if branch_ids is not None:
-            branches = Branch.objects.filter(id__in=branch_ids)
-            if not branches.exists():
-                raise ValueError("No valid branches found")
+            if branch_ids:
+                branches = Branch.objects.filter(id__in=branch_ids)
+                if not branches.exists():
+                    raise ValueError("No valid branches found")
 
-            # ✅ Remove existing branch assignments
-            UserBranch.objects.filter(user=user).delete()
+                # ✅ Remove existing branch assignments
+                UserBranch.objects.filter(user=user).delete()
 
-            # ✅ Assign new branches
-            user_branches = [UserBranch(user=user, branch=branch) for branch in branches]
-            UserBranch.objects.bulk_create(user_branches)
+                # ✅ Assign new branches
+                user_branches = [UserBranch(user=user, branch=branch) for branch in branches]
+                UserBranch.objects.bulk_create(user_branches)
+            else:
+                # ✅ If branch_ids is empty, remove all branch assignments
+                UserBranch.objects.filter(user=user).delete()
 
         return user
