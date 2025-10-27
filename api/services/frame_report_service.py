@@ -91,10 +91,10 @@ def generate_brand_wise_report(initial_branch_id=None):
         try:
             sold_query = OrderItem.objects.filter(frame__in=frames_query)
             
-            # If initial_branch is provided, only count sales from that branch
-            if initial_branch_id:
-                sold_query = sold_query.filter(order__branch_id=initial_branch_id)
-                
+            # Note: When initial_branch_id is provided, frames_query already filters frames
+            # by initial_branch, so we count all sales of those frames regardless of sale location
+            # (unless a specific sale branch filter is needed separately)
+            
             total_sold = sold_query.aggregate(
                 total=Sum('quantity')
             )['total'] or 0
