@@ -160,6 +160,7 @@ class GetAllUsersView(APIView):
                     "username": user.username,
                     "email": user.email,
                     "user_code": user.user_code,
+                    "mobile": user.mobile,  # ✅ Added mobile number
                     "role": "Superuser" if user.is_superuser else ("Admin" if user.is_staff else "User"),
                     "is_staff": user.is_staff,
                     "is_superuser": user.is_superuser,
@@ -211,4 +212,3 @@ class GetSingleUserView(APIView):
             "is_active": user.is_active,
             "branches": branch_details
         })
-    
