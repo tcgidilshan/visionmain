@@ -180,7 +180,7 @@ class GetSingleUserView(APIView):
         if not request.user.is_superuser and not request.user.is_staff:
             return Response({"error": "You do not have permission to access this resource."}, status=status.HTTP_403_FORBIDDEN)
 
-        user = CustomUser.objects.filter(is_active=True).get(id=user_id)
+        user = CustomUser.all_objects.filter(is_active=True).get(id=user_id)
         
         # ✅ Admin can only view regular users
         if request.user.is_staff and not request.user.is_superuser:
