@@ -6,6 +6,8 @@ from django.contrib.auth import get_user_model
 from ..models import UserBranch
 CustomUser = get_user_model()
 from rest_framework.permissions import IsAuthenticated
+from ..services.pagination_service import PaginationService
+from django.db.models import Q
 class CreateUserView(generics.CreateAPIView):
     """
     API View to create a user and assign them to multiple branches.
@@ -122,6 +124,24 @@ class GetAllUsersView(APIView):
 
             users = CustomUser.objects.all()
 
+            # Add search functionality
+            search = request.GET.get('search')
+            if search:
+                search_lower = search.lower()
+                role_filter = Q()
+                if search_lower == 'superuser':
+                    role_filter = Q(is_superuser=True)
+                elif search_lower == 'admin':
+                    role_filter = Q(is_staff=True, is_superuser=False)
+                elif search_lower == 'user':
+                    role_filter = Q(is_staff=False, is_superuser=False)
+                
+                users = users.filter(
+                    Q(username__icontains=search) | 
+                    Q(user_code__icontains=search) | 
+                    role_filter
+                )
+
             user_list = []
             for user in users:
                 # ✅ Get all branches assigned to the user
@@ -147,7 +167,10 @@ class GetAllUsersView(APIView):
                     "branches": branch_details,  # ✅ Add branch list
                 })
 
-            return Response(user_list, status=status.HTTP_200_OK)
+            # Use pagination
+            paginator = PaginationService()
+            paginated_users = paginator.paginate_queryset(user_list, request)
+            return paginator.get_paginated_response(paginated_users)
 
 class GetSingleUserView(APIView):
     permission_classes = [IsAuthenticated]
