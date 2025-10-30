@@ -370,6 +370,7 @@ class FrameFilterView(APIView):
                 "brand_type": frame.get_brand_type_display(),
                 "image_url": image_url,  # Use the URL from serializer
                 "is_active": frame.is_active,
+                "initial_branch": frame.initial_branch.id if frame.initial_branch else None,
                 "stock_qty": stock_qty,
                 "stock": [
                     {

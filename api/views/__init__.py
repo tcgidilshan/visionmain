@@ -71,3 +71,4 @@ from .reset_auth_data import RestPasswordView,ResetPasswordConfirmView
 from .payment_method_banks import PaymentMethodBanksView, PaymentMethodBanksDetailView
 from .order_payment_bank_report import OrderPaymentBankReportViewSet
 from .expence_return import ExpenceReturnAPIView
+from .factory_order_status_summary import FactoryOrderStatusSummaryView
