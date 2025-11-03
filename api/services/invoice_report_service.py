@@ -108,7 +108,7 @@ class InvoiceReportService:
                 "invoice_id": invoice.id,
                 "invoice_number": invoice.invoice_number,
                 "invoice_type": invoice.invoice_type,
-                "invoice_date": invoice.invoice_date.strftime("%Y-%m-%d"),
+                "invoice_date": invoice.invoice_date,
                 "order_id": order_id,
                 "total_invoice_price": float(invoice.order.total_price),
                 "total_cash_payment": payment_data.get("cash", 0),
@@ -198,7 +198,7 @@ class InvoiceReportService:
                 "invoice_id": invoice.id,
                 "invoice_number": invoice.invoice_number,
                 "invoice_type": "soldering",  # Mark as soldering type
-                "invoice_date": invoice.invoice_date.strftime("%Y-%m-%d"),
+                "invoice_date": invoice.invoice_date,
                 "order_id": order_id,
                 "total_invoice_price": float(invoice.order.price),  # Use price from SolderingOrder
                 "total_cash_payment": payment_data.get("cash", 0),
@@ -338,8 +338,8 @@ class InvoiceReportService:
             orders.append({
                 # 'refraction_number': refraction_number,
                 'invoice_number': invoice.invoice_number or '',
-                'date': invoice.invoice_date.strftime("%Y-%m-%d"),
-                'time': invoice.invoice_date.strftime("%H:%M:%S"),
+                'date': invoice.invoice_date,
+                'time': invoice.invoice_date,
                 'customer_name': customer_name,
                 'nic': nic or '',
                 'address': address or '',
@@ -490,8 +490,8 @@ class InvoiceReportService:
             orders.append({
                 # 'refraction_number': refraction_number,
                 'invoice_number': invoice.invoice_number or '',
-                'date': invoice.invoice_date.strftime("%Y-%m-%d"),
-                'time': invoice.invoice_date.strftime("%H:%M:%S"),
+                'date': invoice.invoice_date,
+                'time': invoice.invoice_date,
                 'customer_name': customer_name,
                 'nic': nic or '',
                 'address': address or '',

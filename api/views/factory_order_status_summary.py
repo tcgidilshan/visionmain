@@ -6,8 +6,13 @@ from ..models import Order, OrderProgress
 
 class FactoryOrderStatusSummaryView(APIView):
     def get(self, request):
+        branch_id = request.GET.get('branch_id')
+        
         # Filter orders with invoice_type='factory'
         orders = Order.objects.filter(invoice__invoice_type='factory')
+        
+        if branch_id:
+            orders = orders.filter(branch_id=branch_id)
         
         # Subquery to get the latest progress status for each order
         latest_progress = OrderProgress.objects.filter(
