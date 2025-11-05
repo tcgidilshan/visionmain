@@ -30,6 +30,14 @@ class OtherItemListCreateView(generics.ListCreateAPIView):
         List paginated OtherItems with stock data.
         """
         queryset = self.filter_queryset(self.get_queryset())
+        
+        # Filter by is_active: default to active items, filter to inactive if param is 'false'
+        is_active_param = request.GET.get('is_active')
+        if is_active_param is None:
+            queryset = queryset.filter(is_active=True)
+        elif is_active_param.lower() == 'false':
+            queryset = queryset.filter(is_active=False)
+        
         branch = BranchProtectionsService.validate_branch_id(request)
         paginated_queryset = self.paginate_queryset(queryset)
 
@@ -152,10 +160,10 @@ class OtherItemRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
 
     def delete(self, request, *args, **kwargs):
         """
-        Delete an item and its associated stock.
+        Soft delete an item by setting is_active to False.
         """
         instance = self.get_object()
-        instance.stocks.all().delete()  # Delete stock first
-        instance.delete()
+        instance.is_active = False
+        instance.save()
 
-        return Response({"message": "OtherItem and its stock deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+        return Response({"message": "OtherItem soft deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
