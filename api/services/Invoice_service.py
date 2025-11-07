@@ -5,6 +5,7 @@ from rest_framework.exceptions import NotFound
 from ..serializers import InvoiceSerializer,RefractionDetailsSerializer
 from rest_framework.exceptions import ValidationError
 from django.db.models import OuterRef, Subquery
+from .time_zone_convert_service import TimezoneConverterService
 
 class InvoiceService:
     """
@@ -140,6 +141,64 @@ class InvoiceService:
         # Optimize the query
         qs = qs.select_related('order', 'order__customer') \
                .prefetch_related('order__order_progress_status') \
+               .order_by('-invoice_date')
+               
+        return qs
+
+    @staticmethod
+    def search_normal_invoices(user, invoice_number=None, mobile=None, nic=None, branch_id=None, patient_id=None, patient_name=None, start_date=None, end_date=None):
+        """
+        Search for normal invoices with various filters.
+        
+        Args:
+            user: The user making the request
+            invoice_number: Filter by invoice number (exact match)
+            mobile: Filter by customer's mobile number
+            nic: Filter by customer's NIC number
+            branch_id: Filter by branch ID
+            patient_id: Filter by patient ID (exact match)
+            patient_name: Filter by patient name (case-insensitive partial match)
+            start_date: Filter invoices from this date (YYYY-MM-DD format)
+            end_date: Filter invoices until this date (YYYY-MM-DD format)
+            
+        Returns:
+            QuerySet of matching invoices
+        """
+        # Use all_objects to include soft-deleted invoices
+        qs = Invoice.all_objects.filter(invoice_type='normal')
+
+        # Handle branch filtering
+        if branch_id:
+            qs = qs.filter(order__branch_id=branch_id)
+            
+        # Handle invoice number filtering with user branch check
+        if invoice_number:
+            user_branches = user.user_branches.all().values_list('branch_id', flat=True)
+            if not user_branches:
+                raise ValueError("User has no branches assigned.")
+            qs = qs.filter(invoice_number=invoice_number, order__branch_id__in=user_branches)
+
+        # Apply customer filters
+        if mobile:
+            qs = qs.filter(order__customer__phone_number=mobile)
+
+        if nic:
+            qs = qs.filter(order__customer__nic=nic)
+            
+        if patient_id:
+            qs = qs.filter(order__customer_id=patient_id)
+            
+        if patient_name:
+            qs = qs.filter(order__customer__name__icontains=patient_name)
+        
+        # Handle date range filtering using TimezoneConverterService
+        if start_date or end_date:
+            start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
+            if start_datetime and end_datetime:
+                qs = qs.filter(invoice_date__gte=start_datetime, invoice_date__lte=end_datetime)
+        
+        # Optimize the query
+        qs = qs.select_related('order', 'order__customer') \
                .order_by('-invoice_date')
                
         return qs

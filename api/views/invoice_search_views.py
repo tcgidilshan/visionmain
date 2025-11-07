@@ -52,6 +52,47 @@ class FactoryInvoiceSearchView(APIView):
         serializer = InvoiceSearchSerializer(invoices, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+class NormalInvoiceSearchView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+    
+    def get(self, request):
+        invoice_number = request.query_params.get('invoice_number')
+        mobile = request.query_params.get('mobile')
+        nic = request.query_params.get('nic')
+        branch_id = request.query_params.get('branch_id')
+        patient_id = request.query_params.get('patient_id')
+        patient_name = request.query_params.get('patient_name')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+
+        if not any([invoice_number, mobile, nic, branch_id, patient_id, patient_name, start_date, end_date]):
+            return Response(
+                {"error": "Please provide at least one search parameter: invoice_number, mobile, nic, branch_id, patient_id, patient_name, start_date, or end_date."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        invoices = InvoiceService.search_normal_invoices(
+            user=request.user,
+            invoice_number=invoice_number,
+            mobile=mobile,
+            nic=nic,
+            branch_id=branch_id,
+            patient_id=patient_id,
+            patient_name=patient_name,
+            start_date=start_date,
+            end_date=end_date
+        )
+        
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(invoices, request)
+        if page is not None:
+            serializer = InvoiceSearchSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+            
+        serializer = InvoiceSearchSerializer(invoices, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
     serializer_class = ExternalLensOrderItemSerializer
     pagination_class = PaginationService
