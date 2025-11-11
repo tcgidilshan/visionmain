@@ -16,7 +16,8 @@ class PaymentView(APIView):
     @transaction.atomic
     def put(self, request, *args, **kwargs):
         order_id = request.data.get("order_id")  # Order ID from request
-        progress_status = request.data.get("progress_status") 
+        progress_status = request.data.get("progress_status")
+        on_hold = request.data.get("on_hold")
         invoice_id = request.data.get("invoice_id")  # Invoice ID (if used)
         payments_data = request.data.get("payments", [])  # List of payments
         admin_id = request.data.get("admin_id")
@@ -68,6 +69,10 @@ class PaymentView(APIView):
             
             order.total_payment = total_payments - total_expenses
             order.save(update_fields=['total_payment'])
+            #update on_hold status
+            if on_hold is not None:
+                order.on_hold = on_hold
+                order.save(update_fields=['on_hold'])
 
             # ✅ Return updated order payment details
             updated_payments = order.orderpayment_set.all()
