@@ -124,19 +124,19 @@ class EmployeeReportService:
                 total=Sum('quantity')
             )['total'] or 0
             
-            # Count factory orders
+            # Count factory orders (orders with invoice_type='factory')
             factory_orders_count = employee_orders.filter(
-                # Add your factory order criteria here
-                # For example: is_factory_order=True or specific status
-                # Currently using a placeholder condition
-                is_frame_only=False  # Adjust this based on your factory order logic
+                invoice__invoice_type='factory'
             ).count()
             
-            # Count normal orders
+            # Count normal orders (orders with invoice_type='normal')
             normal_orders_count = employee_orders.filter(
-                # Add your normal order criteria here
-                # Currently using opposite of factory order condition
-                is_frame_only=True  # Adjust this based on your normal order logic
+                invoice__invoice_type='normal'
+            ).count()
+            
+            # Count glass sender orders (orders where issued_by is not null)
+            glass_sender_count = employee_orders.filter(
+                issued_by__isnull=False
             ).count()
             
             # Customer feedback count
@@ -176,6 +176,7 @@ class EmployeeReportService:
                 'branded_lenses_sold_count': int(branded_lenses_count),
                 'factory_order_count': factory_orders_count,
                 'normal_order_count': normal_orders_count,
+                'glass_sender_count': glass_sender_count,
                 'customer_feedback_count': customer_feedback_count,
                 'feedback_ratings': {
                     'rating_1': feedback_counts['rating_1'],
@@ -247,8 +248,11 @@ class EmployeeReportService:
             lens__isnull=False
         ).aggregate(total=Sum('quantity'))['total'] or 0
         
-        factory_orders = all_orders.filter(is_frame_only=False).count()
-        normal_orders = all_orders.filter(is_frame_only=True).count()
+        factory_orders = all_orders.filter(invoice__invoice_type='factory').count()
+        normal_orders = all_orders.filter(invoice__invoice_type='normal').count()
+        
+        # Count glass sender orders (orders where issued_by is not null)
+        glass_sender_orders = all_orders.filter(issued_by__isnull=False).count()
         
         # Get branch info if filtering by branch
         branch_info = None
@@ -276,7 +280,8 @@ class EmployeeReportService:
                 'total_frames_sold': int(total_frames_sold),
                 'total_lenses_sold': int(total_lenses_sold),
                 'factory_orders': factory_orders,
-                'normal_orders': normal_orders
+                'normal_orders': normal_orders,
+                'glass_sender_orders': glass_sender_orders
             },
             'averages': {
                 'avg_revenue_per_employee': float(total_revenue / total_employees) if total_employees > 0 else 0,

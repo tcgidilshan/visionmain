@@ -43,4 +43,12 @@ class FactoryOrderStatusSummaryView(APIView):
             if item['last_status'] in summary:
                 summary[item['last_status']] = item['count']
         
+        # Count orders that are on_hold
+        on_hold_count = orders.filter(on_hold=True).count()
+        summary['on_hold'] = on_hold_count
+        
+        # Count orders with fitting_on_collection
+        fitting_on_collection_count = orders.filter(fitting_on_collection=True).count()
+        summary['fitting_on_collection'] = fitting_on_collection_count
+        
         return Response(summary)
