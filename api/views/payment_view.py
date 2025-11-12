@@ -4,9 +4,10 @@ from rest_framework import status
 from django.db import transaction
 from django.db.models import Sum
 from decimal import Decimal
-from ..models import Order,Invoice,OrderProgress,OrderPayment,Expense  # Assuming Order model exists
+from ..models import Order,Invoice,OrderProgress,OrderPayment,Expense,OrderItem,LensStock,LensCleanerStock,OtherItemStock,HearingItemStock  # Assuming Order model exists
 from ..serializers import OrderPaymentSerializer
-from ..services.order_payment_service import OrderPaymentService  # Assuming service function is in OrderService
+from ..services.order_payment_service import OrderPaymentService  # Assuming service function in OrderService
+from ..services.stock_validation_service import StockValidationService
 
 class PaymentView(APIView):
     """
@@ -33,6 +34,38 @@ class PaymentView(APIView):
                 order = Order.objects.get(id=order_id)
             elif invoice_id:
                 order = Order.objects.get(invoice_id=invoice_id)
+
+            # Track on_hold flag changes (same pattern as order_service.py)
+            was_on_hold = order.on_hold
+            will_be_on_hold = on_hold if on_hold is not None else was_on_hold
+            # Detect transition from on-hold to active
+            transitioning_off_hold = was_on_hold and not will_be_on_hold
+
+            # If transitioning from on-hold to active, validate lens stock
+            lens_stock_updates = []
+            if transitioning_off_hold:
+                branch_id = order.branch_id
+                if not branch_id:
+                    raise ValueError("Order is not associated with a branch.")
+
+                # Get ALL lens items from existing order items for validation
+                # Only reduce stock for lens items when transitioning from on_hold=True to on_hold=False
+                lens_items = []
+                for existing_item in order.order_items.filter(is_deleted=False):
+                    if existing_item.lens and not existing_item.is_non_stock:
+                        # Convert existing item to item_data format for validation
+                        lens_items.append({
+                            'id': existing_item.id,
+                            'lens': existing_item.lens_id,
+                            'quantity': existing_item.quantity,
+                            'is_non_stock': existing_item.is_non_stock
+                        })
+                
+                # Only validate if there are actual stock items to validate
+                if lens_items:
+                    _, lens_stock_updates = StockValidationService.validate_stocks(
+                        lens_items, branch_id, on_hold=False
+                    )
 
             # 1. Update the progress_status field (capture previous if needed)
             incoming_status = request.data.get('progress_status', None)
@@ -73,6 +106,10 @@ class PaymentView(APIView):
             if on_hold is not None:
                 order.on_hold = on_hold
                 order.save(update_fields=['on_hold'])
+
+            # Final: Deduct lens stock if on_hold → False (same pattern as order_service.py)
+            if transitioning_off_hold:
+                StockValidationService.adjust_stocks(lens_stock_updates)
 
             # ✅ Return updated order payment details
             updated_payments = order.orderpayment_set.all()
