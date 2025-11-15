@@ -197,10 +197,21 @@ class OrderService:
                 raise ValueError("Order is not associated with a branch.")
 
             # Track on_hold flag changes
-            was_on_hold = order.on_hold
-            will_be_on_hold = order_data.get("on_hold", was_on_hold)
+            order_pre_on_hold = order.on_hold
+            payload_on_hold = order_data.get("on_hold")
             # Detect transition from on-hold to active
-            transitioning_off_hold = was_on_hold and not will_be_on_hold
+            transitioning_off_hold = order_pre_on_hold and not payload_on_hold
+            # Detect transition from active to on-hold (need to restore lens stock)
+            transitioning_to_hold = not order_pre_on_hold and payload_on_hold
+            
+            # print(f"\n{'='*60}")
+            # print(f"ORDER {order.id} ON_HOLD STATUS TRACKING")
+            # print(f"{'='*60}")
+            # print(f"Previous on_hold: {order_pre_on_hold}")
+            # print(f"Payload on_hold: {payload_on_hold}")
+            # print(f"Transitioning off hold (True→False): {transitioning_off_hold}")
+            # print(f"Transitioning to hold (False→True): {transitioning_to_hold}")
+            # print(f"{'='*60}\n")
             
             # Track existing items for later comparison
             existing_items = {item.id: item for item in order.order_items.all()}
@@ -208,6 +219,9 @@ class OrderService:
             # If transitioning from on-hold to active, validate lens stock
             lens_stock_updates = []
             if transitioning_off_hold:
+                # print(f"\n{'*'*60}")
+                # print(f"TRANSITIONING OFF HOLD - VALIDATING LENS STOCK")
+                # print(f"{'*'*60}")
                 # Get only the lens-related items (not frames) for validation
                 # Skip external_lens since they don't maintain stock
                 lens_items = []
@@ -215,12 +229,66 @@ class OrderService:
                     if (item_data.get('lens') or item_data.get('lens_cleaner') or 
                         item_data.get('other_item')) and not item_data.get('is_non_stock', False):
                         lens_items.append(item_data)
+                        # print(f"  - Found lens item to validate: lens={item_data.get('lens')}, "
+                        #       f"lens_cleaner={item_data.get('lens_cleaner')}, "
+                        #       f"other_item={item_data.get('other_item')}, "
+                        #       f"quantity={item_data.get('quantity')}, "
+                        #       f"item_id={item_data.get('id')}")
+                
+                # print(f"Total lens items to validate: {len(lens_items)}")
                 
                 # Only validate if there are actual stock items to validate
                 if lens_items:
+                    # print(f"Calling StockValidationService.validate_stocks for {len(lens_items)} lens items...")
                     _, lens_stock_updates = StockValidationService.validate_stocks(
-                        lens_items, branch_id, on_hold=False, existing_items=existing_items
+                        lens_items, branch_id, on_hold=False, existing_items=existing_items, is_transitioning_off_hold=True
                     )
+                    # print(f"Stock validation completed. Updates prepared: {len(lens_stock_updates)} items")
+                    # for update in lens_stock_updates:
+                    #     print(f"  - Stock update: {update}")
+                # else:
+                #     print("No lens items to validate (all are external or non-stock)")
+                # print(f"{'*'*60}\n")
+
+            # If transitioning from active to on-hold, prepare to restore lens stock for EXISTING items
+            lens_stock_restorations = []
+            if transitioning_to_hold:
+                # print(f"\n{'@'*60}")
+                # print(f"TRANSITIONING TO HOLD - PREPARING LENS STOCK RESTORATION")
+                # print(f"{'@'*60}")
+                # print(f"Need to restore lens stock for existing items (not new, not refunded, not deleted)")
+                
+                # Track which items from payload correspond to existing items
+                payload_item_ids = {item_data.get('id') for item_data in order_items_data if item_data.get('id')}
+                
+                for item_id, existing_item in existing_items.items():
+                    # Only restore stock for items that:
+                    # 1. Still exist in payload (not being deleted)
+                    # 2. Are not non-stock items
+                    # 3. Are lens-related (not frames)
+                    if item_id in payload_item_ids and not existing_item.is_non_stock:
+                        stock_type = None
+                        stock = None
+                        
+                        if existing_item.lens_id:
+                            stock_type = "lens"
+                            stock = LensStock.objects.filter(lens_id=existing_item.lens_id, branch_id=branch_id).first()
+                        elif existing_item.lens_cleaner_id:
+                            stock_type = "lens_cleaner"
+                            stock = LensCleanerStock.objects.filter(lens_cleaner_id=existing_item.lens_cleaner_id, branch_id=branch_id).first()
+                        elif existing_item.other_item_id:
+                            stock_type = "other_item"
+                            stock = OtherItemStock.objects.filter(other_item_id=existing_item.other_item_id, branch_id=branch_id).first()
+                        # Note: We don't restore frame stock - frames are always deducted regardless of hold status
+                        
+                        if stock and stock_type:
+                            lens_stock_restorations.append((stock_type, stock, existing_item.quantity, item_id))
+                            # print(f"  - Will restore {stock_type} stock: item_id={item_id}, "
+                            #       f"{stock_type}_id={getattr(existing_item, f'{stock_type}_id')}, "
+                            #       f"qty={existing_item.quantity}, current_stock={stock.qty}")
+                
+                # print(f"Total lens stock restorations to perform: {len(lens_stock_restorations)}")
+                # print(f"{'@'*60}\n")
 
 
             # Update order fields
@@ -231,7 +299,7 @@ class OrderService:
             order.sales_staff_code_id = order_data.get('sales_staff_code', order.sales_staff_code_id)
             order.order_remark = order_data.get('order_remark', order.order_remark)
             order.user_date = order_data.get('user_date', order.user_date)
-            order.on_hold = will_be_on_hold  # Update hold status
+            order.on_hold = payload_on_hold  # Update hold status
             order.fitting_on_collection = order_data.get('fitting_on_collection', order.fitting_on_collection)  # Update hold status
             bus_title_id = order_data.get('bus_title')
             #urgent
@@ -350,25 +418,47 @@ class OrderService:
                     raise ValueError(f"{stock_type.capitalize()} stock not found for branch {branch_id}.")
 
                 # Only adjust lens-related stock if NOT on hold (or frame stock always)
-                should_adjust_stock = is_frame or not will_be_on_hold
+                # Special case: if transitioning TO hold, we'll restore lens stock later, so skip deduction here
+                should_adjust_stock = is_frame or (not payload_on_hold and not transitioning_to_hold)
+                
+                # print(f"\n--- STOCK ADJUSTMENT CHECK for item {item_id or 'NEW'} ---")
+                # print(f"  Stock type: {stock_type}")
+                # print(f"  Is frame: {is_frame}")
+                # print(f"  Payload on_hold: {payload_on_hold}")
+                # print(f"  Transitioning off hold: {transitioning_off_hold}")
+                # print(f"  Transitioning to hold: {transitioning_to_hold}")
+                # print(f"  Should adjust stock IN LOOP: {should_adjust_stock}")
+                # print(f"  Current stock qty: {stock.qty}")
+                # print(f"  Quantity to process: {new_quantity if (item_id and item_id in existing_items) else quantity}")
 
                 if should_adjust_stock:
                     if item_id and item_id in existing_items:
                         # Update existing item
                        old_item = existing_items[item_id]
                        if int(old_item.quantity) != new_quantity:
+                          # print(f"  >> Quantity changed from {old_item.quantity} to {new_quantity}")
                           if stock.qty < new_quantity:
                             raise ValueError(f"Insufficient {stock_type} stock.")
                           stock.qty -= new_quantity
                           stock.save()
+                          # print(f"  >> Stock adjusted: {stock.qty + new_quantity} → {stock.qty}")
+                       # else:
+                          # print(f"  >> Quantity unchanged, no stock adjustment needed")
                     else:
                         # Create new item
-
+                        # print(f"  >> Creating NEW item, deducting {quantity} from stock")
                         if stock.qty < quantity:
                             
                             raise ValueError(f"Insufficient {stock_type} stock.")
+                        # print(f"  >> Stock before: {stock.qty}")
                         stock.qty -= new_quantity
                         stock.save()
+                        # print(f"  >> Stock after: {stock.qty}")
+                # else:
+                    # if transitioning_to_hold and not is_frame:
+                    #     print(f"  >> SKIPPING deduction - transitioning to hold (will restore existing items' stock later)")
+                    # else:
+                    #     print(f"  >> SKIPPING stock adjustment in loop (will be done at end if transitioning off hold)")
 
                 # Save order item
                 if item_id and item_id in existing_items:
@@ -439,7 +529,7 @@ class OrderService:
                             stock_model = OtherItemStock
                             stock_filter = {"other_item_id": deleted_item.other_item_id, "branch_id": branch_id}
 
-                        should_restock = is_frame or not will_be_on_hold
+                        should_restock = is_frame or not order_pre_on_hold
 
                         if should_restock and stock_model and stock_filter:
                             stock = stock_model.objects.select_for_update().filter(**stock_filter).first()
@@ -461,7 +551,33 @@ class OrderService:
 
             # Final: Deduct lens stock if on_hold → False
             if transitioning_off_hold:
+                # print(f"\n{'#'*60}")
+                # print(f"FINAL LENS STOCK ADJUSTMENT - TRANSITIONING OFF HOLD")
+                # print(f"{'#'*60}")
+                # print(f"Number of lens stock updates to apply: {len(lens_stock_updates)}")
+                # for i, update in enumerate(lens_stock_updates, 1):
+                #     print(f"  Update {i}: {update}")
+                # print("Calling StockValidationService.adjust_stocks()...")
                 StockValidationService.adjust_stocks(lens_stock_updates)
+                # print(f"Lens stock adjustment completed!")
+                # print(f"{'#'*60}\n")
+
+            # Final: Restore lens stock if False → True (active to on-hold)
+            if transitioning_to_hold and lens_stock_restorations:
+                # print(f"\n{'$'*60}")
+                # print(f"RESTORING LENS STOCK - TRANSITIONING TO HOLD")
+                # print(f"{'$'*60}")
+                # print(f"Restoring stock for {len(lens_stock_restorations)} existing lens items")
+                
+                for stock_type, stock, qty, item_id in lens_stock_restorations:
+                    # print(f"  - Restoring {stock_type} stock for item {item_id}: qty={qty}")
+                    # print(f"    Stock before: {stock.qty}")
+                    stock.qty += qty
+                    stock.save()
+                    # print(f"    Stock after: {stock.qty}")
+                
+                # print(f"Lens stock restoration completed!")
+                # print(f"{'$'*60}\n")
 
             # Handle Refund Logic: Recalculate order totals from ALL current items
             # This ensures new items are included in the calculation

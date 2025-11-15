@@ -16,7 +16,6 @@ class OrderUpdateView(APIView):
     """
     API View to update an existing order, including external lenses, stock validation, and payments.
     """
-
     @transaction.atomic
     def put(self, request, pk, *args, **kwargs):
         try:

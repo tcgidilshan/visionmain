@@ -8,12 +8,15 @@ class StockValidationService:
     """
 
     @staticmethod
-    def validate_stocks(order_items_data, branch_id, on_hold=False, existing_items=None):
+    def validate_stocks(order_items_data, branch_id, on_hold=False, existing_items=None, is_transitioning_off_hold=False):
         """
         Validates branch-specific stock availability for given order items.
         For on-hold orders: validates all stock but separates frame stock and lens-related stock.
         Raises ValueError if stock is insufficient.
         Returns a tuple of (frame_stock_updates, lens_stock_updates).
+        
+        is_transitioning_off_hold: When True, validates the full quantity for existing items
+                                   because lens stock was never deducted when on_hold=True
         """
         if not order_items_data:
             raise ValueError("Order items are required.")
@@ -23,6 +26,10 @@ class StockValidationService:
 
         frame_stock_updates = []  # List to track frame stock changes
         lens_stock_updates = []   # List to track lens and other stock changes
+
+        print(f"\n[STOCK VALIDATION SERVICE]")
+        print(f"  on_hold={on_hold}, is_transitioning_off_hold={is_transitioning_off_hold}")
+        print(f"  branch_id={branch_id}, items_to_validate={len(order_items_data)}")
 
         with transaction.atomic():
             for item_data in order_items_data:
@@ -39,10 +46,19 @@ class StockValidationService:
                     existing_qty = existing_items[item_id].quantity
 
                 new_qty = item_data['quantity']
-                effective_qty = new_qty - existing_qty
+                
+                # CRITICAL FIX: When transitioning off hold, use full quantity for lens items
+                # because they were never deducted when the order was on hold
+                if is_transitioning_off_hold and item_id:
+                    effective_qty = new_qty  # Full quantity needs to be deducted
+                    print(f"  [TRANSITION OFF HOLD] Item {item_id}: Using FULL qty={new_qty} (was on hold)")
+                else:
+                    effective_qty = new_qty - existing_qty
+                    print(f"  [NORMAL] Item {item_id or 'NEW'}: effective_qty={effective_qty} (new={new_qty}, existing={existing_qty})")
 
                 # ✅ Skip validation if no additional stock is needed
                 if effective_qty <= 0:
+                    print(f"  [SKIP] Item {item_id or 'NEW'}: effective_qty <= 0, no stock change needed")
                     continue
 
                 # Process lens-related items
