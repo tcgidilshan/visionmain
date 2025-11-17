@@ -73,7 +73,7 @@ from .views import (
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
     LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
     RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
-    HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView,HearingOrderReportView,FactoryOrderStatusSummaryView
+    HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView,HearingOrderReportView,FactoryOrderStatusSummaryView,SafeTransactionSummaryView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -320,6 +320,7 @@ urlpatterns = [
     path('reports/payment-method/', PaymentSummaryReportView.as_view(), name='payment-summary-report'),
     path('reports/payment-method/banking/', OrderPaymentBankReportViewSet.as_view(), name='payment-summary-report-detail'),
     path('banking-report/', BankingReportView.as_view(), name='banking-report'),
+    path('reports/safe-transactions/', SafeTransactionSummaryView.as_view(), name='safe-transaction-report'),
     # 2. Banking confirm action endpoint
     path('banking-report/confirm/<int:deposit_id>/', ConfirmDepositView.as_view(), name='confirm-deposit'),
     path('reports/customer-location-statistics/', CustomerLocationStatisticsView.as_view(), name='customer-location-statistics-report'),
@@ -337,5 +338,7 @@ urlpatterns = [
     path('reports/daily-money/', DailyMoneyReportView.as_view(), name='daily-money-report'),
     path('reports/refraction/', RefractionReportView.as_view(), name='refraction-report'),
     path('factory-order-status-summary/', FactoryOrderStatusSummaryView.as_view(), name='factory-order-status-summary'),
+
+
 ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
