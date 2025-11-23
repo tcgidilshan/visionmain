@@ -102,8 +102,8 @@ class RefractionListAPIView(generics.ListAPIView):
     ]
 
     # Fields orderable via ?ordering=
-    ordering_fields = ['refraction_number', 'created_at']
-    ordering = ['-refraction_number']  # Default ordering (latest first)
+    ordering_fields = ['refraction_number', 'created_at', 'id']
+    ordering = ['-id']  # Default ordering by ID (latest/highest refraction number first)
 
     def get_queryset(self):
         """
