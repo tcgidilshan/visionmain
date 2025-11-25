@@ -351,24 +351,24 @@ class OrderService:
 
                 # Only adjust lens-related stock if NOT on hold (or frame stock always)
                 should_adjust_stock = is_frame or not will_be_on_hold
+                #//TODO UNCOMENTED
+                # if should_adjust_stock:
+                #     if item_id and item_id in existing_items:
+                #         # Update existing item
+                #        old_item = existing_items[item_id]
+                #        if int(old_item.quantity) != new_quantity:
+                #           if stock.qty < new_quantity:
+                #             raise ValueError(f"Insufficient {stock_type} stock.")
+                #           stock.qty -= new_quantity
+                #           stock.save()
+                #     else:
+                #         # Create new item
 
-                if should_adjust_stock:
-                    if item_id and item_id in existing_items:
-                        # Update existing item
-                       old_item = existing_items[item_id]
-                       if int(old_item.quantity) != new_quantity:
-                          if stock.qty < new_quantity:
-                            raise ValueError(f"Insufficient {stock_type} stock.")
-                          stock.qty -= new_quantity
-                          stock.save()
-                    else:
-                        # Create new item
-
-                        if stock.qty < quantity:
+                #         if stock.qty < quantity:
                             
-                            raise ValueError(f"Insufficient {stock_type} stock.")
-                        stock.qty -= new_quantity
-                        stock.save()
+                #             raise ValueError(f"Insufficient {stock_type} stock.")
+                #         stock.qty -= new_quantity
+                #         stock.save()
 
                 # Save order item
                 if item_id and item_id in existing_items:
@@ -539,7 +539,10 @@ class OrderService:
                             stock_type = "hearing_item"
                         
                         # Restore stock quantity (add back the refunded quantity)
-                        if stock:
+                        if stock and stock_type != 'lens':
+                            stock.qty += item.quantity
+                            stock.save()
+                        elif stock_type == 'lens' and not order.on_hold:
                             stock.qty += item.quantity
                             stock.save()
                     

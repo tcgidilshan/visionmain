@@ -5,6 +5,7 @@ from django.db import transaction
 from ..models import Order,ExternalLens,Invoice, CustomUser,OrderItemWhatsAppLog,OrderProgress,ArrivalStatus, OrderFeedback
 from ..serializers import OrderSerializer,ExternalLensSerializer
 from ..services.order_service import OrderService
+from ..services.order_update_service import OrderUpdateService
 from ..services.audit_log_service import OrderAuditLogService
 from ..services.patient_service import PatientService
 from ..services.external_lens_service import ExternalLensService
@@ -51,7 +52,7 @@ class OrderUpdateView(APIView):
             
             # Step 3: Update Order 
             # The updated update_order method now handles different stock behavior based on on_hold status and refunds
-            updated_order = OrderService.update_order(order, order_data, order_items_data, payments_data, admin_id, user_id)
+            updated_order = OrderUpdateService.update_order(order, order_data, order_items_data, payments_data, admin_id, user_id)
             
             # Now log only if update succeeded
             OrderAuditLogService.log_order_changes(
