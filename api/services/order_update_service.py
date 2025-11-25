@@ -365,7 +365,7 @@ class OrderUpdateService:
                             
                             if stock_type == 'lens':
                                 OrderUpdateService.handle_lens_stock_adjustment(
-                                    stock, qty_diff, previous_on_hold, new_on_hold, is_refund=is_refund, refund_qty=item_data['quantity'] if is_refund else 0
+                                    stock, qty_diff, previous_on_hold, new_on_hold, is_refund=is_refund
                                 )
                                
                             if stock_type != 'lens' and not is_refund:
