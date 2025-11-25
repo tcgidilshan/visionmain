@@ -336,11 +336,17 @@ class OrderUpdateService:
 
             # Fetch existing items once (O(1) query)
             existing_items = {item.id: item for item in order.order_items.filter(is_deleted=False)}
+            refund_total = 0
+            refund_item_count=0
+            order_item_total= 0
             for item_data in order_items_data:
                 item_id = item_data.get('id',None)
                 existing_item = existing_items[item_id] if item_id else None
                 is_refund = item_data.get('is_refund')
+                if not is_refund:
+                    order_item_total += item_data['quantity'] * item_data['price_per_unit']
                 if item_id and item_id in existing_items:
+
                     #step 1: validate stock adn return validated data 
                     stock, stock_type = OrderUpdateService.get_stock_for_item(item_data, branch_id)
 
@@ -362,22 +368,30 @@ class OrderUpdateService:
                                     stock, qty_diff, previous_on_hold, new_on_hold, is_refund=is_refund, refund_qty=item_data['quantity'] if is_refund else 0
                                 )
                                
-                            elif stock_type != 'lens' and not is_refund:
+                            if stock_type != 'lens' and not is_refund:
                                 if stock.qty < qty_diff:
                                     raise ValueError(f"Insufficient stock for item ID {item_id}. Available: {stock.qty}, Required additional: {qty_diff}")
-                                stock.qty += qty_diff
+                                    
+                            elif stock_type != 'lens' and is_refund :
+                                stock.qty += item_data['quantity']
                                 stock.save()
-                        elif stock and stock_type != 'external_lens' and is_refund :
-                            stock.qty += item_data['quantity']
-                            stock.save()
+                        if existing_item['is_refund']:
+                            # get the sum of refund quantities for this item
+                            item_total =existing_item['quantity'] * item_data['price_per_unit']
+                            refund_total += item_total
+                            refund_item_count += 1
                     # Step 3: Update item using on-change-append logic
-                    OrderUpdateService.on_change_append(
-                        existing_item, item_data, admin_id, user_id
-                    )
+                        OrderUpdateService.on_change_append(
+                                existing_item, item_data, admin_id, user_id
+                            )
                 else:
                     #create new items
                     #step 1: validate stock adn return validated data 
                     stock, stock_type = OrderUpdateService.get_stock_for_item(item_data, branch_id)
+
+                    #ADD TO TOTALiTEM 
+                    order_item_total += item_data['quantity'] * item_data['price_per_unit']
+
                     #step 2: check stock deferance and prepare stock adjustments
                     qty_diff = item_data['quantity']
                     if stock and stock_type != 'external_lens':  # ✅ This checks for None
@@ -392,27 +406,140 @@ class OrderUpdateService:
                         elif stock_type != 'lens':
                             if stock.qty < qty_diff:
                                 raise ValueError(f"Insufficient stock for item ID {item_id}. Available: {stock.qty}, Required: {qty_diff}")
-                            stock.qty -= qty_diff  # ❌ WRONG: Should be -= when reducing stock
+                            stock.qty -= qty_diff  
                             stock.save()
+                        
 
-                            #create hearing order item
-                            #create lens Order item
-                            #create other item order item
-                            #create frame order item
-                            #create external lens order item
+
                     OrderUpdateService.create_order_item(order, item_data)
-                    # from here preform other operations
-                    #order model related updates 
-                    # bus id 
-                    #payments handle
-
-    
-                        
-                        
-                    
-
-                    
-
+            
+            # Step 4: Update order model fields after processing all items
+            order.sub_total = Decimal(str(order_data.get('sub_total', order.sub_total)))
+            order.discount = Decimal(str(order_data.get('discount', order.discount))) if order_data.get('discount') else Decimal('0.00')
+            order.total_price = Decimal(str(order_data.get('total_price', order.total_price)))
+            order.status = order_data.get('status', order.status)
+            order.sales_staff_code_id = order_data.get('sales_staff_code', order.sales_staff_code_id)
+            order.order_remark = order_data.get('order_remark', order.order_remark)
+            order.user_date = order_data.get('user_date', order.user_date)
+            order.on_hold = new_on_hold
+            order.fitting_on_collection = order_data.get('fitting_on_collection', order.fitting_on_collection)
+            order.urgent = order_data.get('urgent', order.urgent)
+            
+            # Handle bus_title FK
+            bus_title_id = order_data.get('bus_title')
+            if bus_title_id is not None:
+                try:
+                    order.bus_title = BusSystemSetting.objects.get(pk=bus_title_id)
+                except BusSystemSetting.DoesNotExist:
+                    raise ValueError(f"BusSystemSetting with ID {bus_title_id} does not exist")
+            
+            # Update measurement fields
+            for field in ['pd', 'height', 'right_height', 'left_height', 'left_pd', 'right_pd']:
+                if field in order_data:
+                    setattr(order, field, order_data.get(field))
+            
+            order.save()
+            
+            # Step 5: Update progress status
+            incoming_status = order_data.get('progress_status')
+            if incoming_status:
+                last_progress = order.order_progress_status.order_by('-changed_at').first()
+                if last_progress is None or last_progress.progress_status != incoming_status:
+                    OrderProgress.objects.create(
+                        order=order,
+                        progress_status=incoming_status
+                    )
+            
+            # Step 6: Handle refund expense creation
+            if refund_item_count > 0:
+                main_category_id = order_data.get('main_category', 1)
+                sub_category_id = order_data.get('sub_category', 2)
+                
+                try:
+                    main_category = ExpenseMainCategory.objects.get(pk=main_category_id)
+                    sub_category = ExpenseSubCategory.objects.get(pk=sub_category_id, main_category=main_category)
+                except (ExpenseMainCategory.DoesNotExist, ExpenseSubCategory.DoesNotExist):
+                    raise ValueError("Invalid expense category for refund")
+                
+                # Get invoice number for note
+                invoice_number = (
+                    order.invoice.invoice_number 
+                    if hasattr(order, 'invoice') and order.invoice 
+                    else f"Order #{order.pk}"
+                )
+                
+                # Calculate new order totals after refund, considering discount
+                # new_subtotal = sum of non-refunded items (already calculated in order_item_total)
+                # new_total = new_subtotal - discount
+                new_subtotal = Decimal(str(order_item_total))
+                discount = Decimal(str(order_data.get('discount', order.discount))) if order_data.get('discount') else Decimal('0.00')
+                new_order_total = new_subtotal - discount
+                
+                # Ensure total doesn't go negative
+                if new_order_total < Decimal('0.00'):
+                    new_order_total = Decimal('0.00')
+                
+                # Update order with recalculated values considering discount
+                order.sub_total = new_subtotal
+                order.discount = discount
+                order.total_price = new_order_total
+                order.save()
+                
+                # Get EXISTING payments (before processing new payments)
+                existing_payments = OrderPayment.objects.filter(
+                    order=order,
+                    is_deleted=False
+                ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+                
+                # Get PREVIOUS refunds already given
+                previous_refunds = Expense.objects.filter(
+                    order_refund=order,
+                    is_refund=True
+                ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+                
+                # Calculate cash refund with discount consideration
+                # Formula: (existing_payments - previous_refunds) - new_order_total
+                # Example: Item1=$1000, Item2=$1000, Discount=$1200, Payment=$800
+                #   Refund Item1: new_subtotal=$1000, new_total=$1000-$1200=$0 (capped at 0)
+                #   Cash refund = ($800 - $0) - $0 = $800
+                net_payments = existing_payments - previous_refunds
+                
+                if net_payments > new_order_total:
+                    cash_refund_amount = net_payments - new_order_total
+                else:
+                    cash_refund_amount = Decimal('0.00')
+                
+                # Create expense record for refund
+                Expense.objects.create(
+                    paid_source='cash',
+                    branch=order.branch,
+                    main_category=main_category,
+                    sub_category=sub_category,
+                    amount=cash_refund_amount,
+                    note=f"Refund for Invoice {invoice_number} - {refund_item_count} item(s) refunded (Refund total: {refund_total}, Discount: {discount})",
+                    paid_from_safe=False,
+                    is_refund=True,
+                    order_refund=order
+                )
+            
+            # Step 7: Process payments
+            OrderPaymentService.append_on_change_payments_for_order(order, payments_data, admin_id, user_id)
+            
+            # Step 8: Calculate total_payment (payments - expenses)
+            total_payments = OrderPayment.objects.filter(
+                order=order,
+                is_deleted=False
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+            
+            total_expenses = Expense.objects.filter(
+                order_refund=order
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+            
+            order.total_payment = total_payments - total_expenses
+            order.save(update_fields=['total_payment'])
+            
+            # Return updated order
+            return order
 
         except ExternalLens.DoesNotExist:
             raise ValueError("Invalid External Lens ID.")
