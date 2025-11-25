@@ -65,6 +65,99 @@ class OrderUpdateService:
             stock_type = 'hearing_item'
         
         return stock, stock_type
+    @staticmethod
+    def create_order_item(order, item_data):
+        """
+        Creates a new order item based on the item type.
+        Handles: hearing_item, lens, frame, other_item, external_lens, lens_cleaner
+        """
+        quantity = item_data['quantity']
+        price_per_unit = item_data['price_per_unit']
+        subtotal = item_data['subtotal']
+        note = item_data.get('note')
+        is_non_stock = item_data.get('is_non_stock', False)
+        
+        # Determine item type and create accordingly
+        if item_data.get('hearing_item'):
+            hearing_item = HearingItem.objects.get(pk=item_data['hearing_item'])
+            return OrderItem.objects.create(
+                order=order,
+                quantity=quantity,
+                price_per_unit=price_per_unit,
+                subtotal=subtotal,
+                hearing_item=hearing_item,
+                next_service_date=item_data.get('next_service_date'),
+                serial_no=item_data.get('serial_no'),
+                battery=item_data.get('battery'),
+                is_non_stock=is_non_stock,
+                note=note,
+                admin_id=None,
+                user_id=None
+            )
+        elif item_data.get('lens'):
+            return OrderItem.objects.create(
+                order=order,
+                quantity=quantity,
+                price_per_unit=price_per_unit,
+                subtotal=subtotal,
+                lens_id=item_data['lens'],
+                is_non_stock=is_non_stock,
+                note=note,
+                admin_id=None,
+                user_id=None
+            )
+        elif item_data.get('frame'):
+            return OrderItem.objects.create(
+                order=order,
+                quantity=quantity,
+                price_per_unit=price_per_unit,
+                subtotal=subtotal,
+                frame_id=item_data['frame'],
+                note=note,
+                admin_id=None,
+                user_id=None
+            )
+        elif item_data.get('other_item'):
+            return OrderItem.objects.create(
+                order=order,
+                quantity=quantity,
+                price_per_unit=price_per_unit,
+                subtotal=subtotal,
+                other_item_id=item_data['other_item'],
+                is_non_stock=is_non_stock,
+                note=note,
+                admin_id=None,
+                user_id=None
+            )
+        elif item_data.get('external_lens'):
+            # Validate external lens exists
+            if not ExternalLens.objects.filter(id=item_data['external_lens']).exists():
+                raise ValueError(f"External lens ID {item_data['external_lens']} does not exist.")
+            return OrderItem.objects.create(
+                order=order,
+                quantity=quantity,
+                price_per_unit=price_per_unit,
+                subtotal=subtotal,
+                external_lens_id=item_data['external_lens'],
+                note=note,
+                admin_id=None,
+                user_id=None
+            )
+        elif item_data.get('lens_cleaner'):
+            return OrderItem.objects.create(
+                order=order,
+                quantity=quantity,
+                price_per_unit=price_per_unit,
+                subtotal=subtotal,
+                lens_cleaner_id=item_data['lens_cleaner'],
+                is_non_stock=is_non_stock,
+                note=note,
+                admin_id=None,
+                user_id=None
+            )
+        else:
+            raise ValueError("No valid item type found in item_data")
+    
     #handle on holde for lens utill
     @staticmethod
     def handle_lens_stock_adjustment(stock, qty_diff,item_data, previous_on_hold, new_on_hold, is_refund):
@@ -285,6 +378,35 @@ class OrderUpdateService:
                     #create new items
                     #step 1: validate stock adn return validated data 
                     stock, stock_type = OrderUpdateService.get_stock_for_item(item_data, branch_id)
+                    #step 2: check stock deferance and prepare stock adjustments
+                    qty_diff = item_data['quantity']
+                    if stock and stock_type != 'external_lens':  # ✅ This checks for None
+                        #if new onhold true skip stock reduction for lens 
+                        if stock_type == 'lens':
+                            #handle manualy here
+                            if new_on_hold == False:
+                                if stock.qty < qty_diff:
+                                    raise ValueError(f"Insufficient stock for lens. Available: {stock.qty}, Required: {item_data['quantity']}")
+                                stock.qty -= qty_diff
+                                stock.save()
+                        elif stock_type != 'lens':
+                            if stock.qty < qty_diff:
+                                raise ValueError(f"Insufficient stock for item ID {item_id}. Available: {stock.qty}, Required: {qty_diff}")
+                            stock.qty -= qty_diff  # ❌ WRONG: Should be -= when reducing stock
+                            stock.save()
+
+                            #create hearing order item
+                            #create lens Order item
+                            #create other item order item
+                            #create frame order item
+                            #create external lens order item
+                    OrderUpdateService.create_order_item(order, item_data)
+                    # from here preform other operations
+                    #order model related updates 
+                    # bus id 
+                    #payments handle
+
+    
                         
                         
                     
