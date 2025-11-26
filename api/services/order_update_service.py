@@ -365,7 +365,7 @@ class OrderUpdateService:
                             
                             if stock_type == 'lens':
                                 OrderUpdateService.handle_lens_stock_adjustment(
-                                    stock, qty_diff, previous_on_hold, new_on_hold, is_refund=is_refund
+                                    stock, qty_diff, item_data, previous_on_hold, new_on_hold, is_refund
                                 )
                                
                             if stock_type != 'lens' and not is_refund:
@@ -375,9 +375,9 @@ class OrderUpdateService:
                             elif stock_type != 'lens' and is_refund :
                                 stock.qty += item_data['quantity']
                                 stock.save()
-                        if existing_item['is_refund']:
+                        if is_refund:
                             # get the sum of refund quantities for this item
-                            item_total =existing_item['quantity'] * item_data['price_per_unit']
+                            item_total = item_data['quantity'] * item_data['price_per_unit']
                             refund_total += item_total
                             refund_item_count += 1
                     # Step 3: Update item using on-change-append logic
