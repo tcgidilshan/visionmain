@@ -196,6 +196,10 @@ class OrderService:
             if not branch_id:
                 raise ValueError("Order is not associated with a branch.")
 
+            # STEP 1: Capture original state BEFORE any modifications (for refund calculation)
+            original_discount = order.discount or Decimal('0.00')
+            original_total_price = order.total_price
+
             # Track on_hold flag changes
             was_on_hold = order.on_hold
             will_be_on_hold = order_data.get("on_hold", was_on_hold)
@@ -222,7 +226,8 @@ class OrderService:
                         lens_items, branch_id, on_hold=False, existing_items=existing_items
                     )
 
-
+            previous_discount = order.discount
+            new_discount = order_data.get('discount', 0)
             # Update order fields
             order.sub_total = order_data.get('sub_total', order.sub_total)
             order.discount = order_data.get('discount', order.discount)
@@ -257,6 +262,11 @@ class OrderService:
                 if field in order_data:
                     setattr(order, field, order_data.get(field))
             order.save()
+            
+            # Track discount change for refund note
+            new_discount = order.discount
+            has_discount_increase = new_discount > original_discount
+            
             updated_item_ids = set()
             # Create/Update order items
             for item_data in order_items_data:
@@ -472,24 +482,34 @@ class OrderService:
                 is_deleted=False
             )
             
-            # Recalculate subtotal from ALL active items (excluding refunded ones)
-            new_subtotal = Decimal('0.00')
-            total_refund_amount = Decimal('0.00')
+            # Identify refunded items
             refund_items = [item for item in order_items_data if item.get('is_refund', False) and item.get('id')]
             refund_item_ids = [item['id'] for item in refund_items] if refund_items else []
             
+            # Recalculate subtotal from remaining (non-refunded) items
+            new_subtotal = Decimal('0.00')
             for item in current_order_items:
-                if item.pk in refund_item_ids or item.is_refund:
-                    # Track refunded items but don't add to subtotal
-                    total_refund_amount += item.subtotal
-                else:
-                    # Only non-refunded items count toward subtotal
+                if item.pk not in refund_item_ids and not item.is_refund:
                     new_subtotal += item.subtotal
             
-            # Update order totals with recalculated values
+            # Update order with new subtotal and recalculate total_price
+            # Use the discount from order_data (user's new discount value)
             order.sub_total = new_subtotal
-            order.total_price = new_subtotal - (order.discount or Decimal('0.00'))
+            order.total_price = new_subtotal - order.discount
             order.save()
+            
+            # Get expense categories for refund handling
+            main_category_id = order_data.get('main_category', 1)
+            sub_category_id = order_data.get('sub_category', 2)
+            
+            try:
+                main_category = ExpenseMainCategory.objects.get(pk=main_category_id)
+                sub_category = ExpenseSubCategory.objects.get(pk=sub_category_id, main_category=main_category)
+            except (ExpenseMainCategory.DoesNotExist, ExpenseSubCategory.DoesNotExist):
+                raise ValueError("Invalid expense category for refund")
+            
+            # Get invoice number for refund notes
+            invoice_number = order.invoice.invoice_number if hasattr(order, 'invoice') and order.invoice else f"Order #{order.pk}"
             
             if refund_items:
                 # Get refunded order items for stock restoration
@@ -555,85 +575,82 @@ class OrderService:
                         item.user = CustomUser.objects.get(pk=user_id)
                     item.save()
 
-                # Calculate actual cash refund amount based on overpayment
-                if total_refund_amount > 0:
-                    main_category_id = order_data.get('main_category', 1)
-                    sub_category_id = order_data.get('sub_category', 2)
-                    
-                    try:
-                        main_category = ExpenseMainCategory.objects.get(pk=main_category_id)
-                        sub_category = ExpenseSubCategory.objects.get(pk=sub_category_id, main_category=main_category)
-                    except (ExpenseMainCategory.DoesNotExist, ExpenseSubCategory.DoesNotExist):
-                        raise ValueError("Invalid expense category for refund")
-
-                    # Get invoice number for note
-                    invoice_number = order.invoice.invoice_number if hasattr(order, 'invoice') and order.invoice else f"Order #{order.pk}"
-
-                    # Build descriptive refund items list
-                    refund_descriptions = []
-                    for item in refunded_order_items:
-                        qty = item.quantity
-                        if item.external_lens:
-                            item_type = f"{qty} External Lens" if qty == 1 else f"{qty} External Lenses"
-                        elif item.lens:
-                            item_type = f"{qty} In-Stock Lens" if qty == 1 else f"{qty} In-Stock Lenses"
-                        elif item.frame:
-                            item_type = f"{qty} Frame" if qty == 1 else f"{qty} Frames"
-                        elif item.lens_cleaner:
-                            item_type = f"{qty} Lens Cleaner" if qty == 1 else f"{qty} Lens Cleaners"
-                        elif item.other_item:
-                            item_type = f"{qty} Other Item" if qty == 1 else f"{qty} Other Items"
-                        elif item.hearing_item:
-                            item_type = f"{qty} Hearing Item" if qty == 1 else f"{qty} Hearing Items"
-                        else:
-                            item_type = f"{qty} Item" if qty == 1 else f"{qty} Items"
-                        refund_descriptions.append(item_type)
-                    
-                    # Join descriptions with commas
-                    items_description = ", ".join(refund_descriptions)
-
-                    # Calculate new order total after refund (already updated above)
-                    new_order_total = order.total_price
-                    
-                    # Get EXISTING payments (before processing new payments in this update)
-                    existing_payments = OrderPayment.objects.filter(
-                        order=order,
-                        is_deleted=False
-                    ).aggregate(
-                        total=Sum('amount')
-                    )['total'] or Decimal('0.00')
-                    
-                    # Get PREVIOUS refunds already given (critical fix for multiple refunds)
-                    previous_refunds = Expense.objects.filter(
-                        order_refund=order,
-                        is_refund=True
-                    ).aggregate(
-                        total=Sum('amount')
-                    )['total'] or Decimal('0.00')
-                    
-                    # Calculate cash refund: how much customer overpaid for the NEW order total
-                    # Formula: existing_payments - previous_refunds - new_order_total
-                    # Example 1: Paid 700, refunded 0, new total 400 → refund = 700 - 0 - 400 = 300
-                    # Example 2: Paid 400, refunded 50, new total 200 → refund = 400 - 50 - 200 = 150
-                    net_payments = existing_payments - previous_refunds
-                    if net_payments > new_order_total:
-                        cash_refund_amount = net_payments - new_order_total
+                # Build descriptive refund items list
+                refund_descriptions = []
+                for item in refunded_order_items:
+                    qty = item.quantity
+                    if item.external_lens:
+                        item_type = f"{qty} External Lens" if qty == 1 else f"{qty} External Lenses"
+                    elif item.lens:
+                        item_type = f"{qty} In-Stock Lens" if qty == 1 else f"{qty} In-Stock Lenses"
+                    elif item.frame:
+                        item_type = f"{qty} Frame" if qty == 1 else f"{qty} Frames"
+                    elif item.lens_cleaner:
+                        item_type = f"{qty} Lens Cleaner" if qty == 1 else f"{qty} Lens Cleaners"
+                    elif item.other_item:
+                        item_type = f"{qty} Other Item" if qty == 1 else f"{qty} Other Items"
+                    elif item.hearing_item:
+                        item_type = f"{qty} Hearing Item" if qty == 1 else f"{qty} Hearing Items"
                     else:
-                        cash_refund_amount = Decimal('0.00')
-                    
-                    # Create expense record with actual cash refund amount
-                    # Always create expense even with 0 amount for audit trail
-                    Expense.objects.create(
-                        paid_source='cash',
-                        branch=order.branch,
-                        main_category=main_category,
-                        sub_category=sub_category,
-                        amount=cash_refund_amount,
-                        note=f"Refund for Invoice {invoice_number} - {items_description}",
-                        paid_from_safe=False,
-                        is_refund=True,
-                        order_refund=order
-                    )
+                        item_type = f"{qty} Item" if qty == 1 else f"{qty} Items"
+                    refund_descriptions.append(item_type)
+                
+                items_description = ", ".join(refund_descriptions) if refund_descriptions else "items"
+            else:
+                items_description = "items"
+
+            # UNIFIED overpayment detection (runs for ALL order edits)
+            # Calculate what customer should pay vs what they paid
+            
+            # Get EXISTING payments (before processing new payments in this update)
+            existing_payments = OrderPayment.objects.filter(
+                order=order,
+                is_deleted=False
+            ).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0.00')
+            
+            # Get PREVIOUS refunds already given
+            previous_refunds = Expense.objects.filter(
+                order_refund=order,
+                is_refund=True
+            ).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0.00')
+            
+            # Calculate net amount customer has paid
+            net_payments = existing_payments - previous_refunds
+            
+            # What customer SHOULD pay (updated total_price with new discount)
+            current_order_total = order.total_price
+            
+            # Detect overpayment and create refund expense if needed
+            if net_payments > current_order_total:
+                refund_needed = net_payments - current_order_total
+                
+                # Determine refund reason for audit trail
+                if refund_items:
+                    # Item refund scenario (may include discount change)
+                    refund_note = f"Refund for Invoice {invoice_number} - {items_description}"
+                elif has_discount_increase:
+                    # Only discount increase, no item refund
+                    refund_note = f"Refund for Invoice {invoice_number} - Discount increased (LKR {original_discount:.2f} → LKR {new_discount:.2f})"
+                else:
+                    # General order adjustment
+                    refund_note = f"Refund for Invoice {invoice_number} - Order total adjusted"
+                
+                # Create refund expense
+                Expense.objects.create(
+                    paid_source='cash',
+                    branch=order.branch,
+                    main_category=main_category,
+                    sub_category=sub_category,
+                    amount=refund_needed,
+                    note=refund_note,
+                    paid_from_safe=False,
+                    is_refund=True,
+                    order_refund=order
+                )
 
             # Process Payments (now order.total_price is already updated with refund deduction)
             OrderPaymentService.append_on_change_payments_for_order(order, payments_data,admin_id,user_id)
