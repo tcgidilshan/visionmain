@@ -114,60 +114,87 @@ class OrderPaymentService:
             return {"error": f"An error occurred: {str(e)}"}
         
     @staticmethod
+    @transaction.atomic
     def refund_order(order_id, expense_data):
+        """
+        Refunds the entire order (complete invoice).
+        Calculates actual cash refund = total_payments - previous_refunds_given
+        """
         try:
             order = Order.all_objects.get(id=order_id)
         except Order.DoesNotExist:
             raise ValidationError("Order not found.")
     
         if order.is_refund:
-            raise ValidationError("This order has already been refunded.")
+            raise ValidationError("This order has already been fully refunded.")
         
-    # Get total amount paid by customer
-    #get all payments 
-        payments = OrderPayment.all_objects.filter(is_deleted=False,is_edited=False,order=order_id)
-       
+        # Get total amount paid by customer (all non-deleted, non-edited payments)
         total_paid = (
             OrderPayment.all_objects
-            .filter(is_deleted=False,is_edited=False,order=order_id)
+            .filter(is_deleted=False, is_edited=False, order=order_id)
             .aggregate(total=Sum("amount"))["total"] or 0
         )
         
         if total_paid == 0:
             raise ValidationError("No successful payments found to refund.")
+        
+        # Get previous refund expenses already given (from item refunds)
+        previous_refunds = (
+            Expense.objects
+            .filter(order_refund=order, is_refund=True)
+            .aggregate(total=Sum("amount"))["total"] or 0
+        )
+        
+        # Calculate actual cash to refund = payments - previous refunds
+        cash_refund_amount = total_paid - previous_refunds
+        
+        if cash_refund_amount <= 0:
+            raise ValidationError(f"No cash refund needed. Total paid: {total_paid}, Already refunded: {previous_refunds}")
+        
+        # Soft-delete all payments
         now = timezone.now()
+        payments = OrderPayment.all_objects.filter(is_deleted=False, is_edited=False, order=order_id)
         for payment in payments:
             payment.is_deleted = True
             payment.deleted_at = now
             payment.save()
-        # Mark order as refunded
+        
+        # Mark order as fully refunded
         order.is_refund = True
         order.refunded_at = timezone.now()
-        order.refund_note = f"Refund processed on {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        order.save()
-
-        # Get invoice number if exists
         try:
             invoice_number = order.invoice.invoice_number
-            note = f"Refund Invoice {invoice_number}"
-        except Invoice.DoesNotExist:
-            note = f"Refund for No invoice Number"
+            order.refund_note = f"Full refund for Invoice {invoice_number}"
+        except:
+            order.refund_note = f"Full refund for Order #{order.id}"
+        order.save()
+
+        # Get invoice number for note
+        try:
+            invoice_number = order.invoice.invoice_number
+            note = f"Full refund for Invoice {invoice_number}"
+        except:
+            note = f"Full refund for Order #{order.id}"
             
-        # Prepare expense data
-        expense_data['amount'] = str(total_paid)
+        # Prepare expense data with actual cash refund amount
+        expense_data['amount'] = str(cash_refund_amount)
         expense_data['paid_source'] = 'cash'
         expense_data['paid_from_safe'] = False
         expense_data['note'] = note
         expense_data['is_refund'] = True
+        expense_data['order_refund'] = order.id
 
-        # Create expense
+        # Create expense record for the actual cash refund
         serializer = ExpenseSerializer(data=expense_data)
         serializer.is_valid(raise_exception=True)
         expense = serializer.save()
 
         return {
-            "message": "Order refund processed successfully.",
+            "message": "Order fully refunded successfully.",
             "order_id": order.id,
+            "total_paid": float(total_paid),
+            "previous_refunds": float(previous_refunds),
+            "cash_refund_amount": float(cash_refund_amount),
             "refund_expense_id": expense.id
         }
     @staticmethod
