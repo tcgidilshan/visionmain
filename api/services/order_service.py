@@ -200,31 +200,23 @@ class OrderService:
             original_discount = order.discount or Decimal('0.00')
             original_total_price = order.total_price
 
-            # Track on_hold flag changes
-            was_on_hold = order.on_hold
-            will_be_on_hold = order_data.get("on_hold", was_on_hold)
-            # Detect transition from on-hold to active
-            transitioning_off_hold = was_on_hold and not will_be_on_hold
+            # Track on_hold flag changes for lens stock management
+            previous_on_hold = order.on_hold
+            new_on_hold = order_data.get("on_hold", previous_on_hold)
+            
+            print(f"\n=== ON_HOLD DEBUG START - Order #{order.pk} ===")
+            print(f"Previous on_hold: {previous_on_hold}")
+            print(f"New on_hold: {new_on_hold}")
+            
+            # Detect transitions
+            transitioning_off_hold = previous_on_hold and not new_on_hold  # True → False (need to deduct lens stock)
+            transitioning_to_hold = not previous_on_hold and new_on_hold   # False → True (need to restore lens stock)
+            print(f"Transitioning off hold (True→False): {transitioning_off_hold}")
+            print(f"Transitioning to hold (False→True): {transitioning_to_hold}")
             
             # Track existing items for later comparison
             existing_items = {item.id: item for item in order.order_items.all()}
-
-            # If transitioning from on-hold to active, validate lens stock
-            lens_stock_updates = []
-            if transitioning_off_hold:
-                # Get only the lens-related items (not frames) for validation
-                # Skip external_lens since they don't maintain stock
-                lens_items = []
-                for item_data in order_items_data:
-                    if (item_data.get('lens') or item_data.get('lens_cleaner') or 
-                        item_data.get('other_item')) and not item_data.get('is_non_stock', False):
-                        lens_items.append(item_data)
-                
-                # Only validate if there are actual stock items to validate
-                if lens_items:
-                    _, lens_stock_updates = StockValidationService.validate_stocks(
-                        lens_items, branch_id, on_hold=False, existing_items=existing_items
-                    )
+            print(f"Existing items count: {len(existing_items)}")
 
             previous_discount = order.discount
             new_discount = order_data.get('discount', 0)
@@ -236,8 +228,8 @@ class OrderService:
             order.sales_staff_code_id = order_data.get('sales_staff_code', order.sales_staff_code_id)
             order.order_remark = order_data.get('order_remark', order.order_remark)
             order.user_date = order_data.get('user_date', order.user_date)
-            order.on_hold = will_be_on_hold  # Update hold status
-            order.fitting_on_collection = order_data.get('fitting_on_collection', order.fitting_on_collection)  # Update hold status
+            order.on_hold = new_on_hold  # Update hold status
+            order.fitting_on_collection = order_data.get('fitting_on_collection', order.fitting_on_collection)
             bus_title_id = order_data.get('bus_title')
             #urgent
             order.urgent = order_data.get('urgent', order.urgent)
@@ -333,19 +325,19 @@ class OrderService:
                             )
                     continue
 
-                # Handle stock for items (frame vs lens-related differently)
+                # Handle stock for items
                 stock = None
                 stock_type = None
-                is_frame = False
+                is_lens_type = False  # Only TRUE lens items affected by on_hold
 
                 # Determine stock type and get stock object
                 if item_data.get("lens"):
                     stock = LensStock.objects.select_for_update().filter(lens_id=item_data["lens"], branch_id=branch_id).first()
                     stock_type = "lens"
+                    is_lens_type = True  # ONLY lens affected by on_hold
                 elif item_data.get("frame"):
                     stock = FrameStock.objects.select_for_update().filter(frame_id=item_data["frame"], branch_id=branch_id).first()
                     stock_type = "frame"
-                    is_frame = True
                 elif item_data.get("other_item"):
                     stock = OtherItemStock.objects.select_for_update().filter(other_item_id=item_data["other_item"], branch_id=branch_id).first()
                     stock_type = "other_item"
@@ -359,8 +351,17 @@ class OrderService:
                 if not stock:
                     raise ValueError(f"{stock_type.capitalize()} stock not found for branch {branch_id}.")
 
-                # Only adjust lens-related stock if NOT on hold (or frame stock always)
-                should_adjust_stock = is_frame or not will_be_on_hold
+                # Determine if stock should be adjusted based on item type and on_hold status
+                # For existing items: use previous_on_hold
+                # For new items: use new_on_hold
+                if item_id and item_id in existing_items:
+                    # Existing item: only skip if it's a lens AND previous_on_hold was True
+                    should_adjust_stock = not (is_lens_type and previous_on_hold)
+                    print(f"\n[ITEM] Existing {stock_type} (ID:{item_id}) - is_lens:{is_lens_type}, prev_on_hold:{previous_on_hold}, adjust:{should_adjust_stock}")
+                else:
+                    # New item: only skip if it's a lens AND new_on_hold is True
+                    should_adjust_stock = not (is_lens_type and new_on_hold)
+                    print(f"\n[ITEM] New {stock_type} - is_lens:{is_lens_type}, new_on_hold:{new_on_hold}, adjust:{should_adjust_stock}")
 
                 if should_adjust_stock:
                     if item_id and item_id in existing_items:
@@ -369,6 +370,7 @@ class OrderService:
                        if int(old_item.quantity) != new_quantity:
                           if stock.qty < new_quantity:
                             raise ValueError(f"Insufficient {stock_type} stock.")
+                          print(f"[STOCK] Adjusting existing {stock_type}: qty {stock.qty} → {stock.qty - new_quantity}")
                           stock.qty -= new_quantity
                           stock.save()
                     else:
@@ -377,8 +379,11 @@ class OrderService:
                         if stock.qty < quantity:
                             
                             raise ValueError(f"Insufficient {stock_type} stock.")
+                        print(f"[STOCK] Deducting new {stock_type}: qty {stock.qty} → {stock.qty - new_quantity}")
                         stock.qty -= new_quantity
                         stock.save()
+                else:
+                    print(f"[STOCK] Skipping stock adjustment (on_hold logic)")
 
                 # Save order item
                 if item_id and item_id in existing_items:
@@ -433,15 +438,15 @@ class OrderService:
                         stock = None
                         stock_model = None
                         stock_filter = {}
-                        is_frame = False
+                        is_lens_type = False  # Only TRUE lens affected by on_hold
 
                         if deleted_item.lens_id:
                             stock_model = LensStock
                             stock_filter = {"lens_id": deleted_item.lens_id, "branch_id": branch_id}
+                            is_lens_type = True  # ONLY lens affected by on_hold
                         elif deleted_item.frame_id:
                             stock_model = FrameStock
                             stock_filter = {"frame_id": deleted_item.frame_id, "branch_id": branch_id}
-                            is_frame = True
                         elif deleted_item.lens_cleaner_id:
                             stock_model = LensCleanerStock
                             stock_filter = {"lens_cleaner_id": deleted_item.lens_cleaner_id, "branch_id": branch_id}
@@ -449,11 +454,15 @@ class OrderService:
                             stock_model = OtherItemStock
                             stock_filter = {"other_item_id": deleted_item.other_item_id, "branch_id": branch_id}
 
-                        should_restock = is_frame or not will_be_on_hold
+                        # Only skip restocking lens if new_on_hold is True
+                        # All other items (frame, lens_cleaner, other_item, hearing_item) always restock
+                        should_restock = not (is_lens_type and new_on_hold)
+                        print(f"\n[DELETE] Item {deleted_item.id} ({stock_model.__name__ if stock_model else 'unknown'}) - is_lens:{is_lens_type}, new_on_hold:{new_on_hold}, restock:{should_restock}")
 
                         if should_restock and stock_model and stock_filter:
                             stock = stock_model.objects.select_for_update().filter(**stock_filter).first()
                             if stock:
+                                print(f"[DELETE] Restocking: qty {stock.qty} → {stock.qty + deleted_item.quantity}")
                                 stock.qty += deleted_item.quantity
                                 stock.save()
                             elif stock_model:
@@ -466,12 +475,59 @@ class OrderService:
                                     f"⚠️ Warning: Item ID {deleted_item.id} marked as stock, but has no stock FK set "
                                     f"(lens, frame, other_item, or lens_cleaner). Skipping restock."
                                 )
+                        elif not should_restock:
+                            print(f"[DELETE] Skipping restock (on_hold logic)")
                     deleted_item.delete()
 
 
-            # Final: Deduct lens stock if on_hold → False
+            # Final: Handle on_hold transitions for lens stock
             if transitioning_off_hold:
-                StockValidationService.adjust_stocks(lens_stock_updates)
+                # Transitioning from on_hold=True to False: deduct lens stock for ALL lens items
+                print(f"\n[TRANSITION OFF_HOLD] Deducting lens stock for all lens items")
+                
+                # Collect all lens items from current order (after updates)
+                current_lens_items = OrderItem.objects.filter(
+                    order=order,
+                    is_deleted=False,
+                    lens__isnull=False  # Only lens items
+                )
+                
+                for lens_item in current_lens_items:
+                    lens_stock = LensStock.objects.select_for_update().filter(
+                        lens=lens_item.lens,
+                        branch=order.branch
+                    ).first()
+                    
+                    if lens_stock:
+                        if lens_stock.qty < lens_item.quantity:
+                            raise ValueError(f"Insufficient lens stock for lens ID {lens_item.lens.id}")
+                        print(f"[TRANSITION OFF_HOLD] Deducting lens {lens_item.lens.id}: qty {lens_stock.qty} → {lens_stock.qty - lens_item.quantity}")
+                        lens_stock.qty -= lens_item.quantity
+                        lens_stock.save()
+                    else:
+                        raise ValueError(f"Lens stock not found for lens ID {lens_item.lens.id}")
+                        
+            elif transitioning_to_hold:
+                # Transitioning from on_hold=False to True: restore lens stock for ALL lens items
+                print(f"\n[TRANSITION TO_HOLD] Restoring lens stock for all lens items")
+                
+                # Collect all lens items from current order
+                current_lens_items = OrderItem.objects.filter(
+                    order=order,
+                    is_deleted=False,
+                    lens__isnull=False  # Only lens items
+                )
+                
+                for lens_item in current_lens_items:
+                    lens_stock = LensStock.objects.select_for_update().filter(
+                        lens=lens_item.lens,
+                        branch=order.branch
+                    ).first()
+                    
+                    if lens_stock:
+                        print(f"[TRANSITION TO_HOLD] Restoring lens {lens_item.lens.id}: qty {lens_stock.qty} → {lens_stock.qty + lens_item.quantity}")
+                        lens_stock.qty += lens_item.quantity
+                        lens_stock.save()
 
             # Handle Refund Logic: Recalculate order totals from ALL current items
             # This ensures new items are included in the calculation
@@ -512,6 +568,7 @@ class OrderService:
             invoice_number = order.invoice.invoice_number if hasattr(order, 'invoice') and order.invoice else f"Order #{order.pk}"
             
             if refund_items:
+                print(f"\n[REFUND] Processing {len(refund_items)} refunded items")
                 # Get refunded order items for stock restoration
                 refunded_order_items = OrderItem.objects.filter(
                     id__in=refund_item_ids,
@@ -521,10 +578,11 @@ class OrderService:
                 
                 # Now restore stock and soft delete items
                 for item in refunded_order_items:
-                    # Restore stock quantities based on item type (only if not on_hold)
+                    # Restore stock quantities based on item type
                     if not item.is_non_stock:
                         stock = None
                         stock_type = None
+                        is_lens_type = False  # Only TRUE lens affected by on_hold
                         
                         # Determine stock type and get stock object
                         if item.lens:
@@ -533,35 +591,48 @@ class OrderService:
                                 branch=order.branch
                             ).first()
                             stock_type = "lens"
-                        elif item.frame:
-                            stock = FrameStock.objects.select_for_update().filter(
-                                frame=item.frame, 
-                                branch=order.branch
-                            ).first()
-                            stock_type = "frame"
-                        elif item.other_item:
-                            stock = OtherItemStock.objects.select_for_update().filter(
-                                other_item=item.other_item, 
-                                branch=order.branch
-                            ).first()
-                            stock_type = "other_item"
+                            is_lens_type = True  # ONLY lens affected by on_hold
                         elif item.lens_cleaner:
                             stock = LensCleanerStock.objects.select_for_update().filter(
                                 lens_cleaner=item.lens_cleaner, 
                                 branch=order.branch
                             ).first()
                             stock_type = "lens_cleaner"
+                            # is_lens_type = False (always restore, not affected by on_hold)
+                        elif item.other_item:
+                            stock = OtherItemStock.objects.select_for_update().filter(
+                                other_item=item.other_item, 
+                                branch=order.branch
+                            ).first()
+                            stock_type = "other_item"
+                            # is_lens_type = False (always restore, not affected by on_hold)
+                        elif item.frame:
+                            stock = FrameStock.objects.select_for_update().filter(
+                                frame=item.frame, 
+                                branch=order.branch
+                            ).first()
+                            stock_type = "frame"
+                            # is_lens_type = False (always restore, not affected by on_hold)
                         elif item.hearing_item:
                             stock = HearingItemStock.objects.select_for_update().filter(
                                 hearing_item=item.hearing_item, 
                                 branch=order.branch
                             ).first()
                             stock_type = "hearing_item"
+                            # is_lens_type = False (always restore, not affected by on_hold)
                         
                         # Restore stock quantity (add back the refunded quantity)
-                        if stock:
+                        # ONLY lens items: skip restore if previous_on_hold was True (stock was never deducted)
+                        # All other items (frame, lens_cleaner, other_item, hearing_item): always restore
+                        should_restore = not (is_lens_type and previous_on_hold)
+                        print(f"[REFUND] Item {item.id} ({stock_type}) - is_lens:{is_lens_type}, prev_on_hold:{previous_on_hold}, restore:{should_restore}")
+                        
+                        if stock and should_restore:
+                            print(f"[REFUND] Restoring stock: qty {stock.qty} → {stock.qty + item.quantity}")
                             stock.qty += item.quantity
                             stock.save()
+                        elif not should_restore:
+                            print(f"[REFUND] Skipping restore (lens was on_hold, stock never deducted)")
                     
                     # Soft delete the item
                     item.is_deleted = True
@@ -652,6 +723,8 @@ class OrderService:
                     order_refund=order
                 )
 
+            print(f"\n=== ON_HOLD DEBUG END - Order #{order.pk} ===\n")
+            
             # Process Payments (now order.total_price is already updated with refund deduction)
             OrderPaymentService.append_on_change_payments_for_order(order, payments_data,admin_id,user_id)
             
