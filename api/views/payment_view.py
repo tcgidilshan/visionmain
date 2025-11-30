@@ -4,7 +4,7 @@ from rest_framework import status
 from django.db import transaction
 from django.db.models import Sum
 from decimal import Decimal
-from ..models import Order,Invoice,OrderProgress,OrderPayment,Expense  # Assuming Order model exists
+from ..models import Order,Invoice,OrderProgress,OrderPayment,Expense,OrderItem,LensStock  # Import LensStock for on_hold handling
 from ..serializers import OrderPaymentSerializer
 from ..services.order_payment_service import OrderPaymentService  # Assuming service function is in OrderService
 
@@ -69,10 +69,72 @@ class PaymentView(APIView):
             
             order.total_payment = total_payments - total_expenses
             order.save(update_fields=['total_payment'])
-            #update on_hold status
+            
+            # ✅ Handle on_hold status change with lens stock management
             if on_hold is not None:
-                order.on_hold = on_hold
+                previous_on_hold = order.on_hold
+                new_on_hold = on_hold
+                
+                print(f"\n=== ON_HOLD PAYMENT UPDATE - Order #{order.pk} ===")
+                print(f"Previous on_hold: {previous_on_hold}")
+                print(f"New on_hold: {new_on_hold}")
+                
+                # Detect transitions
+                transitioning_off_hold = previous_on_hold and not new_on_hold  # True → False
+                transitioning_to_hold = not previous_on_hold and new_on_hold   # False → True
+                
+                if transitioning_off_hold:
+                    # Transitioning from on_hold=True to False: deduct lens stock
+                    print("[PAYMENT] Transitioning OFF hold - deducting lens stock")
+                    
+                    # Get all lens items for this order
+                    lens_items = OrderItem.objects.filter(
+                        order=order,
+                        is_deleted=False,
+                        lens__isnull=False
+                    )
+                    
+                    for lens_item in lens_items:
+                        lens_stock = LensStock.objects.select_for_update().filter(
+                            lens=lens_item.lens,
+                            branch=order.branch
+                        ).first()
+                        
+                        if lens_stock:
+                            if lens_stock.qty < lens_item.quantity:
+                                raise ValueError(f"Insufficient lens stock for lens ID {lens_item.lens.id}")
+                            print(f"[PAYMENT] Deducting lens {lens_item.lens.id}: qty {lens_stock.qty} → {lens_stock.qty - lens_item.quantity}")
+                            lens_stock.qty -= lens_item.quantity
+                            lens_stock.save()
+                        else:
+                            raise ValueError(f"Lens stock not found for lens ID {lens_item.lens.id}")
+                            
+                elif transitioning_to_hold:
+                    # Transitioning from on_hold=False to True: restore lens stock
+                    print("[PAYMENT] Transitioning TO hold - restoring lens stock")
+                    
+                    # Get all lens items for this order
+                    lens_items = OrderItem.objects.filter(
+                        order=order,
+                        is_deleted=False,
+                        lens__isnull=False
+                    )
+                    
+                    for lens_item in lens_items:
+                        lens_stock = LensStock.objects.select_for_update().filter(
+                            lens=lens_item.lens,
+                            branch=order.branch
+                        ).first()
+                        
+                        if lens_stock:
+                            print(f"[PAYMENT] Restoring lens {lens_item.lens.id}: qty {lens_stock.qty} → {lens_stock.qty + lens_item.quantity}")
+                            lens_stock.qty += lens_item.quantity
+                            lens_stock.save()
+                
+                # Update on_hold status after stock adjustments
+                order.on_hold = new_on_hold
                 order.save(update_fields=['on_hold'])
+                print(f"=== ON_HOLD PAYMENT UPDATE END ===\n")
 
             # ✅ Return updated order payment details
             updated_payments = order.orderpayment_set.all()
