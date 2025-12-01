@@ -106,9 +106,10 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
     pagination_class = PaginationService
 
     def get_queryset(self):
-        # Use all_objects to include soft-deleted items
+        # Only include non-deleted items with external lens
         queryset = OrderItem.all_objects.filter(
-            external_lens__isnull=False
+            external_lens__isnull=False,
+            is_deleted=False,
         ).select_related(
             'order__invoice', 'order__branch', 'external_lens__brand'
         ).order_by('-order__invoice__invoice_date')
