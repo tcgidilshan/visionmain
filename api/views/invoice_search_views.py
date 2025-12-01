@@ -166,9 +166,10 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
                 # ✅ Returned rows: last status == 'recived'
                 queryset = queryset.filter(latest_arrival_status='recived')
             else:  # arrival_status == 'not_received'
-                # ✅ Returned rows: last status == 'mnt_marked'
+                # ✅ Returned rows: last status == 'mnt_marked' OR 'Mnt Marked' (handle both old and new data) OR null
                 queryset = queryset.filter(
                     Q(latest_arrival_status='mnt_marked') | 
+                    Q(latest_arrival_status='Mnt Marked') |  # Handle old data format
                     Q(latest_arrival_status__isnull=True)
                 )
 
