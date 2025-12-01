@@ -73,6 +73,9 @@ class ExpenseReportView(APIView):
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
         branch_id = request.query_params.get('branch_id')
+        # Support both parameter naming conventions
+        main_category_id = request.query_params.get('main_category_id') or request.query_params.get('main_category')
+        sub_category_id = request.query_params.get('sub_category_id') or request.query_params.get('sub_category')
 
         if not start_date or not branch_id:
             return Response({
@@ -85,7 +88,16 @@ class ExpenseReportView(APIView):
             queryset = Expense.objects.select_related('main_category', 'sub_category').filter(
                 created_at__range=[start_datetime, end_datetime],
                 branch_id=branch_id
-            ).order_by('-created_at')
+            )
+            
+            # Apply category filters if provided
+            if main_category_id:
+                queryset = queryset.filter(main_category_id=main_category_id)
+            
+            if sub_category_id:
+                queryset = queryset.filter(sub_category_id=sub_category_id)
+            
+            queryset = queryset.order_by('-created_at')
 
             total = queryset.aggregate(total_expense=Sum('amount'))['total_expense'] or 0
            
