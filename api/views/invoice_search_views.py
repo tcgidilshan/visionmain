@@ -25,12 +25,19 @@ class FactoryInvoiceSearchView(APIView):
         progress_status = request.query_params.get('progress_status')
         patient_id = request.query_params.get('patient_id')
         patient_name = request.query_params.get('patient_name')
+        include_mnt = request.query_params.get('include_mnt')  # ✅ Get include_mnt parameter
 
         if not any([invoice_number, mobile, nic, branch_id, progress_status, patient_id, patient_name]):
             return Response(
                 {"error": "Please provide at least one search parameter: invoice_number, mobile, nic, branch_id, progress_status, patient_id, or patient_name."},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        # ✅ Convert include_mnt to boolean or None
+        if include_mnt is not None:
+            include_mnt = include_mnt.lower() in ['true', '1', 'yes']
+        else:
+            include_mnt = None
 
         invoices = InvoiceService.search_factory_invoices(
             user=request.user,
@@ -40,7 +47,8 @@ class FactoryInvoiceSearchView(APIView):
             branch_id=branch_id,
             progress_status=progress_status,
             patient_id=patient_id,
-            patient_name=patient_name
+            patient_name=patient_name,
+            include_mnt=include_mnt,  # ✅ Pass include_mnt to the service
         )
         
         paginator = self.pagination_class()
@@ -98,11 +106,12 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
     pagination_class = PaginationService
 
     def get_queryset(self):
-        # Use all_objects to include soft-deleted items
+        # Only include non-deleted items with external lens
         queryset = OrderItem.all_objects.filter(
-            external_lens__isnull=False
+            external_lens__isnull=False,
+            is_deleted=False,
         ).select_related(
-            'order__invoice', 'order__branch'
+            'order__invoice', 'order__branch', 'external_lens__brand'
         ).order_by('-order__invoice__invoice_date')
 
         invoice_number = self.request.query_params.get('invoice_number')
@@ -113,9 +122,14 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
         end_date = self.request.query_params.get('end_date')
         #arrival status 
         arrival_status = self.request.query_params.get('arrival_status')
+        # External lens brand filter
+        external_lens_brand_id = self.request.query_params.get('external_lens_brand_id')
 
         if invoice_number:
             queryset = queryset.filter(order__invoice__invoice_number__icontains=invoice_number)
+        
+        if external_lens_brand_id:
+            queryset = queryset.filter(external_lens__brand_id=external_lens_brand_id)
 
         # --- Only apply annotation/filter if param is present ---
         if whatsapp_sent in ['sent', 'not_sent']:
@@ -128,11 +142,11 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
             )
             if whatsapp_sent == 'sent':
                 # filter last record status what is sent
-                queryset = queryset.filter(latest_wp_status='sent')
+                queryset = queryset.filter(Q(latest_wp_status='sent')|Q(latest_wp_status='Mnt Marked'))
             else:
                 # filter orders where last record is either mnt_marked or doesn't exist
                 queryset = queryset.filter(
-                    Q(latest_wp_status='mnt_marked') | 
+                    Q(latest_wp_status='Mnt Marked') | 
                     Q(latest_wp_status__isnull=True)
                 )
         if arrival_status in ['received', 'not_received']:
@@ -152,9 +166,10 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
                 # ✅ Returned rows: last status == 'recived'
                 queryset = queryset.filter(latest_arrival_status='recived')
             else:  # arrival_status == 'not_received'
-                # ✅ Returned rows: last status == 'mnt_marked'
+                # ✅ Returned rows: last status == 'mnt_marked' OR 'Mnt Marked' (handle both old and new data) OR null
                 queryset = queryset.filter(
                     Q(latest_arrival_status='mnt_marked') | 
+                    Q(latest_arrival_status='Mnt Marked') |  # Handle old data format
                     Q(latest_arrival_status__isnull=True)
                 )
 

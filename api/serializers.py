@@ -1463,13 +1463,22 @@ class ExternalLensOrderItemSerializer(serializers.ModelSerializer):
     payments = serializers.SerializerMethodField()
     whatsapp_sent = serializers.SerializerMethodField()
     arrival_status = serializers.SerializerMethodField()
+    mnt_number = serializers.SerializerMethodField()
+    
+    # External Lens related fields
+    external_lens_brand_name = serializers.CharField(source='external_lens.brand.name', read_only=True)
+    external_lens_type_name = serializers.CharField(source='external_lens.lens_type.name', read_only=True)
+    external_lens_coating_name = serializers.CharField(source='external_lens.coating.name', read_only=True)
+    external_lens_branded = serializers.CharField(source='external_lens.branded', read_only=True)
+    
     class Meta:
         model = OrderItem
         fields = [
             'id', 'external_lens', 'quantity', 'price_per_unit', 'subtotal',
             'order_id', 'invoice_number', 'invoice_date', 'branch_name','customer_name',
             'total_price','total_payment', 'fitting_on_collection', 'on_hold', 'payments','urgent',
-            'progress_status','whatsapp_sent','arrival_status'
+            'progress_status','whatsapp_sent','arrival_status','mnt_number',
+            'external_lens_brand_name', 'external_lens_type_name', 'external_lens_coating_name', 'external_lens_branded'
         ]
     def get_payments(self, obj):
             # Get the order related to this invoice
@@ -1517,6 +1526,18 @@ class ExternalLensOrderItemSerializer(serializers.ModelSerializer):
         if last_arrival_status:
             return ArrivalStatusSerializer(last_arrival_status).data
         return None
+    
+    def get_mnt_number(self, obj):
+        """Get MNT number if this order is a remake order"""
+        order = getattr(obj, "order", None)
+        if not order:
+            return None
+        
+        try:
+            mnt_order = MntOrder.objects.get(order=order)
+            return mnt_order.mnt_number
+        except MntOrder.DoesNotExist:
+            return None
 class SolderingOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = SolderingOrder

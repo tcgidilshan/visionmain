@@ -17,19 +17,29 @@ class RefractionReportView(APIView):
         if not start_datetime or not end_datetime:
             return Response({"error": "Invalid date range"}, status=400)
 
-        # Get refractions that do not have any associated orders
-        refractions = Refraction.objects.annotate(
+        # Base queryset with counts
+        refractions_with_counts = Refraction.objects.annotate(
             num_orders=Count('order')
         ).filter(
-            num_orders=0,
             created_at__range=(start_datetime, end_datetime)
         ).select_related('patient', 'branch')
 
         if branch_id:
-            refractions = refractions.filter(branch_id=branch_id)
+            refractions_with_counts = refractions_with_counts.filter(branch_id=branch_id)
+
+        # Get refractions that do not have any associated orders
+        refractions_without_orders = refractions_with_counts.filter(num_orders=0)
+
+        # Get refractions that have orders
+        refractions_with_orders = refractions_with_counts.filter(num_orders__gt=0)
+
+        # Calculate totals
+        total_refractions = refractions_with_counts.count()
+        total_with_orders = refractions_with_orders.count()
+        total_without_orders = refractions_without_orders.count()
 
         data = []
-        for r in refractions:
+        for r in refractions_without_orders:
             data.append({
                 'id': r.id,
                 'refraction_number': r.refraction_number,
@@ -39,4 +49,14 @@ class RefractionReportView(APIView):
                 'created_at': r.created_at.isoformat(),
             })
 
-        return Response(data)
+        # Build response with summary
+        response_data = {
+            'summary': {
+                'total_refractions': total_refractions,
+                'refractions_with_orders': total_with_orders,
+                'refractions_without_orders': total_without_orders,
+            },
+            'refractions_without_orders': data
+        }
+
+        return Response(response_data)

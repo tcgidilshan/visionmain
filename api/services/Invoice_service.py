@@ -6,7 +6,9 @@ from ..serializers import InvoiceSerializer,RefractionDetailsSerializer
 from rest_framework.exceptions import ValidationError
 from django.db.models import OuterRef, Subquery
 from .time_zone_convert_service import TimezoneConverterService
-
+from api.models import OrderProgress, MntOrder
+from django.db.models import Exists
+        
 class InvoiceService:
     """
     Service class to handle invoice creation based on new invoice type logic.
@@ -83,7 +85,7 @@ class InvoiceService:
             raise NotFound("Invoice not found.")
         
     @staticmethod
-    def search_factory_invoices(user, invoice_number=None, mobile=None, nic=None, branch_id=None, progress_status=None, patient_id=None, patient_name=None):
+    def search_factory_invoices(user, invoice_number=None, mobile=None, nic=None, branch_id=None, progress_status=None, patient_id=None, patient_name=None, include_mnt=None):
         """
         Search for factory invoices with various filters.
         
@@ -96,10 +98,12 @@ class InvoiceService:
             progress_status: Comma-separated list of statuses to filter by
             patient_id: Filter by patient ID (exact match)
             patient_name: Filter by patient name (case-insensitive partial match)
+            include_mnt: Filter for MNT orders (True/False/None for all)
             
         Returns:
             QuerySet of matching invoices
         """
+       
         # Use all_objects to include soft-deleted invoices
         qs = Invoice.all_objects.filter(invoice_type='factory')
 
@@ -127,10 +131,19 @@ class InvoiceService:
         if patient_name:
             qs = qs.filter(order__customer__name__icontains=patient_name)
 
+        # Handle MNT filtering
+        if include_mnt is not None:
+            mnt_exists = MntOrder.objects.filter(order=OuterRef('order_id'))
+            if include_mnt:
+                # Only include orders with MNT records
+                qs = qs.annotate(has_mnt=Exists(mnt_exists)).filter(has_mnt=True)
+            else:
+                # Exclude orders with MNT records
+                qs = qs.annotate(has_mnt=Exists(mnt_exists)).filter(has_mnt=False)
+
         # Handle progress status filtering
         if progress_status:
             status_list = [s.strip() for s in progress_status.split(",") if s.strip()]
-            from api.models import OrderProgress
             latest_progress = OrderProgress.objects.filter(
                 order=OuterRef('order_id')
             ).order_by('-changed_at')
@@ -138,9 +151,9 @@ class InvoiceService:
                 latest_progress_status=Subquery(latest_progress.values('progress_status')[:1])
             ).filter(latest_progress_status__in=status_list)
         
-        # Optimize the query
+        # Optimize the query - include MNT orders in prefetch
         qs = qs.select_related('order', 'order__customer') \
-               .prefetch_related('order__order_progress_status') \
+               .prefetch_related('order__order_progress_status', 'order__mnt_orders') \
                .order_by('-invoice_date')
                
         return qs
