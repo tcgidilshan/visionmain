@@ -142,11 +142,11 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
             )
             if whatsapp_sent == 'sent':
                 # filter last record status what is sent
-                queryset = queryset.filter(latest_wp_status='sent')
+                queryset = queryset.filter(Q(latest_wp_status='sent')|Q(latest_wp_status='Mnt Marked'))
             else:
                 # filter orders where last record is either mnt_marked or doesn't exist
                 queryset = queryset.filter(
-                    Q(latest_wp_status='mnt_marked') | 
+                    Q(latest_wp_status='Mnt Marked') | 
                     Q(latest_wp_status__isnull=True)
                 )
         if arrival_status in ['received', 'not_received']:
