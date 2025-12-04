@@ -50,7 +50,7 @@ class RefractionReportView(APIView):
             })
 
         # Build response with summary
-    response_data = {
+        response_data = {
             'summary': {
                 'total_refractions': total_refractions,
                 'refractions_with_orders': total_with_orders,
