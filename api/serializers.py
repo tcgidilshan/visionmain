@@ -716,7 +716,9 @@ class OrderSerializer(serializers.ModelSerializer):
             'deleted_at',
             'refunded_at',
             'urgent',
-            'mnt_order'
+            'mnt_order',
+            'co_order',
+            'co_note'
         ] 
 class OrderAuditLogSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.username', read_only=True)
@@ -1098,6 +1100,8 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
     order_deleted_at = serializers.DateTimeField(source='order.deleted_at', read_only=True)
     order_is_refund = serializers.BooleanField(source='order.is_refund', read_only=True)
     order_refunded_at = serializers.DateTimeField(source='order.refunded_at', read_only=True)
+    co_note = serializers.CharField(source='order.co_note', read_only=True)
+    co_order = serializers.BooleanField(source='order.co_order', read_only=True)
     is_deleted = serializers.BooleanField(read_only=True)
     deleted_at = serializers.DateTimeField(read_only=True)
     
@@ -1132,6 +1136,8 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
             'order_deleted_at',
             'order_is_refund',
             'order_refunded_at',
+            'co_note',
+            'co_order',
             # Invoice deletion status
             'is_deleted',
             'deleted_at'
@@ -1322,6 +1328,8 @@ class FrameOnlyOrderSerializer(serializers.Serializer):
     required=False,
     default='received_from_customer'
     )
+    co_order = serializers.BooleanField(required=False, default=False)
+    co_note = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     def validate(self, data):
         if not data.get('frame').is_active:
@@ -1341,6 +1349,8 @@ class FrameOnlyOrderUpdateSerializer(serializers.Serializer):
     sub_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     discount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0.00)
     total_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    co_order = serializers.BooleanField(required=False, default=False)
+    co_note = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     def validate(self, data):
         if not data.get('frame').is_active:
@@ -1614,8 +1624,9 @@ class OrderLiteSerializer(serializers.ModelSerializer):
             'is_refund',       # add this for refund status
             'refunded_at',     # add this for refund date
             'refund_note',     # add if you want the reason/note
-            'total_payment'
-           
+            'total_payment',
+            'co_order',
+            'co_note'
         ]
     def get_total_payment(self, obj):
         # //TODO: Only sum payments that are not deleted and are successful

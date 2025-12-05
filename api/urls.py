@@ -73,7 +73,8 @@ from .views import (
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
     LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
     RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
-    HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView,HearingOrderReportView,FactoryOrderStatusSummaryView,SafeTransactionSummaryView
+    HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView,HearingOrderReportView,FactoryOrderStatusSummaryView,SafeTransactionSummaryView,
+    COOrderReportView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -339,6 +340,7 @@ urlpatterns = [
     path('reports/refraction/', RefractionReportView.as_view(), name='refraction-report'),
     path('factory-order-status-summary/', FactoryOrderStatusSummaryView.as_view(), name='factory-order-status-summary'),
 
-
+# co orders 
+    path('report/co-order/', COOrderReportView.as_view(), name='co-order-report'),
 ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),

@@ -595,6 +595,8 @@ class Order(models.Model):
     issued_date = models.DateTimeField(null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
+    co_order = models.BooleanField(default=False)
+    co_note = models.TextField(null=True, blank=True)
 
     fitting_status = models.CharField(max_length=20, choices=FITTING_CHOICES, default='Pending')
     fitting_status_updated_date = models.DateTimeField(null=True, blank=True)

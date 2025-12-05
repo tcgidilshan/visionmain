@@ -36,6 +36,8 @@ class OrderUpdateView(APIView):
             order_data = request.data.get("order", {})
             order_items_data = request.data.get("order_items", [])
             payments_data = request.data.get("order_payments", [])
+            co_order = request.data.get("co_order")
+            co_note = request.data.get("co_note","")
             
 
             # Check if we're changing on_hold status
@@ -105,6 +107,11 @@ class OrderUpdateView(APIView):
                         created_at=timezone.now()
                     )
                 # Optionally: return mnt_order info in response or audit log
+
+            if co_order is not None:
+                updated_order.co_order = co_order
+                updated_order.co_note = co_note
+                updated_order.save()   
 
 
             # Step 5: Return Updated Order Response
