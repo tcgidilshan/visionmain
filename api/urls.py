@@ -74,7 +74,7 @@ from .views import (
     LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
     RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
     HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView,HearingOrderReportView,FactoryOrderStatusSummaryView,SafeTransactionSummaryView,
-    COOrderReportView
+    COOrderReportView,BranchTimeReportView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -342,5 +342,7 @@ urlpatterns = [
 
 # co orders 
     path('report/co-order/', COOrderReportView.as_view(), name='co-order-report'),
+    #branch tiem report 
+    path('report/branch-time-report/', BranchTimeReportView.as_view(), name='branch-time-report'),
 ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),

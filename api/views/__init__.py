@@ -73,3 +73,4 @@ from .order_payment_bank_report import OrderPaymentBankReportViewSet
 from .expence_return import ExpenceReturnAPIView
 from .factory_order_status_summary import FactoryOrderStatusSummaryView
 from .co_order_view import COOrderReportView
+from .branch_time_report_view import BranchTimeReportView
