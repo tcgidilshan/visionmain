@@ -43,10 +43,13 @@ class OrderUpdateView(APIView):
             # Check if we're changing on_hold status
             current_on_hold = order.on_hold
             new_on_hold = order_data.get("on_hold", current_on_hold)
+            
+            # Capture original order data BEFORE update
             original_order_data = {
-            field: getattr(order, field)
-            for field in OrderAuditLogService.TRACKED_FIELDS
+                field: getattr(order, field)
+                for field in OrderAuditLogService.TRACKED_FIELDS
             }
+            
             # Log the on-hold transition if it's happening (can be helpful for debugging)
             if current_on_hold != new_on_hold:
                 print(f"Order {order.id} on_hold status changing: {current_on_hold} → {new_on_hold}")
@@ -55,15 +58,24 @@ class OrderUpdateView(APIView):
             # The updated update_order method now handles different stock behavior based on on_hold status and refunds
             updated_order = OrderService.update_order(order, order_data, order_items_data, payments_data, admin_id, user_id)
             
-            # Now log only if update succeeded
-            OrderAuditLogService.log_order_changes(
-            order_instance=updated_order,
-            updated_data=order_data,
-            original_data=original_order_data,
-            raw_data={
-                "admin_id": admin_id,
-                "user_id": user_id
+            # Refresh order from database to get final calculated values
+            updated_order.refresh_from_db()
+            
+            # Capture the FINAL updated data after all recalculations
+            final_order_data = {
+                field: getattr(updated_order, field)
+                for field in OrderAuditLogService.TRACKED_FIELDS
             }
+            
+            # Now log with the actual final values
+            OrderAuditLogService.log_order_changes(
+                order_instance=updated_order,
+                updated_data=final_order_data,
+                original_data=original_order_data,
+                raw_data={
+                    "admin_id": admin_id,
+                    "user_id": user_id
+                }
             )
               # --- MNT logic (if requested) ---
             if request.data.get("mnt", False):
