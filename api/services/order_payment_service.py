@@ -264,7 +264,6 @@ class OrderPaymentService:
                             "payment_method_bank": payment_method_bank,
                             "user": user_id,
                             "admin": admin_id,
-                            
                         }
                         # print("Before serialization:", payment_data['payment_date'])
                         payment_serializer = OrderPaymentSerializer(data=payment_data)
