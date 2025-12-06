@@ -10,8 +10,8 @@ from ..services.pagination_service import PaginationService
 
 class COOrderReportView(APIView):
     def get(self, request):
-        start_date = request.query_params.get('date_start')
-        end_date = request.query_params.get('date_end')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
         branch_id = request.query_params.get('branch_id')
 
         start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
@@ -24,7 +24,7 @@ class COOrderReportView(APIView):
             co_order=True,
             order_date__range=(start_datetime, end_datetime)
         ).select_related('customer', 'branch', 'invoice')
-
+        print(co_orders.query)
         if branch_id:
             co_orders = co_orders.filter(branch_id=branch_id)
 
