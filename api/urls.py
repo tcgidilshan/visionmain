@@ -73,7 +73,7 @@ from .views import (
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
     LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
     RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
-    HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView,HearingOrderReportView,FactoryOrderStatusSummaryView,SafeTransactionSummaryView,
+    HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView,EarningReportView,HearingOrderReportView,FactoryOrderStatusSummaryView,SafeTransactionSummaryView,
     COOrderReportView,BranchTimeReportView
 )
 from .views.customer_report_views import BestCustomersReportView
@@ -272,7 +272,6 @@ urlpatterns = [
     path('expenses/', ExpenseCreateView.as_view(), name='expense-create'),
     path("expenses/report/", ExpenseReportView.as_view(), name="expense-report"),
     path("expense/summary-report/", ExpenceSummeryReportView.as_view(), name="expense-report-summery"),
-
     path('expenses/<int:pk>/update/', ExpenseUpdateView.as_view(), name='expense-update'),
     path('expenses/<int:pk>/', ExpenseRetrieveView.as_view(), name='expense-detail'),
     path('expense/cash-return/', ExpenceReturnAPIView.as_view(), name='expense-cash-return'),
@@ -344,5 +343,8 @@ urlpatterns = [
     path('report/co-order/', COOrderReportView.as_view(), name='co-order-report'),
     #branch tiem report 
     path('report/branch-time-report/', BranchTimeReportView.as_view(), name='branch-time-report'),
+    path("earnings/report/", EarningReportView.as_view(), name="earning-report"),
+
+
 ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),
