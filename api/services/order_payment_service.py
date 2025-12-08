@@ -19,6 +19,11 @@ class OrderPaymentService:
             payment_data['order'] = order.id
             payment_data['payment_date'] = timezone.now()  # Add payment_date set to now
             payment_data['transaction_status'] = payment_data.get('transaction_status', 'success')  # Set default transaction status
+            #set user id and admin id if exist in payment_data
+            if 'user_id' in payment_data:
+                payment_data['user'] = payment_data.pop('user_id')
+            if 'admin_id' in payment_data:
+                payment_data['admin'] = payment_data.pop('admin_id')
 
             # Determine if this payment is partial
             payment_data['is_partial'] = total_payment + payment_data['amount'] < order.total_price
@@ -241,10 +246,11 @@ class OrderPaymentService:
                     )
                     if changed:
                         # Soft-delete old, create new (keep date)
-                        old_payment.user_id = user_id
-                        old_payment.admin_id = admin_id
+                        # old_payment.user_id = user_id
+                        # old_payment.admin_id = admin_id
                         old_payment.is_edited = True
-                        old_payment.save(update_fields=['user', 'admin'])
+                        # old_payment.save(update_fields=['user', 'admin'])
+                        
                         old_payment.delete()
                         # print("OLD DATE",old_payment.payment_date)
                         payment_data = {
@@ -256,9 +262,8 @@ class OrderPaymentService:
                             "is_partial": False,
                             "is_final_payment": False,
                             "payment_method_bank": payment_method_bank,
-                            "user": None,
-                            "admin": None,
-                            
+                            "user": user_id,
+                            "admin": admin_id,
                         }
                         # print("Before serialization:", payment_data['payment_date'])
                         payment_serializer = OrderPaymentSerializer(data=payment_data)
@@ -288,8 +293,8 @@ class OrderPaymentService:
                     "payment_date": timezone.now(),  # Add this line
                     "is_partial": False,
                     "is_final_payment": False,
-                    "admin": None,
-                    "user": None,
+                    "admin": admin_id,
+                    "user": user_id,
                 }
                 
                 payment_serializer = OrderPaymentSerializer(data=payment_data)
@@ -301,10 +306,10 @@ class OrderPaymentService:
         # 2. Soft-delete payments that are in DB but not referenced in the new list (user "removed" them)
         for db_id, db_pmt in db_payments.items():
             if db_id not in seen_payment_ids:
-                db_pmt.user_id = user_id
-                db_pmt.admin_id = admin_id
+                # db_pmt.user_id = user_id
+                # db_pmt.admin_id = admin_id
                 db_pmt.is_edited = True
-                db_pmt.save(update_fields=['user', 'admin'])
+                # db_pmt.save(update_fields=['user', 'admin'])
                 db_pmt.delete()
 
         # 3. Set is_partial and is_final_payment

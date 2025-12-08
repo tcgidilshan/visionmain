@@ -2,7 +2,7 @@
 
 from rest_framework import generics,status
 from ..models import ExpenseMainCategory, ExpenseSubCategory,Expense,ExpenseReturn
-from ..serializers import ExpenseMainCategorySerializer, ExpenseSubCategorySerializer,ExpenseSerializer,ExpenseReportSerializer
+from ..serializers import ExpenseMainCategorySerializer, ExpenseSubCategorySerializer,ExpenseSerializer,ExpenseReportSerializer,ExpenseReturnSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from ..services.expense_validation_service import ExpenseValidationService
@@ -85,41 +85,79 @@ class ExpenseReportView(APIView):
         try:
             start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
             
-            queryset = Expense.objects.select_related('main_category', 'sub_category').filter(
+            # Query expenses
+            expense_queryset = Expense.objects.select_related('main_category', 'sub_category').filter(
+                created_at__range=[start_datetime, end_datetime],
+                branch_id=branch_id
+            )
+            
+            # Query expense returns
+            return_queryset = ExpenseReturn.objects.select_related('main_category', 'sub_category').filter(
                 created_at__range=[start_datetime, end_datetime],
                 branch_id=branch_id
             )
             
             # Apply category filters if provided
             if main_category_id:
-                queryset = queryset.filter(main_category_id=main_category_id)
+                expense_queryset = expense_queryset.filter(main_category_id=main_category_id)
+                return_queryset = return_queryset.filter(main_category_id=main_category_id)
             
             if sub_category_id:
-                queryset = queryset.filter(sub_category_id=sub_category_id)
+                expense_queryset = expense_queryset.filter(sub_category_id=sub_category_id)
+                return_queryset = return_queryset.filter(sub_category_id=sub_category_id)
             
-            queryset = queryset.order_by('-created_at')
+            expense_queryset = expense_queryset.order_by('-created_at')
+            return_queryset = return_queryset.order_by('-created_at')
 
-            total = queryset.aggregate(total_expense=Sum('amount'))['total_expense'] or 0
-           
+            # Calculate expense totals
+            expense_total = expense_queryset.aggregate(total=Sum('amount'))['total'] or 0
+            expense_cash_total = expense_queryset.filter(paid_source='cash').aggregate(total=Sum('amount'))['total'] or 0
+            expense_safe_total = expense_queryset.filter(paid_source='safe').aggregate(total=Sum('amount'))['total'] or 0
+            expense_bank_total = expense_queryset.filter(paid_source='bank').aggregate(total=Sum('amount'))['total'] or 0
 
-            cash_total = queryset.filter(paid_source='cash').aggregate(cash_total=Sum('amount'))['cash_total'] or 0
-           
+            # Calculate expense return totals
+            return_total = return_queryset.aggregate(total=Sum('amount'))['total'] or 0
+            return_cash_total = return_queryset.filter(paid_source='cash').aggregate(total=Sum('amount'))['total'] or 0
+            return_safe_total = return_queryset.filter(paid_source='safe').aggregate(total=Sum('amount'))['total'] or 0
+            return_bank_total = return_queryset.filter(paid_source='bank').aggregate(total=Sum('amount'))['total'] or 0
 
+            # Calculate net amounts
+            net_total = expense_total - return_total
+            net_cash_total = expense_cash_total - return_cash_total
+            net_safe_total = expense_safe_total - return_safe_total
+            net_bank_total = expense_bank_total - return_bank_total
 
-            safe_total = queryset.filter(paid_source='safe').aggregate(safe_total=Sum('amount'))['safe_total'] or 0
-           
-
-            bank_total = queryset.filter(paid_source='bank').aggregate(bank_total=Sum('amount'))['bank_total'] or 0
-           
-
+            # Combine expenses and returns into a single array
+            expenses_data = ExpenseReportSerializer(expense_queryset, many=True).data
+            for expense in expenses_data:
+                expense['transaction_type'] = 'expense'
+                expense['cash_return'] = 0  # Expenses have no return amount
+            
+            returns_data = ExpenseReturnSerializer(return_queryset, many=True).data
+            for return_item in returns_data:
+                return_item['transaction_type'] = 'return'
+                return_item['cash_return'] = int(float(return_item['amount']))  # Return amount goes to cash_return
+                return_item['amount'] = '0.00'  # Returns have 0 expense amount
+            
+            # Combine and sort by created_at (newest first)
+            all_transactions = expenses_data + returns_data
+            all_transactions.sort(key=lambda x: x['created_at'], reverse=True)
        
             return Response({
-                "total_expense": total,
-                "cash_expense_total": cash_total,
-                "safe_expense_total": safe_total,
-                "bank_expense_total": bank_total,
-                "subtotal_expense": total,
-                "expenses": ExpenseReportSerializer(queryset, many=True).data
+                "total_expense": expense_total,
+                "cash_expense_total": expense_cash_total,
+                "safe_expense_total": expense_safe_total,
+                "bank_expense_total": expense_bank_total,
+                "total_return": return_total,
+                "cash_return_total": return_cash_total,
+                "safe_return_total": return_safe_total,
+                "bank_return_total": return_bank_total,
+                "net_total": net_total,
+                "net_cash_total": net_cash_total,
+                "net_safe_total": net_safe_total,
+                "net_bank_total": net_bank_total,
+                "subtotal_expense": expense_total,
+                "transactions": all_transactions
             })
 
         except Exception as e:

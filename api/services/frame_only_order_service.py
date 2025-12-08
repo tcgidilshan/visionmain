@@ -18,6 +18,8 @@ class FrameOnlyOrderService:
         price_per_unit = data["price_per_unit"]
         branch_id = data["branch_id"]
         sales_staff_code = data.get("sales_staff_code", None)
+        co_order = data.get("co_order", False)
+        co_note = data.get("co_note", None)
         
         
 
@@ -61,6 +63,10 @@ class FrameOnlyOrderService:
             user_date=date.today(),
             order_remark=data.get("order_remark", "")  # Add order_remark from payload
         )
+        if co_order:
+            order.co_order = co_order
+            order.co_note = co_note
+            order.save()
         
 
         # 1. Update the progress_status field (capture previous if needed)
@@ -197,6 +203,11 @@ class FrameOnlyOrderService:
         order.total_price = total_price
         order.status = data.get("status", order.status)
         order.progress_status = data.get("progress_status", order.progress_status)
+        co_order = data.get("co_order", False)
+        co_note = data.get("co_note", None)
+        if co_order:
+            order.co_order = co_order
+            order.co_note = co_note
         order.save()
 
         # 🔹 Step 6: Replace order item

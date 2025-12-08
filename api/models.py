@@ -595,6 +595,8 @@ class Order(models.Model):
     issued_date = models.DateTimeField(null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
+    co_order = models.BooleanField(default=False)
+    co_note = models.TextField(null=True, blank=True)
 
     fitting_status = models.CharField(max_length=20, choices=FITTING_CHOICES, default='Pending')
     fitting_status_updated_date = models.DateTimeField(null=True, blank=True)
@@ -1093,6 +1095,8 @@ class Appointment(models.Model):
     refund_note = models.TextField(blank=True, null=True)
     doctor_fees = models.DecimalField(max_digits=10, decimal_places=2,default=0)
     branch_fees = models.DecimalField(max_digits=10, decimal_places=2,default=0)
+    is_arrived = models.BooleanField(default=False)
+    arrival_time = models.DateTimeField(null=True, blank=True)
     objects = SoftDeleteManager()      # Only active records
     all_objects = models.Manager() 
     class Meta:

@@ -314,7 +314,7 @@ class DailyFinanceSummaryService:
         )
         #total credit card payment from channel
         today_channel_payments_credit_card = DailyFinanceSummaryService._sum(
-            ChannelPayment.objects.filter(
+            ChannelPayment.all_objects.filter(
                 appointment__branch_id=branch_id,
                 payment_date__gte=start_of_day,
                 payment_date__lte=end_of_day,
@@ -324,7 +324,7 @@ class DailyFinanceSummaryService:
         )
         #total cash payment from channel
         today_channel_payments_cash = DailyFinanceSummaryService._sum(
-            ChannelPayment.objects.filter(
+            ChannelPayment.all_objects.filter(
                 appointment__branch_id=branch_id,
                 payment_date__gte=start_of_day,
                 payment_date__lte=end_of_day,
@@ -366,7 +366,6 @@ class DailyFinanceSummaryService:
         today_total_credit_card_payments = today_order_payments_credit_card + today_channel_payments_credit_card + today_soldering_payments_credit_card
         #grand total cash payment from orders
         today_total_cash_payments = today_order_payments_cash + today_channel_payments_cash + today_soldering_payments_cash
-        
         return {
             "branch": branch_id,
             "date": str(date),

@@ -16,14 +16,17 @@ class BankAccountListCreateView(generics.ListCreateAPIView):
         """
         queryset = self.get_queryset()
 
-        # Optional filtering by bank name or account number
+        # Optional filtering by bank name, account number, or branch
         bank_name_filter = request.query_params.get('bank_name')
         account_number_filter = request.query_params.get('account_number')
+        branch_id_filter = request.query_params.get('branch_id')
 
         if bank_name_filter:
             queryset = queryset.filter(bank_name__icontains=bank_name_filter)
         if account_number_filter:
             queryset = queryset.filter(account_number__icontains=account_number_filter)
+        if branch_id_filter:
+            queryset = queryset.filter(branch_id=branch_id_filter)
 
         # Pagination is automatically handled by DRF
         serializer = self.get_serializer(queryset, many=True)

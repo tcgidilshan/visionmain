@@ -26,6 +26,8 @@ class OrderCreateView(APIView):
                 
                 # 🔹 Step 1: Validate & Create/Update Patient
                 patient_id = request.data.get("patient_id")
+                co_order = request.data.get("co_order", False)
+                co_note = request.data.get("co_note", "")
                 if not patient_id:
                     return Response({"error": "Patient details are required."}, status=status.HTTP_400_BAD_REQUEST)
                 patient = None
@@ -91,6 +93,12 @@ class OrderCreateView(APIView):
                 #     raise ValueError("At least one order payment is required.")
 
                 total_payment = OrderPaymentService.process_payments(order, payments_data)
+                if co_order:
+                    # order.co_order= true
+                    # order.co_note = co_order.note
+                    order.co_order = True
+                    order.co_note = co_note
+                    order.save()
 
                 # 🔹 Step 9: Store total payment in order
                 order.total_payment = Decimal(str(total_payment))

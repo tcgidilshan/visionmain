@@ -5,11 +5,11 @@ from api.models import Invoice, OrderAuditLog, OrderPayment
 from django.utils import timezone
 from datetime import datetime, timedelta
 from rest_framework.generics import ListAPIView
-from ..models import Order,OrderItem,OrderPayment,RefractionDetails,OrderAuditLog,Invoice,RefractionDetailsAuditLog
+from ..models import Order,OrderItem,OrderPayment,RefractionDetails,OrderAuditLog,Invoice,RefractionDetailsAuditLog,Expense
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from ..serializers import OrderLiteSerializer,OrderSerializer,OrderItemSerializer,OrderPaymentSerializer
+from ..serializers import OrderLiteSerializer,OrderSerializer,OrderItemSerializer,OrderPaymentSerializer,ExpenseSerializer
 from ..services.pagination_service import PaginationService 
 from django.db.models import (
     BooleanField,
@@ -78,12 +78,16 @@ class OrderAuditHistoryView(APIView):
         order_id = request.query_params.get("order_id")
         order_logs = OrderAuditLog.objects.all()
         order_items = OrderItem.all_objects.filter(is_deleted=True).order_by('-deleted_at')
-        order_payments = OrderPayment.all_objects.filter(is_deleted=True).order_by('-deleted_at')
+        # Get ALL payments (active + deleted + edited) for complete audit trail
+        order_payments = OrderPayment.all_objects.all().order_by('payment_date')
+        # Get order refund expenses
+        order_expenses = Expense.objects.none()
         refraction_logs = []
         if order_id:
             order_items = order_items.filter(order_id=order_id)
             order_payments = order_payments.filter(order_id=order_id)
             order_logs = order_logs.filter(order_id=order_id)
+            order_expenses = Expense.objects.filter(order_refund_id=order_id, is_refund=True).order_by('-created_at')
             # Fetch refraction details audit logs if applicable
             try:
                 order = Order.all_objects.select_related('refraction').get(id=order_id)
@@ -104,7 +108,8 @@ class OrderAuditHistoryView(APIView):
 
         return Response({
             "order_items": OrderItemSerializer(order_items.order_by('-deleted_at'), many=True).data,
-            "order_payments": OrderPaymentSerializer(order_payments.order_by('-deleted_at'), many=True).data,
+            "order_payments": OrderPaymentSerializer(order_payments.order_by('payment_date'), many=True).data,
+            "order_expenses": ExpenseSerializer(order_expenses, many=True).data,
             "order_logs": [
                 {
                     "order_id": log.order_id,
