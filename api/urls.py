@@ -74,7 +74,7 @@ from .views import (
     LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
     RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
     HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView,EarningReportView,HearingOrderReportView,FactoryOrderStatusSummaryView,SafeTransactionSummaryView,
-    COOrderReportView,BranchTimeReportView
+    COOrderReportView,BranchTimeReportView,AppointmentArrivalMarkView,InvoiceTrackingReportView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -248,6 +248,7 @@ urlpatterns = [
     path('channels/fees/', DoctorBranchChannelFeesCreateView.as_view(), name='doctor-branch-channel-fees-create'),
     path('channels/fees/<int:pk>/update/', DoctorBranchChannelFeesUpdateView.as_view(), name='doctor-branch-channel-fees-list'),
     path('channels/fees/list/', DoctorBranchChannelFeesListView.as_view(), name='doctor-branch-channel-fees-list'),
+    path('appointment/<int:pk>/arrival-mark/', AppointmentArrivalMarkView.as_view(), name='appointment-arrival-mark'),
     
     #channel repayment
     path('channel/repayments/', ChannelRepaymentView.as_view(), name='channel-repayments'),
@@ -344,6 +345,7 @@ urlpatterns = [
     #branch tiem report 
     path('report/branch-time-report/', BranchTimeReportView.as_view(), name='branch-time-report'),
     path("earnings/report/", EarningReportView.as_view(), name="earning-report"),
+    path("invoice-tracking-report/", InvoiceTrackingReportView.as_view(), name="invoice-tracking-report"),
 
 
 ]

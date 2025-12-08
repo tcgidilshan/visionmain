@@ -917,7 +917,9 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'note',
             'doctor_fees',
             'branch_fees',
-            "is_deleted"
+            "is_deleted",
+            'is_arrived',  # Appointment arrival status
+            'arrival_time'  # Appointment arrival timestamp
         ]
 
 class ChannelPaymentSerializer(serializers.ModelSerializer):
@@ -978,7 +980,9 @@ class ChannelListSerializer(serializers.ModelSerializer):
             'is_refund',
             'deleted_at',
             'refunded_at',
-            'created_at'
+            'created_at',
+            'is_arrived',
+            'arrival_time'
         ]
 
     def get_first_payment(self, obj):

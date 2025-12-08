@@ -602,3 +602,23 @@ class BranchAppointmentCountView(APIView):
             response_data['filtered_branch_id'] = int(branch_id)
         
         return Response(response_data)
+
+class AppointmentArrivalMarkView(APIView):
+    def post(self, request, pk):
+        try:
+            appointment = get_object_or_404(Appointment, pk=pk, is_deleted=False)
+
+            if appointment.is_arrived:
+                return Response({"error": "Appointment is already marked as arrived."}, status=status.HTTP_400_BAD_REQUEST)
+
+            appointment.is_arrived = True
+            appointment.arrival_time = timezone.now()
+            appointment.save()
+
+            return Response({
+                "message": "Appointment marked as arrived.",
+                "appointment": AppointmentSerializer(appointment).data
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

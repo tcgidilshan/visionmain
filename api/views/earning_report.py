@@ -42,8 +42,8 @@ class EarningReportView(APIView):
             is_deleted=False
         ).count()
 
-        # Amounts
-        factory_order_amount = OrderPayment.objects.filter(
+        # Amounts - calculate total payments first, then subtract refunds
+        factory_order_payment_total = OrderPayment.objects.filter(
             order__invoice__invoice_type='factory',
             order__invoice__invoice_date__gte=period_start,
             order__invoice__invoice_date__lt=period_end,
@@ -54,7 +54,18 @@ class EarningReportView(APIView):
             is_deleted=False
         ).aggregate(Sum('amount'))['amount__sum'] or 0
 
-        normal_order_amount = OrderPayment.objects.filter(
+        factory_order_refund = Expense.objects.filter(
+            order_refund__invoice__invoice_type='factory',
+            order_refund__branch_id=branch_id_int,
+            is_refund=True,
+            order_refund__isnull=False,
+            created_at__gte=period_start,
+            created_at__lt=period_end
+        ).aggregate(Sum('amount'))['amount__sum'] or 0
+
+        factory_order_amount = factory_order_payment_total - factory_order_refund
+
+        normal_order_payment_total = OrderPayment.objects.filter(
             order__invoice__invoice_type='normal',
             order__invoice__invoice_date__gte=period_start,
             order__invoice__invoice_date__lt=period_end,
@@ -65,7 +76,18 @@ class EarningReportView(APIView):
             is_deleted=False
         ).aggregate(Sum('amount'))['amount__sum'] or 0
 
-        hearing_order_amount = OrderPayment.objects.filter(
+        normal_order_refund = Expense.objects.filter(
+            order_refund__invoice__invoice_type='normal',
+            order_refund__branch_id=branch_id_int,
+            is_refund=True,
+            order_refund__isnull=False,
+            created_at__gte=period_start,
+            created_at__lt=period_end
+        ).aggregate(Sum('amount'))['amount__sum'] or 0
+
+        normal_order_amount = normal_order_payment_total - normal_order_refund
+
+        hearing_order_payment_total = OrderPayment.objects.filter(
             order__invoice__invoice_type='hearing',
             order__invoice__invoice_date__gte=period_start,
             order__invoice__invoice_date__lt=period_end,
@@ -75,6 +97,17 @@ class EarningReportView(APIView):
             payment_date__lt=period_end,
             is_deleted=False
         ).aggregate(Sum('amount'))['amount__sum'] or 0
+
+        hearing_order_refund = Expense.objects.filter(
+            order_refund__invoice__invoice_type='hearing',
+            order_refund__branch_id=branch_id_int,
+            is_refund=True,
+            order_refund__isnull=False,
+            created_at__gte=period_start,
+            created_at__lt=period_end
+        ).aggregate(Sum('amount'))['amount__sum'] or 0
+
+        hearing_order_amount = hearing_order_payment_total - hearing_order_refund
 
         soldering_order_amount = SolderingPayment.objects.filter(
             order__branch_id=branch_id_int,
@@ -93,10 +126,12 @@ class EarningReportView(APIView):
             is_deleted=False
         ).aggregate(Sum('amount'))['amount__sum'] or 0
 
+        # Expense amount - exclude order refunds (they're already deducted from order amounts)
         expense_amount = Expense.objects.filter(
             branch_id=branch_id_int,
             created_at__gte=period_start,
-            created_at__lt=period_end
+            created_at__lt=period_end,
+            order_refund__isnull=True  # Only get expenses that are NOT order refunds
         ).aggregate(Sum('amount'))['amount__sum'] or 0
 
         expense_return_amount = ExpenseReturn.objects.filter(
