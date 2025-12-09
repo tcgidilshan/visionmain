@@ -294,7 +294,7 @@ class InvoiceTrackingReportView(APIView):
             }
             
             if payment.payment_method_bank:
-                payment_data['bank'] = payment.payment_method_bank.bank_name
+                payment_data['bank'] = payment.payment_method_bank.name
             
             result.append(payment_data)
         

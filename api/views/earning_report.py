@@ -15,7 +15,7 @@ class EarningReportView(APIView):
 
     def get_period_data(self, period_start, period_end, branch_id_int):
         """Helper method to get earning data for a specific period"""
-        # Counts - using timezone-aware datetime range
+        # Counts - using invoice_date for orders and created_at for channels
         invoices = Invoice.objects.filter(
             invoice_date__gte=period_start,
             invoice_date__lt=period_end,
@@ -26,7 +26,7 @@ class EarningReportView(APIView):
         normal_order_count = invoices.filter(invoice_type='normal').count()
         hearing_order_count = invoices.filter(invoice_type='hearing').count()
 
-        # SolderingInvoice
+        # SolderingInvoice count based on invoice_date
         soldering_order_count = SolderingInvoice.objects.filter(
             invoice_date__gte=period_start.date(),
             invoice_date__lte=period_end.date(),
@@ -34,7 +34,7 @@ class EarningReportView(APIView):
             is_deleted=False
         ).count()
 
-        # Appointments
+        # Appointments count based on created_at
         channel_count = Appointment.objects.filter(
             created_at__gte=period_start,
             created_at__lt=period_end,
@@ -42,11 +42,9 @@ class EarningReportView(APIView):
             is_deleted=False
         ).count()
 
-        # Amounts - calculate total payments first, then subtract refunds
+        # Payment amounts - based on payment_date (when payment was actually made)
         factory_order_payment_total = OrderPayment.objects.filter(
             order__invoice__invoice_type='factory',
-            order__invoice__invoice_date__gte=period_start,
-            order__invoice__invoice_date__lt=period_end,
             order__branch_id=branch_id_int,
             order__invoice__is_deleted=False,
             payment_date__gte=period_start,
@@ -67,8 +65,6 @@ class EarningReportView(APIView):
 
         normal_order_payment_total = OrderPayment.objects.filter(
             order__invoice__invoice_type='normal',
-            order__invoice__invoice_date__gte=period_start,
-            order__invoice__invoice_date__lt=period_end,
             order__branch_id=branch_id_int,
             order__invoice__is_deleted=False,
             payment_date__gte=period_start,
@@ -89,8 +85,6 @@ class EarningReportView(APIView):
 
         hearing_order_payment_total = OrderPayment.objects.filter(
             order__invoice__invoice_type='hearing',
-            order__invoice__invoice_date__gte=period_start,
-            order__invoice__invoice_date__lt=period_end,
             order__branch_id=branch_id_int,
             order__invoice__is_deleted=False,
             payment_date__gte=period_start,
@@ -109,6 +103,7 @@ class EarningReportView(APIView):
 
         hearing_order_amount = hearing_order_payment_total - hearing_order_refund
 
+        # Soldering payments based on payment_date
         soldering_order_amount = SolderingPayment.objects.filter(
             order__branch_id=branch_id_int,
             payment_date__gte=period_start,
@@ -116,10 +111,9 @@ class EarningReportView(APIView):
             is_deleted=False
         ).aggregate(Sum('amount'))['amount__sum'] or 0
 
+        # Channel payments based on payment_date
         channel_amount = ChannelPayment.objects.filter(
             appointment__branch_id=branch_id_int,
-            appointment__created_at__gte=period_start,
-            appointment__created_at__lt=period_end,
             appointment__is_deleted=False,
             payment_date__gte=period_start,
             payment_date__lt=period_end,
