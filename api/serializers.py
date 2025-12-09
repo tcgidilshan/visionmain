@@ -1098,6 +1098,8 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
     arrival_status = serializers.SerializerMethodField()
     #get mni invoice number 
     mnt_number = serializers.SerializerMethodField()
+    # Order images count
+    order_images_count = serializers.SerializerMethodField()
     
     # Order deletion and refund status
     order_is_deleted = serializers.BooleanField(source='order.is_deleted', read_only=True)
@@ -1135,6 +1137,7 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
             'fitting_status',
             'fitting_status_updated_date',
             'mnt_number',
+            'order_images_count',
             # Order deletion and refund status fields
             'order_is_deleted',
             'order_deleted_at',
@@ -1152,6 +1155,14 @@ class InvoiceSearchSerializer(serializers.ModelSerializer):
         if mnt_order:
             return mnt_order.mnt_number
         return None
+    
+    def get_order_images_count(self, obj):
+        """Return the count of images associated with this order"""
+        order = getattr(obj, "order", None)
+        if not order:
+            return 0
+        return order.order_images.count()
+    
     def get_progress_status(self, obj):
         order = getattr(obj, "order", None)
         if not order:
