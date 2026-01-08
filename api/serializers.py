@@ -814,7 +814,7 @@ class ExternalLensBrandSerializer(serializers.ModelSerializer):
 class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
-        fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic','patient_note','extra_phone_number']
+        fields = ['id', 'name', 'date_of_birth', 'phone_number','address','nic','patient_note','extra_phone_number','city']
 
 class InvoiceSerializer(serializers.ModelSerializer):
     customer = serializers.PrimaryKeyRelatedField(source='order.customer', read_only=True)  #  Fetch customer ID

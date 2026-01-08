@@ -78,6 +78,7 @@ from .views import (
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
+from .views.city_sales_report import CitySalesReportView
 from .views.banking_views import BankingReportView,ConfirmDepositView
 from .views.customer_report_views import CustomerLocationStatisticsView,CustomerLocationTableView
 from .views.order_feedback import OrderFeedbackCreateView, OrderFeedbackByInvoiceView
@@ -346,6 +347,7 @@ urlpatterns = [
     path('report/branch-time-report/', BranchTimeReportView.as_view(), name='branch-time-report'),
     path("earnings/report/", EarningReportView.as_view(), name="earning-report"),
     path("invoice-tracking-report/", InvoiceTrackingReportView.as_view(), name="invoice-tracking-report"),
+    path("reports/city-sales/", CitySalesReportView.as_view(), name="city-sales-report"),
 
 
 ]

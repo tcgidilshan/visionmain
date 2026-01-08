@@ -106,10 +106,13 @@ class Patient(models.Model):
     address = models.TextField(null=True, blank=True)
     nic = models.CharField(max_length=15, null=True, blank=True)
     patient_note = models.CharField(max_length=100, null=True, blank=True)
+    city = models.CharField(max_length=50, null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if self.nic:
             self.nic = self.nic.upper()
+        if self.city:
+            self.city = self.city.lower()
         super().save(*args, **kwargs)
 
     def __str__(self):
