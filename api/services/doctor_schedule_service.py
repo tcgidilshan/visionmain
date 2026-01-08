@@ -88,16 +88,18 @@ class DoctorScheduleService:
         return new_schedules
     
     @staticmethod
-    def transfer_appointments_only(doctor_id, from_date, to_date):
+    def transfer_appointments_only(doctor_id, from_date, to_date, branch_id):
         doctor = Doctor.objects.get(id=doctor_id)
+        branch = Branch.objects.get(id=branch_id)
 
         appointments = Appointment.objects.filter(
             doctor=doctor,
-            date=from_date
+            date=from_date,
+            branch=branch
         )
 
         if not appointments.exists():
-            raise ValueError("No appointments found on the given from_date.")
+            raise ValueError("No appointments found on the given from_date for the specified branch.")
 
         updated = []
         for appt in appointments:

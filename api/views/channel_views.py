@@ -208,15 +208,17 @@ class DoctorAppointmentTransferView(APIView):
         doctor_id = request.data.get("doctor_id")
         from_date = request.data.get("from_date")
         to_date = request.data.get("to_date")
+        branch_id = request.data.get("branch_id")
 
-        if not all([doctor_id, from_date, to_date]):
-            return Response({"error": "doctor_id, from_date, and to_date are required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not all([doctor_id, from_date, to_date, branch_id]):
+            return Response({"error": "doctor_id, from_date, to_date, and branch_id are required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             updated_appointments = DoctorScheduleService.transfer_appointments_only(
                 doctor_id=doctor_id,
                 from_date=from_date,
-                to_date=to_date
+                to_date=to_date,
+                branch_id=branch_id
             )
 
             return Response({
