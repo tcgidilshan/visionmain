@@ -74,7 +74,7 @@ from .views import (
     LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
     RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
     HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView,EarningReportView,HearingOrderReportView,FactoryOrderStatusSummaryView,SafeTransactionSummaryView,
-    COOrderReportView,BranchTimeReportView,AppointmentArrivalMarkView,InvoiceTrackingReportView
+    COOrderReportView,BranchTimeReportView,AppointmentArrivalMarkView,InvoiceTrackingReportView,BirthdayReportView,BirthdayReminderCreateView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -348,7 +348,8 @@ urlpatterns = [
     path("earnings/report/", EarningReportView.as_view(), name="earning-report"),
     path("invoice-tracking-report/", InvoiceTrackingReportView.as_view(), name="invoice-tracking-report"),
     path("reports/city-sales/", CitySalesReportView.as_view(), name="city-sales-report"),
-
+    path('reports/birthday/', BirthdayReportView.as_view(), name='birthday-report'),
+    path('birthday-reminder/', BirthdayReminderCreateView.as_view(), name='birthday-reminder-create'),
 
 ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),

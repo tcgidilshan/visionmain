@@ -1470,3 +1470,14 @@ class PaymentMethodBanks(models.Model):
 
     def __str__(self):
         return self.name
+
+class BirthdayReminder(models.Model):
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='birthday_reminders')
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='birthday_reminders', null=True, blank=True)
+    is_sms_sent = models.BooleanField(default=False)
+    sms_sent_at = models.DateTimeField(null=True, blank=True)
+    called_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Birthday Reminder for {self.patient.name} on {self.called_at}"
