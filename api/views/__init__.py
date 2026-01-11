@@ -76,3 +76,5 @@ from .co_order_view import COOrderReportView
 from .branch_time_report_view import BranchTimeReportView
 from .earning_report import EarningReportView
 from .invoice_tracking_report import InvoiceTrackingReportView
+from .city_sales_report import CitySalesReportView
+from .birthday_report_view import BirthdayReportView, BirthdayReminderCreateView

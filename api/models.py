@@ -106,10 +106,13 @@ class Patient(models.Model):
     address = models.TextField(null=True, blank=True)
     nic = models.CharField(max_length=15, null=True, blank=True)
     patient_note = models.CharField(max_length=100, null=True, blank=True)
+    city = models.CharField(max_length=50, null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if self.nic:
             self.nic = self.nic.upper()
+        if self.city:
+            self.city = self.city.lower()
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -1467,3 +1470,14 @@ class PaymentMethodBanks(models.Model):
 
     def __str__(self):
         return self.name
+
+class BirthdayReminder(models.Model):
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='birthday_reminders')
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='birthday_reminders', null=True, blank=True)
+    is_sms_sent = models.BooleanField(default=False)
+    sms_sent_at = models.DateTimeField(null=True, blank=True)
+    called_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Birthday Reminder for {self.patient.name} on {self.called_at}"

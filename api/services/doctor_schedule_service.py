@@ -48,11 +48,12 @@ class DoctorScheduleService:
         original_schedules = Schedule.objects.filter(
             doctor=doctor,
             date=from_date,
+            branch=branch,
             status='DOCTOR'
         )
 
         if not original_schedules.exists():
-            raise ValueError("No available schedules found on the given from_date.")
+            raise ValueError("No available schedules found on the given from_date for the specified branch.")
 
         new_schedules = []
 
