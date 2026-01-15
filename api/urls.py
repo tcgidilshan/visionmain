@@ -13,6 +13,7 @@ from .views import (
     RefractionDeleteAPIView,
     RefractionDetailCreateAPIView,
     BrandListCreateView,
+    CrossBranchPaymentReportView,
     BrandRetrieveUpdateDeleteView,
     ColorListCreateView,
     ColorRetrieveUpdateDeleteView,
@@ -157,6 +158,7 @@ urlpatterns = [
     path("frames/filter", FrameFilterView.as_view(), name="frame-stock-filter"),
     path("report/frames/brand/", FrameBrandReportView.as_view(), name="frame-brand-report"),
     path("report/branch-wise/frames/brand/", BranchWiseFrameBrandReportView.as_view(), name="branch-wise-frame-brand-report"),
+    path("report/cross-branch-payment/", CrossBranchPaymentReportView.as_view(), name="cross-branch-payment-report"),
 
     path('frames/report/', FrameReportView.as_view(), name='frames-report'), #frame reports
 
