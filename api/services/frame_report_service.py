@@ -49,17 +49,22 @@ def generate_frames_report(start_date=None, end_date=None):
     
     return response_data
 
-def generate_brand_wise_report(initial_branch_id=None):
+def generate_brand_wise_report(initial_branch_id=None, brand_name=None):
     """
     Generates a brand-wise frame report with total stock available and total sold quantities.
     
     Args:
         initial_branch_id (str, optional): Filter frames by initial branch ID if provided
+        brand_name (str, optional): Filter brands by name (case-insensitive partial match) if provided
     """
     from django.db.models import Q, F, Sum
     
     # Get all frame brands (BRAND_TYPES = 'frame' or 'both')
     frame_brands = Brand.objects.filter(brand_type='frame')
+    
+    # Filter by brand name if provided
+    if brand_name:
+        frame_brands = frame_brands.filter(name__icontains=brand_name)
     
     report_data = []
     total_stock_sum = 0
