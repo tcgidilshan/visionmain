@@ -609,7 +609,8 @@ class OrderPaymentSerializer(serializers.ModelSerializer):
             'user_username',
             'admin_username',
             'deleted_at',
-            'payment_method_bank'
+            'payment_method_bank',
+            'paid_branch',
         ]
 
 class OrderSerializer(serializers.ModelSerializer):
