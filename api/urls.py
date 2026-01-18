@@ -13,6 +13,7 @@ from .views import (
     RefractionDeleteAPIView,
     RefractionDetailCreateAPIView,
     BrandListCreateView,
+    CrossBranchPaymentReportView,
     BrandRetrieveUpdateDeleteView,
     ColorListCreateView,
     ColorRetrieveUpdateDeleteView,
@@ -71,7 +72,7 @@ from .views import (
     ArrivalStatusBulkCreateView,DailyOrderAuditReportView,FrameTransferView,FrameFilterView,
     FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView,SolderingOrderReportView,
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
-    LensHistoryReportView,FrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
+    LensHistoryReportView,FrameBrandReportView,BranchWiseFrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
     RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
     HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView,EarningReportView,HearingOrderReportView,FactoryOrderStatusSummaryView,SafeTransactionSummaryView,
     COOrderReportView,BranchTimeReportView,AppointmentArrivalMarkView,InvoiceTrackingReportView,BirthdayReportView,BirthdayReminderCreateView
@@ -156,6 +157,8 @@ urlpatterns = [
     path("frames/stocks/adjust", StockAdjustmentView.as_view(), name="frame-stock-adjustment"),
     path("frames/filter", FrameFilterView.as_view(), name="frame-stock-filter"),
     path("report/frames/brand/", FrameBrandReportView.as_view(), name="frame-brand-report"),
+    path("report/branch-wise/frames/brand/", BranchWiseFrameBrandReportView.as_view(), name="branch-wise-frame-brand-report"),
+    path("report/cross-branch-payment/", CrossBranchPaymentReportView.as_view(), name="cross-branch-payment-report"),
 
     path('frames/report/', FrameReportView.as_view(), name='frames-report'), #frame reports
 
@@ -185,7 +188,7 @@ urlpatterns = [
     path('other-items/<int:pk>/', OtherItemRetrieveUpdateDeleteView.as_view(), name='other-item-detail'),
     path('orders/', OrderCreateView.as_view(), name='order-create'),
     path('orders/<int:pk>/', OrderUpdateView.as_view(), name='order-update'),
-    path('orders-item/update/', OrderItemUpdateView.as_view(), name='update-payments'),
+    path('orders-item/update/', OrderItemUpdateView.as_view(), name='otheritem-update'),
     #//!headring
     path('hearing-items/', HearingItemListCreateView.as_view(), name='hearing-item-list-create'),
     path('hearing-items/<int:pk>/', HearingItemRetrieveUpdateDeleteView.as_view(), name='hearing-item-detail'),

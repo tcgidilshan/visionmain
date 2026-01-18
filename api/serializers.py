@@ -592,7 +592,7 @@ class OrderPaymentSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source='user.username', read_only=True)
     admin_username = serializers.CharField(source='admin.username', read_only=True)
     deleted_at = serializers.DateTimeField(read_only=True)
-    payment_date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    payment_date = serializers.DateTimeField()
     class Meta:
         model = OrderPayment
         fields = [
@@ -609,7 +609,8 @@ class OrderPaymentSerializer(serializers.ModelSerializer):
             'user_username',
             'admin_username',
             'deleted_at',
-            'payment_method_bank'
+            'payment_method_bank',
+            'paid_branch',
         ]
 
 class OrderSerializer(serializers.ModelSerializer):

@@ -43,7 +43,7 @@ from .finance_summary_view import DailyFinanceSummaryView
 from .bank_deposit_views import BankDepositListCreateView,BankDepositRetrieveUpdateView
 from .daily_summary_views import DailySummaryView
 from .bus_views import BusSystemSettingListCreateView,BusSystemSettingRetrieveUpdateDeleteView
-from .frame_report_views import FrameReportView,FrameBrandReportView
+from .frame_report_views import FrameReportView,FrameBrandReportView,BranchWiseFrameBrandReportView
 from .frame_only_order_view import FrameOnlyOrderCreateView,FrameOnlyOrderUpdateView
 from .external_lens_brand_views import ExternalLensBrandListCreateView,ExternalLensBrandRetrieveUpdateDeleteView
 from .external_lens_coating_views import ExternalLensCoatingListCreateView,ExternalLensCoatingRetrieveUpdateDeleteView
@@ -78,3 +78,4 @@ from .earning_report import EarningReportView
 from .invoice_tracking_report import InvoiceTrackingReportView
 from .city_sales_report import CitySalesReportView
 from .birthday_report_view import BirthdayReportView, BirthdayReminderCreateView
+from .cross_branch_payment_view import CrossBranchPaymentReportView

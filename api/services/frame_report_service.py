@@ -49,17 +49,22 @@ def generate_frames_report(start_date=None, end_date=None):
     
     return response_data
 
-def generate_brand_wise_report(initial_branch_id=None):
+def generate_brand_wise_report(initial_branch_id=None, brand_name=None):
     """
     Generates a brand-wise frame report with total stock available and total sold quantities.
     
     Args:
         initial_branch_id (str, optional): Filter frames by initial branch ID if provided
+        brand_name (str, optional): Filter brands by name (case-insensitive partial match) if provided
     """
     from django.db.models import Q, F, Sum
     
     # Get all frame brands (BRAND_TYPES = 'frame' or 'both')
     frame_brands = Brand.objects.filter(brand_type='frame')
+    
+    # Filter by brand name if provided
+    if brand_name:
+        frame_brands = frame_brands.filter(name__icontains=brand_name)
     
     report_data = []
     total_stock_sum = 0
@@ -116,6 +121,72 @@ def generate_brand_wise_report(initial_branch_id=None):
         'brands': report_data,
         'summary': {
             'total_stock': total_stock_sum,
+            'total_sold': total_sold_sum
+        }
+    }
+
+def generate_branch_wise_frame_brand_report(branch_id, brand_name=None):
+    """
+    Generates a branch-wise frame brand report for a specific branch.
+    Shows available and sold count for each brand's frames in the specified branch.
+    
+    Args:
+        branch_id (int): Branch ID to filter frames and stock
+        brand_name (str, optional): Filter brands by name (case-insensitive partial match) if provided
+    
+    Returns:
+        dict: Report data with brands and summary
+    """
+    from django.db.models import Sum
+    
+    # Get all frame brands
+    frame_brands = Brand.objects.filter(brand_type='frame')
+    
+    # Filter by brand name if provided
+    if brand_name:
+        frame_brands = frame_brands.filter(name__icontains=brand_name)
+    
+    report_data = []
+    total_available_sum = 0
+    total_sold_sum = 0
+    
+    for brand in frame_brands:
+        # Get all frames for this brand
+        frames = Frame.objects.filter(brand=brand, is_active=True)
+        
+        if not frames.exists():
+            continue
+        
+        # Get available stock for this brand in the specified branch
+        available_stock = FrameStock.objects.filter(
+            frame__in=frames,
+            branch_id=branch_id
+        ).aggregate(
+            total=Sum('qty')
+        )['total'] or 0
+        
+        # Get sold quantity for this brand in the specified branch
+        sold_quantity = OrderItem.objects.filter(
+            frame__in=frames,
+            order__branch_id=branch_id
+        ).aggregate(
+            total=Sum('quantity')
+        )['total'] or 0
+        
+        # Add to sums
+        total_available_sum += available_stock
+        total_sold_sum += sold_quantity
+        
+        report_data.append({
+            'brand_name': brand.name,
+            'available_count': available_stock,
+            'sold_count': sold_quantity
+        })
+    
+    return {
+        'brands': report_data,
+        'summary': {
+            'total_available': total_available_sum,
             'total_sold': total_sold_sum
         }
     }

@@ -1001,6 +1001,13 @@ class OrderPayment(models.Model):
         related_name='order_payments'
     )  
     updated_at = models.DateTimeField(auto_now=True)
+    paid_branch= models.ForeignKey(
+        Branch,
+        on_delete=models.SET_NULL,
+        related_name='paid_payments',
+        null=True,
+        blank=True 
+    )
     def __str__(self):
         return f"Payment for Order {self.order.id} - Amount: {self.amount}"
 

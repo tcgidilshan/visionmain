@@ -22,6 +22,7 @@ class PaymentView(APIView):
         payments_data = request.data.get("payments", [])  # List of payments
         admin_id = request.data.get("admin_id")
         user_id = request.data.get("user_id")
+        paid_branch_id = request.data.get("paid_branch_id")  # Branch where payment was made
 
         if not order_id and not invoice_id:
             return Response({"error": "Order ID or Invoice ID is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -51,7 +52,13 @@ class PaymentView(APIView):
                 return Response({"error": "Payments data is required."}, status=status.HTTP_400_BAD_REQUEST)
 
             # ✅ Process payments using the service function
-            total_payment = OrderPaymentService.append_on_change_payments_for_order(order, payments_data,admin_id,user_id)
+            total_payment = OrderPaymentService.append_on_change_payments_for_order(
+                order, 
+                payments_data,
+                admin_id,
+                user_id,
+                paid_branch_id
+            )
 
             # ✅ Update order.total_payment = sum(OrderPayments) - sum(Expenses)
             total_payments = OrderPayment.objects.filter(

@@ -204,7 +204,7 @@ class OrderPaymentService:
         }
     @staticmethod
     @transaction.atomic
-    def append_on_change_payments_for_order(order, payments_data,admin_id,user_id):
+    def append_on_change_payments_for_order(order, payments_data, admin_id, user_id, paid_branch_id=None):
         """
         Medical-compliant payment update with append-on-change logic.
         1. For each payment in input:
@@ -213,6 +213,7 @@ class OrderPaymentService:
                 - If not changed: skip.
             - If no id: create new.
         2. Soft-delete any DB payments not referenced in input.
+        3. Update paid_branch if provided.
         """
         # 1. Index all current, non-deleted payments by id for lookup
         db_payments = {p.id: p for p in order.orderpayment_set.filter(is_deleted=False)}
@@ -264,6 +265,7 @@ class OrderPaymentService:
                             "payment_method_bank": payment_method_bank,
                             "user": user_id,
                             "admin": admin_id,
+                            "paid_branch": paid_branch_id if paid_branch_id is not None else old_payment.paid_branch_id,
                         }
                         # print("Before serialization:", payment_data['payment_date'])
                         payment_serializer = OrderPaymentSerializer(data=payment_data)
@@ -295,6 +297,7 @@ class OrderPaymentService:
                     "is_final_payment": False,
                     "admin": admin_id,
                     "user": user_id,
+                    "paid_branch": paid_branch_id,
                 }
                 
                 payment_serializer = OrderPaymentSerializer(data=payment_data)
