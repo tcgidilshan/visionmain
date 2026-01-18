@@ -165,9 +165,10 @@ def generate_branch_wise_frame_brand_report(branch_id, brand_name=None):
             total=Sum('qty')
         )['total'] or 0
         
-        # Get sold quantity for this brand (all sales of frames of this brand)
+        # Get sold quantity for this brand in the specified branch
         sold_quantity = OrderItem.objects.filter(
-            frame__in=frames
+            frame__in=frames,
+            order__branch_id=branch_id
         ).aggregate(
             total=Sum('quantity')
         )['total'] or 0

@@ -62,8 +62,13 @@ class ChannelAppointmentView(APIView):
             channel_date = data['channel_date']
             branch_id = data['branch_id']
             doctor_id = data['doctor_id']
-            appointments_today = Appointment.all_objects.filter(date=channel_date, branch_id=branch_id, doctor_id=doctor_id).count()
-            channel_no = appointments_today + 1
+            # Get the last created appointment for this date/branch/doctor and use its channel_no + 1
+            last_appointment = Appointment.all_objects.filter(
+                date=channel_date, 
+                branch_id=branch_id, 
+                doctor_id=doctor_id
+            ).order_by('-created_at').first()
+            channel_no = (last_appointment.channel_no + 1) if last_appointment else 1
 
             # Step 5: Create Appointment
             appointment_data = {
@@ -369,11 +374,12 @@ class ChannelUpdateView(APIView):
                 str(appointment.branch_id) == str(data['branch_id'])
             )
             if not is_same_date_branch:
-                appointments_today = Appointment.objects.filter(
+                # Get the last created appointment for this date/branch and use its channel_no + 1
+                last_appointment = Appointment.all_objects.filter(
                     date=data['channel_date'],
                     branch_id=data['branch_id']
-                ).count()
-                channel_no = appointments_today + 1
+                ).order_by('-created_at').first()
+                channel_no = (last_appointment.channel_no + 1) if last_appointment else 1
             else:
                 channel_no = appointment.channel_no  # keep current number
 
