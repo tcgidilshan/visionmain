@@ -97,10 +97,15 @@ class EmployeeReportService:
             )
             
             # Get feedback counts by rating for this employee's orders
-            feedback_counts = employee.orders.filter(
-                order_feedback__isnull=False,
-                order_date__range=[start_date, end_date]
-            ).aggregate(
+            # Use employee_orders to respect branch_id and date filters
+            feedback_query = employee_orders.filter(
+                order_feedback__isnull=False
+            )
+            # Explicitly apply branch filter if provided (employee_orders already has it, but making it explicit)
+            if branch_id:
+                feedback_query = feedback_query.filter(branch_id=branch_id)
+            
+            feedback_counts = feedback_query.aggregate(
                 rating_1=Count('order_feedback', filter=Q(order_feedback__rating=1)),
                 rating_2=Count('order_feedback', filter=Q(order_feedback__rating=2)),
                 rating_3=Count('order_feedback', filter=Q(order_feedback__rating=3)),
