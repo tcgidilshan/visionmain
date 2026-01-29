@@ -46,10 +46,11 @@ class OrderFeedbackByInvoiceView(APIView):
         user_id = request.query_params.get('user_id')
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
+        branch_id = request.query_params.get('branch_id')
         
         # If invoice_number is provided, return feedback for that specific invoice
         if invoice_number:
-            return self._get_feedback_by_invoice(invoice_number)
+            return self._get_feedback_by_invoice(invoice_number, branch_id)
             
         # If user_id with date range is provided, return all feedback for that user in the date range
         elif user_id and start_date and end_date:
@@ -69,7 +70,18 @@ class OrderFeedbackByInvoiceView(APIView):
                 feedbacks = OrderFeedback.objects.filter(
                     user_id=user_id,
                     created_at__range=(start_dt, end_dt)
-                ).select_related('order__invoice')
+                ).select_related('order__invoice', 'order__branch')
+                
+                # Filter by branch_id if provided
+                if branch_id:
+                    try:
+                        branch_id_int = int(branch_id)
+                        feedbacks = feedbacks.filter(order__branch_id=branch_id_int)
+                    except ValueError:
+                        return Response(
+                            {"error": "Invalid branch_id. Must be a valid integer"},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
                 
                 # Prepare response data
                 feedbacks_data = []
@@ -84,6 +96,7 @@ class OrderFeedbackByInvoiceView(APIView):
                     "user_id": user_id,
                     "start_date": start_date,
                     "end_date": end_date,
+                    "branch_id": int(branch_id) if branch_id else None,
                     "count": len(feedbacks_data),
                     "feedbacks": feedbacks_data
                 })
@@ -99,13 +112,28 @@ class OrderFeedbackByInvoiceView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
-    def _get_feedback_by_invoice(self, invoice_number):
+    def _get_feedback_by_invoice(self, invoice_number, branch_id=None):
         try:
             # First find the invoice with the given invoice number
             invoice = Invoice.objects.get(invoice_number=invoice_number, is_deleted=False)
             
             # Then get the order from the invoice
             order = invoice.order
+            
+            # Filter by branch_id if provided
+            if branch_id:
+                try:
+                    branch_id_int = int(branch_id)
+                    if order.branch_id != branch_id_int:
+                        return Response(
+                            {"detail": "Invoice not found for the specified branch"},
+                            status=status.HTTP_404_NOT_FOUND
+                        )
+                except ValueError:
+                    return Response(
+                        {"error": "Invalid branch_id. Must be a valid integer"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
             
             # Then get the feedback for this order
             feedback = OrderFeedback.objects.filter(order=order).first()
@@ -114,6 +142,7 @@ class OrderFeedbackByInvoiceView(APIView):
             response_data = {
                 "order_id": order.id,
                 "invoice_number": invoice_number,
+                "branch_id": int(branch_id) if branch_id else None,
                 "feedback_status": feedback is not None,
             }
             

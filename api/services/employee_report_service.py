@@ -97,9 +97,10 @@ class EmployeeReportService:
             )
             
             # Get feedback counts by rating for this employee's orders
-            # Use employee_orders to respect branch_id and date filters
+            # Filter by employee's user_id and respect branch_id and date filters
             feedback_query = employee_orders.filter(
-                order_feedback__isnull=False
+                order_feedback__isnull=False,
+                order_feedback__user=employee  # Filter by employee's user_id
             )
             # Explicitly apply branch filter if provided (employee_orders already has it, but making it explicit)
             if branch_id:
