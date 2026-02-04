@@ -2,7 +2,7 @@ from django.db.models import Sum, Count, Q, Case, When, IntegerField
 from django.utils import timezone
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from ..models import Order, CustomUser, OrderItem, Frame, Lens, Branch
+from ..models import Order, CustomUser, OrderItem, Frame, Lens, Branch, OrderFeedback
 
 
 class EmployeeReportService:
@@ -77,15 +77,46 @@ class EmployeeReportService:
                 sales_staff_code__user_code=employee_code
             )
         
-        # Get all employees who have orders in the date range
-        employees = CustomUser.objects.filter(
+        # Get all employees who have activity in the date range
+        # This includes: created orders, submitted feedback, or issued glasses
+        employees_with_orders = CustomUser.objects.filter(
             orders__in=orders_query
-        ).distinct()
+        )
+        
+        # Build base queries for feedback and glass issuing
+        feedback_orders_query = Order.objects.filter(
+            order_date__range=[start_date, end_date],
+            is_deleted=False
+        )
+        issued_orders_query = Order.objects.filter(
+            order_date__range=[start_date, end_date],
+            is_deleted=False,
+            issued_by__isnull=False
+        )
+        
+        if branch_id:
+            feedback_orders_query = feedback_orders_query.filter(branch_id=branch_id)
+            issued_orders_query = issued_orders_query.filter(branch_id=branch_id)
+        
+        employees_with_feedback = CustomUser.objects.filter(
+            order_feedback__order__in=feedback_orders_query
+        )
+        
+        employees_with_glass_issued = CustomUser.objects.filter(
+            issued_orders__in=issued_orders_query
+        )
+        
+        # Combine all employees with any activity
+        employees = (employees_with_orders | employees_with_feedback | employees_with_glass_issued).distinct()
+        
+        # Filter by specific employee code if provided
+        if employee_code:
+            employees = employees.filter(user_code=employee_code)
         
         result = []
         
         for employee in employees:
-            # Get employee's orders in the date range
+            # Get employee's orders in the date range (orders created by this employee)
             employee_orders = orders_query.filter(
                 sales_staff_code=employee
             )
@@ -96,16 +127,24 @@ class EmployeeReportService:
                 is_deleted=False
             )
             
-            # Get feedback counts by rating for this employee's orders
-            feedback_counts = employee.orders.filter(
-                order_feedback__isnull=False,
-                order_date__range=[start_date, end_date]
-            ).aggregate(
-                rating_1=Count('order_feedback', filter=Q(order_feedback__rating=1)),
-                rating_2=Count('order_feedback', filter=Q(order_feedback__rating=2)),
-                rating_3=Count('order_feedback', filter=Q(order_feedback__rating=3)),
-                rating_4=Count('order_feedback', filter=Q(order_feedback__rating=4)),
-                total_feedback=Count('order_feedback')
+            # Get feedback submitted by this employee (regardless of who created the order)
+            # This correctly attributes feedback to the user who submitted it
+            feedback_base_query = OrderFeedback.objects.filter(
+                user=employee,
+                order__order_date__range=[start_date, end_date],
+                order__is_deleted=False
+            )
+            
+            # Apply branch filter if provided
+            if branch_id:
+                feedback_base_query = feedback_base_query.filter(order__branch_id=branch_id)
+            
+            feedback_counts = feedback_base_query.aggregate(
+                rating_1=Count('id', filter=Q(rating=1)),
+                rating_2=Count('id', filter=Q(rating=2)),
+                rating_3=Count('id', filter=Q(rating=3)),
+                rating_4=Count('id', filter=Q(rating=4)),
+                total_feedback=Count('id')
             )
             
             # Count branded frames sold
@@ -134,10 +173,19 @@ class EmployeeReportService:
                 invoice__invoice_type='normal'
             ).count()
             
-            # Count glass sender orders (orders where issued_by is not null)
-            glass_sender_count = employee_orders.filter(
-                issued_by__isnull=False
-            ).count()
+            # Count glass sender orders (orders where THIS employee issued the glasses)
+            # This correctly attributes glass issuing to the user who performed the action
+            glass_sender_base_query = Order.objects.filter(
+                order_date__range=[start_date, end_date],
+                is_deleted=False,
+                issued_by=employee
+            )
+            
+            # Apply branch filter if provided
+            if branch_id:
+                glass_sender_base_query = glass_sender_base_query.filter(branch_id=branch_id)
+            
+            glass_sender_count = glass_sender_base_query.count()
             
             # Customer feedback count
             customer_feedback_count = feedback_counts['total_feedback']
@@ -156,15 +204,45 @@ class EmployeeReportService:
                 total=Sum('total_price')
             )['total'] or 0
             
-            # Get branch info if orders exist
+            # Get branch info - prioritize from orders created by employee, 
+            # then from feedback orders, then from glass issued orders
             branch_info = None
-            if employee_orders.exists():
+            if branch_id:
+                # If filtering by branch, use that branch info
+                try:
+                    branch = Branch.objects.get(id=branch_id)
+                    branch_info = {
+                        'id': branch.id,
+                        'name': branch.branch_name,
+                        'location': branch.location
+                    }
+                except Branch.DoesNotExist:
+                    pass
+            elif employee_orders.exists():
                 first_order_branch = employee_orders.first().branch
                 if first_order_branch:
                     branch_info = {
                         'id': first_order_branch.id,
                         'name': first_order_branch.branch_name,
                         'location': first_order_branch.location
+                    }
+            elif feedback_base_query.exists():
+                # Get branch from feedback orders
+                first_feedback = feedback_base_query.first()
+                if first_feedback and first_feedback.order.branch:
+                    branch_info = {
+                        'id': first_feedback.order.branch.id,
+                        'name': first_feedback.order.branch.branch_name,
+                        'location': first_feedback.order.branch.location
+                    }
+            elif glass_sender_base_query.exists():
+                # Get branch from glass issued orders
+                first_issued = glass_sender_base_query.first()
+                if first_issued and first_issued.branch:
+                    branch_info = {
+                        'id': first_issued.branch.id,
+                        'name': first_issued.branch.branch_name,
+                        'location': first_issued.branch.location
                     }
             
             employee_data = {
