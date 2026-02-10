@@ -395,3 +395,96 @@ class FrameFilterView(APIView):
             })
 
         return Response(result)
+
+class BulkFrameImageUploadView(APIView):
+    """
+    Upload an image and assign it to multiple frames.
+    POST /api/frames/bulk-image-upload/
+    Body: {
+        "frame_ids": [1, 2, 3],
+        "image": <file>
+    }
+    """
+    @transaction.atomic
+    def post(self, request):
+        frame_ids = request.data.get('frame_ids', [])
+        image_file = request.FILES.get('image')
+        
+        # Parse frame_ids if it's a JSON string (from FormData)
+        if isinstance(frame_ids, str):
+            try:
+                frame_ids = json.loads(frame_ids)
+            except json.JSONDecodeError:
+                return Response(
+                    {"error": "Invalid frame_ids format. Must be a valid JSON array."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Validate input
+        if not frame_ids:
+            return Response(
+                {"error": "frame_ids is required and must be a non-empty list"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not image_file:
+            return Response(
+                {"error": "image file is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate frame_ids is a list
+        if not isinstance(frame_ids, list):
+            return Response(
+                {"error": "frame_ids must be a list"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if all frames exist and are active
+        frames = Frame.objects.filter(id__in=frame_ids)
+        if frames.count() != len(frame_ids):
+            return Response(
+                {"error": "One or more frame IDs are invalid"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Collect old image instances before changing frames
+        old_image_ids = set()
+        for frame in frames:
+            if frame.image_id:
+                old_image_ids.add(frame.image_id)
+        
+        # Create the new FrameImage
+        frame_image = FrameImage(image=image_file)
+        frame_image.save()
+        
+        # Assign the new image to all frames
+        frames.update(image=frame_image)
+        
+        # Delete old images if they're not used by any other frames
+        if old_image_ids:
+            for old_image_id in old_image_ids:
+                # Check if this image is still used by any other frame (excluding the frames we just updated)
+                if not Frame.objects.filter(image_id=old_image_id).exclude(id__in=frame_ids).exists():
+                    try:
+                        old_image = FrameImage.objects.get(id=old_image_id)
+                        old_image.delete()  # This will also delete the file
+                    except FrameImage.DoesNotExist:
+                        pass
+        
+        # Build the image URL
+        image_url = None
+        if frame_image.image:
+            try:
+                image_url = frame_image.image.url
+                if not image_url.startswith(('http://', 'https://')):
+                    image_url = request.build_absolute_uri(image_url)
+            except Exception:
+                pass
+        
+        return Response({
+            "message": f"Image successfully uploaded and assigned to {frames.count()} frames",
+            "image_id": frame_image.id,
+            "image_url": image_url,
+            "frame_ids": list(frame_ids)
+        }, status=status.HTTP_201_CREATED)
