@@ -97,7 +97,8 @@ class EmployeeReportService:
         print(f"[DEBUG][ERS] issued_orders_query count: {issued_orders_query.count()} (t={time.time()-t0:.3f}s)")
 
         employees_with_feedback = CustomUser.objects.filter(
-            order_feedback__order__in=feedback_orders_query
+            order_feedback__created_at__range=[start_date, end_date],
+            order_feedback__order__is_deleted=False
         )
         print(f"[DEBUG][ERS] employees_with_feedback count: {employees_with_feedback.count()} (t={time.time()-t0:.3f}s)")
 
@@ -138,10 +139,10 @@ class EmployeeReportService:
             )
             print(f"[DEBUG][ERS]   order_items count: {order_items.count()} (t={time.time()-t_emp:.3f}s)")
 
-            # Get feedback submitted by this employee (regardless of who created the order)
+            # Get feedback submitted by this employee within the date range
             feedback_base_query = OrderFeedback.objects.filter(
                 user=employee,
-                order__order_date__range=[start_date, end_date],
+                created_at__range=[start_date, end_date],
                 order__is_deleted=False
             )
             if branch_id:
