@@ -86,7 +86,7 @@ class EmployeeReportService:
             is_deleted=False
         )
         issued_orders_query = Order.objects.filter(
-            order_date__range=[start_date, end_date],
+            issued_date__range=[start_date, end_date],
             is_deleted=False,
             issued_by__isnull=False
         )
@@ -187,9 +187,9 @@ class EmployeeReportService:
             ).count()
             print(f"[DEBUG][ERS]   normal_orders_count: {normal_orders_count}")
 
-            # Count glass sender orders (orders where THIS employee issued the glasses)
+            # Count glass sender orders (orders where THIS employee issued the glasses within the date range)
             glass_sender_base_query = Order.objects.filter(
-                order_date__range=[start_date, end_date],
+                issued_date__range=[start_date, end_date],
                 is_deleted=False,
                 issued_by=employee
             )
