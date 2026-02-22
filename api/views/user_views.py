@@ -8,12 +8,30 @@ CustomUser = get_user_model()
 from rest_framework.permissions import IsAuthenticated
 from ..services.pagination_service import PaginationService
 from django.db.models import Q
+
+
+def _get_scoped_user(req_user, user_id):
+    """
+    Fetch target user scoped by the requesting user's role.
+    Raises CustomUser.DoesNotExist if the ID is outside the requester's allowed scope,
+    producing a 404 instead of leaking that the record exists.
+    """
+    if req_user.is_superuser:
+        return CustomUser.objects.get(id=user_id)
+    else:
+        # Admin and AdminPro: Admin + User levels only (no Superuser, no AdminPro)
+        return CustomUser.objects.get(id=user_id, is_superuser=False, is_admin_pro=False)
 class CreateUserView(generics.CreateAPIView):
     """
     API View to create a user and assign them to multiple branches.
     """
+    permission_classes = [IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
+        req_user = request.user
+        if not (req_user.is_superuser or req_user.is_admin_pro or req_user.is_staff):
+            return Response({"error": "You do not have permission to create users."}, status=status.HTTP_403_FORBIDDEN)
+
         try:
             data = request.data
             mobile = data.get("mobile")
@@ -47,23 +65,25 @@ class UpdateUserView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated]
 
     def put(self, request, user_id):
+        req_user = request.user
+        if not (req_user.is_superuser or req_user.is_admin_pro or req_user.is_staff):
+            return Response({"error": "You do not have permission to update users."}, status=status.HTTP_403_FORBIDDEN)
+
         try:
-            # ✅ Check permissions
-            if not request.user.is_superuser and not request.user.is_staff:
-                return Response({"error": "You do not have permission to update users."}, status=status.HTTP_403_FORBIDDEN)
-            
-            user = CustomUser.objects.get(id=user_id)
-            
-            # ✅ Admin can only update regular users
-            if request.user.is_staff and not request.user.is_superuser:
-                if user.is_staff or user.is_superuser:
-                    return Response({"error": "Admins can only update regular user profiles."}, status=status.HTTP_403_FORBIDDEN)
+            user = _get_scoped_user(req_user, user_id)
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
             
             data = request.data
             
-            # ✅ Handle role changes (only superuser can do this)
-            if "role" in data and request.user.is_superuser:
+            # ✅ Handle role changes (superuser can set all roles; adminpro can only set Admin/User)
+            if "role" in data and (request.user.is_superuser or request.user.is_admin_pro):
                 role = data.get("role")
+                # AdminPro cannot assign Superuser or AdminPro roles
+                if not request.user.is_superuser and role in ("Superuser", "AdminPro"):
+                    return Response({"error": "You do not have permission to assign this role."}, status=status.HTTP_403_FORBIDDEN)
                 if role == "Superuser":
                     user.is_superuser = True
                     user.is_staff = True
@@ -126,29 +146,37 @@ class GetAllUsersView(APIView):
     API View to get all user-branch assignments.
     """
     def get(self, request):
-            # ✅ Check if the user is a superuser
-            if not request.user.is_superuser:
+            req_user = request.user
+
+            # Only superuser, adminpro, and admin can access this view
+            if not (req_user.is_superuser or req_user.is_admin_pro or req_user.is_staff):
                 return Response({"error": "You do not have permission to access this resource."}, status=status.HTTP_403_FORBIDDEN)
 
-            users = CustomUser.objects.all()
+            # Role-based base queryset
+            if req_user.is_superuser:
+                # Superuser sees everyone
+                users = CustomUser.objects.all()
+            else:
+                # Admin and AdminPro see Admin + User levels only (no Superuser, no AdminPro)
+                users = CustomUser.objects.filter(is_superuser=False, is_admin_pro=False)
 
             # Add search functionality
             search = request.GET.get('search')
             if search:
                 search_lower = search.lower()
                 role_filter = Q()
-                if search_lower == 'superuser':
+                if search_lower == 'superuser' and req_user.is_superuser:
                     role_filter = Q(is_superuser=True)
-                elif search_lower == 'adminpro':
+                elif search_lower == 'adminpro' and req_user.is_superuser:
                     role_filter = Q(is_admin_pro=True, is_superuser=False)
-                elif search_lower == 'admin':
+                elif search_lower == 'admin' and (req_user.is_superuser or req_user.is_admin_pro or req_user.is_staff):
                     role_filter = Q(is_staff=True, is_superuser=False, is_admin_pro=False)
                 elif search_lower == 'user':
                     role_filter = Q(is_staff=False, is_superuser=False, is_admin_pro=False)
-                
+
                 users = users.filter(
-                    Q(username__icontains=search) | 
-                    Q(user_code__icontains=search) | 
+                    Q(username__icontains=search) |
+                    Q(user_code__icontains=search) |
                     role_filter
                 )
 
@@ -187,16 +215,14 @@ class GetAllUsersView(APIView):
 class GetSingleUserView(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request, user_id):
-        # ✅ Check permissions based on role
-        if not request.user.is_superuser and not request.user.is_staff:
+        req_user = request.user
+        if not (req_user.is_superuser or req_user.is_admin_pro or req_user.is_staff):
             return Response({"error": "You do not have permission to access this resource."}, status=status.HTTP_403_FORBIDDEN)
 
-        user = CustomUser.objects.filter(is_active=True).get(id=user_id)
-        
-        # ✅ Admin can only view regular users
-        if request.user.is_staff and not request.user.is_superuser:
-            if user.is_staff or user.is_superuser:
-                return Response({"error": "Admins can only view regular user profiles."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            user = _get_scoped_user(req_user, user_id)
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
         branches = UserBranch.objects.filter(user_id=user.id).select_related("branch")
 
