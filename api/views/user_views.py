@@ -67,12 +67,19 @@ class UpdateUserView(generics.UpdateAPIView):
                 if role == "Superuser":
                     user.is_superuser = True
                     user.is_staff = True
+                    user.is_admin_pro = False
+                elif role == "AdminPro":
+                    user.is_superuser = False
+                    user.is_staff = False
+                    user.is_admin_pro = True
                 elif role == "Admin":
                     user.is_superuser = False
                     user.is_staff = True
+                    user.is_admin_pro = False
                 elif role == "User":
                     user.is_superuser = False
                     user.is_staff = False
+                    user.is_admin_pro = False
                 user.save()
             
             # ✅ Handle is_active changes (only superuser can deactivate)
@@ -102,7 +109,8 @@ class UpdateUserView(generics.UpdateAPIView):
                         "mobile": user.mobile,
                         "first_name": user.first_name,
                         "last_name": user.last_name,
-                        "role": "Superuser" if user.is_superuser else ("Admin" if user.is_staff else "User"),
+                        "role": "Superuser" if user.is_superuser else ("AdminPro" if user.is_admin_pro else ("Admin" if user.is_staff else "User")),
+                        "is_admin_pro": user.is_admin_pro,
                         "is_active": user.is_active,
                         "branches_assigned": [ub.branch.id for ub in user.user_branches.all()]
                     }
@@ -131,10 +139,12 @@ class GetAllUsersView(APIView):
                 role_filter = Q()
                 if search_lower == 'superuser':
                     role_filter = Q(is_superuser=True)
+                elif search_lower == 'adminpro':
+                    role_filter = Q(is_admin_pro=True, is_superuser=False)
                 elif search_lower == 'admin':
-                    role_filter = Q(is_staff=True, is_superuser=False)
+                    role_filter = Q(is_staff=True, is_superuser=False, is_admin_pro=False)
                 elif search_lower == 'user':
-                    role_filter = Q(is_staff=False, is_superuser=False)
+                    role_filter = Q(is_staff=False, is_superuser=False, is_admin_pro=False)
                 
                 users = users.filter(
                     Q(username__icontains=search) | 
@@ -161,11 +171,12 @@ class GetAllUsersView(APIView):
                     "email": user.email,
                     "user_code": user.user_code,
                     "mobile": user.mobile,  # ✅ Added mobile number
-                    "role": "Superuser" if user.is_superuser else ("Admin" if user.is_staff else "User"),
+                    "role": "Superuser" if user.is_superuser else ("AdminPro" if user.is_admin_pro else ("Admin" if user.is_staff else "User")),
                     "is_staff": user.is_staff,
                     "is_superuser": user.is_superuser,
+                    "is_admin_pro": user.is_admin_pro,
                     "is_active": user.is_active,
-                    "branches": branch_details,  # ✅ Add branch list
+                    "branches": branch_details,
                 })
 
             # Use pagination
@@ -206,9 +217,10 @@ class GetSingleUserView(APIView):
             "mobile": user.mobile,
             "email": user.email,
             "user_code": user.user_code,
-            "role": "Superuser" if user.is_superuser else ("Admin" if user.is_staff else "User"),
+            "role": "Superuser" if user.is_superuser else ("AdminPro" if user.is_admin_pro else ("Admin" if user.is_staff else "User")),
             "is_staff": user.is_staff,
             "is_superuser": user.is_superuser,
+            "is_admin_pro": user.is_admin_pro,
             "is_active": user.is_active,
             "branches": branch_details
         })

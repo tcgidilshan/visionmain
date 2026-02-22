@@ -49,9 +49,10 @@ class BankDeposit(models.Model):
 
 class CustomUser(AbstractUser):
     mobile = models.CharField(max_length=15, unique=True)
-    user_code = models.CharField(max_length=10, null=True, blank=True) 
+    user_code = models.CharField(max_length=10, null=True, blank=True)
     reset_token = models.CharField(max_length=100, blank=True, null=True)
     reset_token_expiry = models.DateTimeField(null=True, blank=True)
+    is_admin_pro = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.username} ({self.user_code})"
