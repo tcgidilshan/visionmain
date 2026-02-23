@@ -8,6 +8,8 @@ CustomUser = get_user_model()
 from rest_framework.permissions import IsAuthenticated
 from ..services.pagination_service import PaginationService
 from django.db.models import Q
+from ..services.role_service import get_user_role
+from ..views.branch_views import RESTRICTED_BRANCH_IDS
 
 
 def _get_scoped_user(req_user, user_id):
@@ -180,17 +182,18 @@ class GetAllUsersView(APIView):
                     role_filter
                 )
 
+            viewer_role = get_user_role(req_user)
             user_list = []
             for user in users:
-                # ✅ Get all branches assigned to the user
                 branches = UserBranch.objects.filter(user_id=user.id).select_related("branch")
 
                 branch_details = [
                     {
                         "id": ub.branch.id,
-                        "branch_name": ub.branch.branch_name,  # Change if needed
+                        "branch_name": ub.branch.branch_name,
                     }
                     for ub in branches
+                    if viewer_role in ("SUPERUSER", "ADMINPRO") or ub.branch.id not in RESTRICTED_BRANCH_IDS
                 ]
 
                 user_list.append({
@@ -225,13 +228,15 @@ class GetSingleUserView(APIView):
             return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
         branches = UserBranch.objects.filter(user_id=user.id).select_related("branch")
+        viewer_role = get_user_role(req_user)
 
         branch_details = [
             {
                 "id": ub.branch.id,
-                "branch_name": ub.branch.branch_name,  # Change if needed
+                "branch_name": ub.branch.branch_name,
             }
             for ub in branches
+            if viewer_role in ("SUPERUSER", "ADMINPRO") or ub.branch.id not in RESTRICTED_BRANCH_IDS
         ]
 
         return Response({
