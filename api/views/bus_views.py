@@ -47,13 +47,9 @@ class BusSystemSettingRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPI
 
     def retrieve(self, request, *args, **kwargs):
         """
-        Retrieve the current bus system title setting.
+        Retrieve the bus system title setting by ID.
         """
-        instance = self.get_queryset().first()
-        
-        if not instance:
-            return Response({"detail": "No title setting found."}, status=status.HTTP_404_NOT_FOUND)
-
+        instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
@@ -61,11 +57,7 @@ class BusSystemSettingRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPI
         """
         Update the bus system title setting.
         """
-        instance = self.get_queryset().first()
-        
-        if not instance:
-            return Response({"detail": "No title setting found to update."}, status=status.HTTP_404_NOT_FOUND)
-
+        instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
@@ -73,12 +65,8 @@ class BusSystemSettingRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPI
 
     def destroy(self, request, *args, **kwargs):
         """
-        Reset the bus system title setting (delete it).
+        Delete the bus system title setting.
         """
-        instance = self.get_queryset().first()
-        
-        if not instance:
-            return Response({"detail": "No title setting found to delete."}, status=status.HTTP_404_NOT_FOUND)
-
+        instance = self.get_object()
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
