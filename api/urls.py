@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import LoginView, AdminOnlyView, SuperAdminOnlyView
-from .views import UserRegistrationView, AdminRegistrationView,SuperuserRegistrationView
+from .views import UserRegistrationView, AdminRegistrationView, SuperuserRegistrationView, AdminProRegistrationView
 from django.conf import settings
 from django.conf.urls.static import static
 from .views.inventory_transfer import LensTransferView
@@ -96,6 +96,7 @@ urlpatterns = [
     path('super-admin/', SuperAdminOnlyView.as_view(), name='super-admin-only'),
     path('register/user/', UserRegistrationView.as_view(), name='user-registration'),
     path('register/admin/', AdminRegistrationView.as_view(), name='admin-registration'),
+    path('register/adminpro/', AdminProRegistrationView.as_view(), name='adminpro-registration'),
     path('register/superuser/', SuperuserRegistrationView.as_view(), name='superuser-registration'),
     path('branches/', BranchListCreateAPIView.as_view(), name='branch-list-create'),
     path('branches/<int:pk>/', BranchRetrieveUpdateDestroyAPIView.as_view(), name='branch-detail'),

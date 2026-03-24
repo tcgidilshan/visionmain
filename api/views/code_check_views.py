@@ -44,16 +44,17 @@ class AdminCodeCheckView(APIView):
         try:
             user = User.objects.get(user_code=user_code)
 
-            if user.is_staff:  # ✅ If user is active, mark as admin
+            if user.is_staff or user.is_admin_pro:
+                role = "adminpro" if user.is_admin_pro else "admin"
                 return Response(
                     {
                         "id": user.id,
                         "username": user.username,
-                        "role": "admin"
+                        "role": role
                     },
                     status=status.HTTP_200_OK
                 )
-            else:  # ❌ If not active, deny admin access
+            else:
                 return Response(
                     {"error": "You are not an admin"},
                     status=status.HTTP_403_FORBIDDEN
@@ -90,7 +91,14 @@ class AllRoleCheckView(APIView):
                     {"error": "Invalid password"},
                     status=status.HTTP_403_FORBIDDEN
                 )
-            role = "admin" if user.is_staff or user.is_superuser else "user"  # Determine role
+            if user.is_superuser:
+                role = "superuser"
+            elif user.is_admin_pro:
+                role = "adminpro"
+            elif user.is_staff:
+                role = "admin"
+            else:
+                role = "user"
             
             return Response(
                 {

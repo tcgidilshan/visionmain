@@ -25,7 +25,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'visionmain', 'media')
 SECRET_KEY = 'django-insecure-kcu5_435$20fw^btdzjpe%=h+6ztvlgcq&vk8ddq1ifn7_^le_'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS').split(',')
 
@@ -55,7 +55,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
-      'DEFAULT_FILTER_BACKENDS': [
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+    ),
+    'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',

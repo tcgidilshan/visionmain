@@ -29,9 +29,14 @@ class ProfileView(APIView):
             "email": user.email,
             "mobile": user.mobile,
             "user_code": user.user_code,
-            "is_staff": user.is_staff,
-            "is_superuser": user.is_superuser,
             "branches": branch_list,
         }
+
+        if user.is_superuser:
+            user_data["is_superuser"] = True
+        elif user.is_admin_pro:
+            user_data["is_admin_pro"] = True
+        else:
+            user_data["is_staff"] = user.is_staff
 
         return Response(user_data)

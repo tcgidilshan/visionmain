@@ -10,6 +10,9 @@ from django.utils import timezone
 
 class PaymentSummaryReportView(APIView):
     def get(self, request):
+        if not request.user.is_superuser:
+            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
         payment_filter = request.query_params.get('payment')  # Optional: filter by payment method

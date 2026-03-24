@@ -50,6 +50,7 @@ class LoginView(APIView):
                 "username": user.username,
                 "is_staff": user.is_staff,
                 "is_superuser": user.is_superuser,
+                "is_admin_pro": user.is_admin_pro,
                 "branches": branch_details
             })
             
@@ -100,11 +101,23 @@ class SuperAdminOnlyView(APIView):
 
     def get(self, request):
         return Response({"message": "Hello, Super Admin!"})
-    
+
+# Custom permission for AdminPro
+class IsAdminPro(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.is_admin_pro
+
 # Custom permission for admin and super admin
 class IsAdminOrSuperAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user.is_authenticated and (request.user.is_staff or request.user.is_superuser)
+
+# Custom permission for adminpro and above (adminpro, admin, superuser)
+class IsAdminProOrAbove(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and (
+            request.user.is_admin_pro or request.user.is_staff or request.user.is_superuser
+        )
 
     
 class UserRegistrationView(APIView):
@@ -235,6 +248,63 @@ class SuperuserRegistrationView(APIView):
                     "mobile": superuser.mobile,
                     "user_code": superuser.user_code,
                     "role": "Superuser",
+                    "branches_assigned": [branch.id for branch in all_branches]
+                }
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+class AdminProRegistrationView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        username = request.data.get("username")
+        password = request.data.get("password")
+        email = request.data.get("email")
+        first_name = request.data.get("first_name", "")
+        last_name = request.data.get("last_name", "")
+        mobile = request.data.get("mobile", None)
+        user_code = request.data.get("user_code", None)
+
+        if not username or not password or not email or not user_code:
+            return Response({"error": "Username, password, email, and user_code are required!"}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(username=username).exists():
+            return Response({"error": "Username already exists!"}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "Email already exists!"}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(user_code=user_code).exists():
+            return Response({"error": "User code already exists!"}, status=status.HTTP_400_BAD_REQUEST)
+
+        admin_pro_user = User.objects.create_user(
+            username=username,
+            password=password,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            mobile=mobile,
+            user_code=user_code,
+        )
+        admin_pro_user.is_admin_pro = True
+        admin_pro_user.is_staff = False
+        admin_pro_user.is_superuser = False
+        admin_pro_user.save()
+
+        all_branches = Branch.objects.all()
+        user_branches = [UserBranch(user=admin_pro_user, branch=branch) for branch in all_branches]
+        UserBranch.objects.bulk_create(user_branches)
+
+        return Response(
+            {
+                "message": "AdminPro user registered successfully!",
+                "user": {
+                    "id": admin_pro_user.id,
+                    "username": admin_pro_user.username,
+                    "email": admin_pro_user.email,
+                    "first_name": admin_pro_user.first_name,
+                    "last_name": admin_pro_user.last_name,
+                    "mobile": admin_pro_user.mobile,
+                    "user_code": admin_pro_user.user_code,
+                    "role": "AdminPro",
                     "branches_assigned": [branch.id for branch in all_branches]
                 }
             },

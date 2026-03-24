@@ -241,8 +241,10 @@ class ExpenseRetrieveView(generics.RetrieveAPIView):
 
 class ExpenceSummeryReportView(APIView):
 
-    
     def get(self, request):
+        if not request.user.is_superuser:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
         branch_id = request.query_params.get('branch_id')
