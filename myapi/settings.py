@@ -88,6 +88,9 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='localhost,127.0.0.1').split(',')
 
 CORS_ALLOW_ALL_ORIGINS = False
+
+SMS_USER = config('SMS_USER', default='')
+SMS_PASSWORD = config('SMS_PASSWORD', default='')
 CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = 'myapi.urls'

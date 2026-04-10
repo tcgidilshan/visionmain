@@ -1489,3 +1489,20 @@ class BirthdayReminder(models.Model):
 
     def __str__(self):
         return f"Birthday Reminder for {self.patient.name} on {self.called_at}"
+
+
+class SMSToken(models.Model):
+    token = models.TextField()
+    refresh_token = models.TextField(null=True, blank=True)
+    expiration_seconds = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_valid(self):
+        elapsed = (timezone.now() - self.created_at).total_seconds()
+        return elapsed < self.expiration_seconds
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"SMSToken created={self.created_at}"

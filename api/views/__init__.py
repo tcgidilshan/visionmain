@@ -79,3 +79,4 @@ from .invoice_tracking_report import InvoiceTrackingReportView
 from .city_sales_report import CitySalesReportView
 from .birthday_report_view import BirthdayReportView, BirthdayReminderCreateView
 from .cross_branch_payment_view import CrossBranchPaymentReportView
+from .sms_views import SendSMSView

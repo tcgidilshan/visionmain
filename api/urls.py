@@ -75,7 +75,8 @@ from .views import (
     LensHistoryReportView,FrameBrandReportView,BranchWiseFrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
     RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
     HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView,EarningReportView,HearingOrderReportView,FactoryOrderStatusSummaryView,SafeTransactionSummaryView,
-    COOrderReportView,BranchTimeReportView,AppointmentArrivalMarkView,InvoiceTrackingReportView,BirthdayReportView,BirthdayReminderCreateView
+    COOrderReportView,BranchTimeReportView,AppointmentArrivalMarkView,InvoiceTrackingReportView,BirthdayReportView,BirthdayReminderCreateView,
+    SendSMSView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -355,6 +356,7 @@ urlpatterns = [
     path("reports/city-sales/", CitySalesReportView.as_view(), name="city-sales-report"),
     path('reports/birthday/', BirthdayReportView.as_view(), name='birthday-report'),
     path('birthday-reminder/', BirthdayReminderCreateView.as_view(), name='birthday-reminder-create'),
+    path('send-sms/', SendSMSView.as_view(), name='send-sms'),
 
 ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),

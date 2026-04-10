@@ -1757,3 +1757,12 @@ class PaymentReportSerializer(serializers.Serializer):
     total_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     payment_method = serializers.CharField()
     refraction_id = serializers.IntegerField(source='order__refraction_id', allow_null=True)
+
+
+class SMSSendSerializer(serializers.Serializer):
+    mobile_numbers = serializers.ListField(
+        child=serializers.CharField(max_length=15),
+        min_length=1
+    )
+    message = serializers.CharField()
+    source_address = serializers.CharField(max_length=11, required=False, allow_blank=True)
