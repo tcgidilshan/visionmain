@@ -22,13 +22,20 @@ from .models import (
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
     UserBranch,ExpenseMainCategory, ExpenseSubCategory,LensStockHistory,
     DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus,FrameImage,
-    DoctorBranchChannelFees,OrderFeedback,HearingItem,HearingItemStock,HearingOrderItemService,PaymentMethodBanks,ExpenseReturn
+    DoctorBranchChannelFees,OrderFeedback,HearingItem,HearingItemStock,HearingOrderItemService,PaymentMethodBanks,ExpenseReturn,
+    SMSTemplate
 )
 
 class BranchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Branch
-        fields = '__all__'
+        fields = ['id', 'branch_name', 'location', 'address', 'contact_one', 'contact_two', 'created_at', 'updated_at']
+
+
+class BranchContactUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Branch
+        fields = ['address', 'contact_one', 'contact_two']
 
 
 class BankAccountSerializer(serializers.ModelSerializer):
@@ -1766,3 +1773,26 @@ class SMSSendSerializer(serializers.Serializer):
     )
     message = serializers.CharField()
     source_address = serializers.CharField(max_length=11, required=False, allow_blank=True)
+
+
+class SMSTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = SMSTemplate
+        fields = ['id', 'template_type', 'template', 'source_address', 'active',
+                  'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
+
+    def validate(self, data):
+        template_type = data.get('template_type', getattr(self.instance, 'template_type', None))
+        active        = data.get('active',        getattr(self.instance, 'active', False))
+
+        if active:
+            qs = SMSTemplate.objects.filter(template_type=template_type, active=True)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    f"An active template for '{template_type}' already exists. "
+                    "Deactivate it first, or set active=false on this template."
+                )
+        return data

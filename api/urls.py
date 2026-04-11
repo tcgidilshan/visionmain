@@ -6,7 +6,7 @@ from django.conf.urls.static import static
 from .views.inventory_transfer import LensTransferView
 from .views import (
     BranchListCreateAPIView,OrderRefundView,FactoryOrderReportView,
-    BranchRetrieveUpdateDestroyAPIView,NormalOrderReportView,
+    BranchRetrieveUpdateDestroyAPIView,BranchContactUpdateAPIView,NormalOrderReportView,
     RefractionCreateAPIView,ChannelOrderReportView,
     RefractionListAPIView,BranchAppointmentCountView,
     RefractionUpdateAPIView,
@@ -76,7 +76,7 @@ from .views import (
     RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
     HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView,EarningReportView,HearingOrderReportView,FactoryOrderStatusSummaryView,SafeTransactionSummaryView,
     COOrderReportView,BranchTimeReportView,AppointmentArrivalMarkView,InvoiceTrackingReportView,BirthdayReportView,BirthdayReminderCreateView,
-    SendSMSView
+    SendSMSView, SMSTemplateListCreateView, SMSTemplateRetrieveUpdateDeleteView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -101,6 +101,7 @@ urlpatterns = [
     path('register/superuser/', SuperuserRegistrationView.as_view(), name='superuser-registration'),
     path('branches/', BranchListCreateAPIView.as_view(), name='branch-list-create'),
     path('branches/<int:pk>/', BranchRetrieveUpdateDestroyAPIView.as_view(), name='branch-detail'),
+    path('branches/<int:pk>/contact/', BranchContactUpdateAPIView.as_view(), name='branch-contact-update'),
     path('rest-password/', RestPasswordView.as_view(), name='rest-password'),
     path('rest-password/confirm/', ResetPasswordConfirmView.as_view(), name='rest-password-confirm'),
 
@@ -357,6 +358,8 @@ urlpatterns = [
     path('reports/birthday/', BirthdayReportView.as_view(), name='birthday-report'),
     path('birthday-reminder/', BirthdayReminderCreateView.as_view(), name='birthday-reminder-create'),
     path('send-sms/', SendSMSView.as_view(), name='send-sms'),
+    path('sms-templates/', SMSTemplateListCreateView.as_view(), name='sms-template-list'),
+    path('sms-templates/<int:pk>/', SMSTemplateRetrieveUpdateDeleteView.as_view(), name='sms-template-detail'),
 
 ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),

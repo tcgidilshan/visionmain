@@ -1,6 +1,6 @@
 from rest_framework import generics, permissions
 from ..models import Branch
-from ..serializers import BranchSerializer
+from ..serializers import BranchSerializer, BranchContactUpdateSerializer
 from ..services.role_service import get_user_role
 
 RESTRICTED_BRANCH_IDS = [4]
@@ -23,9 +23,18 @@ class BranchListCreateAPIView(generics.ListCreateAPIView):
         return _branch_queryset(self.request.user)
 
 
-# Retrieve, Update, and Delete a Specific Branch
-class BranchRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+# Retrieve and Update a Specific Branch
+class BranchRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateAPIView):
     serializer_class = BranchSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return _branch_queryset(self.request.user)
+
+
+# Update branch contact numbers and address
+class BranchContactUpdateAPIView(generics.UpdateAPIView):
+    serializer_class = BranchContactUpdateSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):

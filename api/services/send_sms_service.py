@@ -3,7 +3,7 @@ import requests
 from django.conf import settings
 from rest_framework.exceptions import ValidationError
 
-from ..models import SMSToken
+from ..models import SMSToken, SMSTemplate
 
 LOGIN_URL = "https://esms.dialog.lk/api/v2/user/login"
 SEND_SMS_URL = "https://e-sms.dialog.lk/api/v2/sms"
@@ -91,3 +91,78 @@ class SMSService:
             )
 
         return data
+
+    @staticmethod
+    def _substitute(template_text: str, context: dict) -> str:
+        """Replace {key} placeholders in template_text using context dict."""
+        message = template_text
+        for key, value in context.items():
+            message = message.replace(f"{{{key}}}", str(value) if value is not None else "")
+        return message
+
+    @staticmethod
+    def send_sms_by_template_type(
+        template_type: str,
+        recipients: list,
+    ) -> list:
+        """
+        Resolve the active template, personalise per recipient, and send.
+
+        template_type : one of SMSTemplate.TemplateType values
+                        ('birthday', 'issue_to_customer', 'order_ready')
+
+        recipients    : list of dicts — each dict must have a 'mobile' key;
+                        all other keys are treated as placeholder context.
+                        Example:
+                        [
+                          {
+                            "mobile": "714551682",
+                            "customer_name": "John Silva",
+                            "branch_name": "Colombo 03",
+                            "branch_address": "123 Main St",
+                            "branch_contact_number": "0112345678",
+                            "invoice_number": "INV-00042",
+                          },
+                          {
+                            "mobile": "763625800",
+                            "customer_name": "Nimal Perera",
+                            "invoice_number": "INV-00043",
+                          },
+                        ]
+
+        Returns a list of per-recipient result dicts:
+          [{"mobile": "...", "status": "sent", "result": {...}}, ...]
+          or {"mobile": "...", "status": "error", "error": "..."} on failure.
+
+        Raises ValidationError if no active template is found.
+        """
+        template = SMSTemplate.objects.filter(
+            template_type=template_type, active=True
+        ).first()
+
+        if not template:
+            raise ValidationError(
+                f"No active SMS template found for type '{template_type}'."
+            )
+
+        results = []
+        for recipient in recipients:
+            mobile = recipient.get("mobile")
+            if not mobile:
+                results.append({"mobile": None, "status": "error", "error": "missing 'mobile' field"})
+                continue
+
+            context = {k: v for k, v in recipient.items() if k != "mobile"}
+            message = SMSService._substitute(template.template, context)
+
+            try:
+                result = SMSService.send_sms(
+                    [mobile],
+                    message,
+                    template.source_address or None,
+                )
+                results.append({"mobile": mobile, "status": "sent", "result": result})
+            except Exception as e:
+                results.append({"mobile": mobile, "status": "error", "error": str(e)})
+
+        return results

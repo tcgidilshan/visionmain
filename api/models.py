@@ -25,6 +25,9 @@ class Item(models.Model):
 class Branch(models.Model):
     branch_name = models.CharField(max_length=255)  # Name of the branch
     location = models.TextField()  # Branch location (address or details)
+    address = models.TextField(blank=True, null=True)
+    contact_one = models.CharField(max_length=20, blank=True, null=True)
+    contact_two = models.CharField(max_length=20, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)  # Auto-created timestamp
     updated_at = models.DateTimeField(auto_now=True)  # Auto-updated timestamp
 
@@ -1506,3 +1509,29 @@ class SMSToken(models.Model):
 
     def __str__(self):
         return f"SMSToken created={self.created_at}"
+
+
+class SMSTemplate(models.Model):
+    class TemplateType(models.TextChoices):
+        BIRTHDAY              = 'birthday',              'Birthday'
+        ISSUE_TO_CUSTOMER     = 'issue_to_customer',     'Issue to Customer'
+        RECEIVED_FROM_FACTORY = 'received_from_factory', 'Received from Factory'
+        ORDER_CREATE          = 'order_create',          'Order Create'
+
+    template_type  = models.CharField(max_length=30, choices=TemplateType.choices)
+    template       = models.TextField()
+    source_address = models.CharField(max_length=11, blank=True, null=True)
+    active         = models.BooleanField(default=False)
+    created_at     = models.DateTimeField(auto_now_add=True)
+    updated_at     = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if self.active:
+            SMSTemplate.objects.filter(
+                template_type=self.template_type,
+                active=True
+            ).exclude(pk=self.pk).update(active=False)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.get_template_type_display()} ({'active' if self.active else 'inactive'})"

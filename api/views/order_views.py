@@ -16,14 +16,14 @@ from ..services.soft_delete_service import OrderSoftDeleteService
 # from ..services.order_payment_service import refund_order  # adjust as needed
 from rest_framework.exceptions import ValidationError
 from decimal import Decimal
+from ..services.send_sms_service import SMSService
 
 class OrderCreateView(APIView):
-    @transaction.atomic
     def post(self, request, *args, **kwargs):
         try:
             # Start transaction
             with transaction.atomic():
-                
+
                 # 🔹 Step 1: Validate & Create/Update Patient
                 patient_id = request.data.get("patient_id")
                 co_order = request.data.get("co_order", False)
@@ -40,7 +40,7 @@ class OrderCreateView(APIView):
                     raise ValueError("Patient ID is required.")
 
                 # # 🔹 Step 2: Update Refraction linkage if provided
-                #//! no need science new methid send patint id  
+                #//! no need science new methid send patint id
                 # refraction_id = patient_data.get("refraction_id")
                 # if refraction_id:
                 #     try:
@@ -68,17 +68,17 @@ class OrderCreateView(APIView):
                 order_data = request.data.get('order')
                 if not order_data:
                     return Response({"error": "The 'order' field is required."}, status=status.HTTP_400_BAD_REQUEST)
-                
+
                 # ✅ Ensure order_date is set
                 if not order_data.get('user_date'):
                     order_data['user_date'] = timezone.now().date()
 
                 # Add customer ID to order data
                 order_data["customer"] = patient.id
-                
+
                 # Get order items
                 order_items_data = request.data.get('order_items', [])
-                
+
                 # 🔹 Step 5: Create Order + Items using the updated service
                 # The stock validation and adjustment is now handled within create_order
                 # based on the on_hold status
@@ -107,9 +107,8 @@ class OrderCreateView(APIView):
                 # 🔹 Step 8: Validate payment amount
                 if total_payment > order.total_price:
                     raise ValueError("Total payments exceed the order total price.")
-                
-                response_serializer = OrderSerializer(order)
-                return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+                response_data = OrderSerializer(order).data
 
         except ValueError as e:
             transaction.set_rollback(True)
@@ -117,6 +116,33 @@ class OrderCreateView(APIView):
         except Exception as e:
             transaction.set_rollback(True)
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # SMS is sent outside the transaction so a failure never rolls back the order
+        try:
+            mobile = getattr(patient, 'phone_number', None)
+            print(f"[SMS DEBUG] patient={patient.id}, mobile={mobile}")
+            if mobile:
+                invoice = getattr(order, 'invoice', None)
+                recipient = {
+                    "mobile": mobile,
+                    "customer_name": getattr(patient, 'name', ''),
+                    "branch_name": getattr(order.branch, 'branch_name', ''),
+                    "branch_address": getattr(order.branch, 'address', '') or '',
+                    "branch_contact_number": getattr(order.branch, 'contact_one', '') or '',
+                    "invoice_number": getattr(invoice, 'invoice_number', ''),
+                }
+                print(f"[SMS DEBUG] sending order_create SMS, recipient={recipient}")
+                result = SMSService.send_sms_by_template_type(
+                    template_type="order_create",
+                    recipients=[recipient],
+                )
+                print(f"[SMS DEBUG] result={result}")
+            else:
+                print("[SMS DEBUG] skipped — no phone number on patient")
+        except Exception as e:
+            print(f"[SMS DEBUG] exception: {e}")  # SMS failure must never affect order creation
+
+        return Response(response_data, status=status.HTTP_201_CREATED)
         
 class OrderSoftDeleteView(APIView):
     """
