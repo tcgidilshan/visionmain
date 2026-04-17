@@ -76,7 +76,7 @@ from .views import (
     RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
     HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView,EarningReportView,HearingOrderReportView,FactoryOrderStatusSummaryView,SafeTransactionSummaryView,
     COOrderReportView,BranchTimeReportView,AppointmentArrivalMarkView,InvoiceTrackingReportView,BirthdayReportView,BirthdayReminderCreateView,
-    SendSMSView, SMSTemplateListCreateView, SMSTemplateRetrieveUpdateDeleteView
+    SendSMSView, SMSTemplateListCreateView, SMSTemplateRetrieveUpdateDeleteView, SMSLogListView
 )
 from .views.customer_report_views import BestCustomersReportView
 from .views.employee_report_views import EmployeeHistoryReportView
@@ -360,6 +360,7 @@ urlpatterns = [
     path('send-sms/', SendSMSView.as_view(), name='send-sms'),
     path('sms-templates/', SMSTemplateListCreateView.as_view(), name='sms-template-list'),
     path('sms-templates/<int:pk>/', SMSTemplateRetrieveUpdateDeleteView.as_view(), name='sms-template-detail'),
+    path('sms-logs/', SMSLogListView.as_view(), name='sms-log-list'),
 
 ]
     # path('api-token-auth/', CustomAuthToken.as_view(), name='api-token-auth'),

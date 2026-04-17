@@ -3,7 +3,7 @@ import requests
 from django.conf import settings
 from rest_framework.exceptions import ValidationError
 
-from ..models import SMSToken, SMSTemplate
+from ..models import SMSToken, SMSTemplate, SMSLog
 
 LOGIN_URL = "https://esms.dialog.lk/api/v2/user/login"
 SEND_SMS_URL = "https://e-sms.dialog.lk/api/v2/sms"
@@ -44,14 +44,21 @@ class SMSService:
         return data["token"]
 
     @staticmethod
-    def send_sms(mobile_numbers: list, message: str, source_address: str = None) -> dict:
+    def send_sms(
+        mobile_numbers: list,
+        message: str,
+        source_address: str = None,
+        template=None,
+        template_type: str = None,
+    ) -> dict:
         """
         Send SMS to one or more mobile numbers via Dialog eSMS API v2.
 
         mobile_numbers : list of strings, e.g. ["714551682", "763625800"]
-                         (9-digit format; 10/11-digit accepted by the API too)
         message        : SMS body text
         source_address : optional sender mask (max 11 chars)
+        template       : SMSTemplate instance (for logging FK)
+        template_type  : template type string snapshot (for logging)
 
         Returns the eSMS API response dict on success.
         Raises ValidationError on any failure.
@@ -77,17 +84,57 @@ class SMSService:
             "Content-Type": "application/json",
         }
 
+        log_defaults = dict(
+            message=message,
+            source_address=source_address or None,
+            template=template,
+            template_type=template_type,
+            transaction_id=transaction_id,
+        )
+
         try:
             resp = requests.post(SEND_SMS_URL, json=payload, headers=headers, timeout=15)
             resp.raise_for_status()
         except requests.RequestException as e:
+            for num in mobile_numbers:
+                SMSLog.objects.create(
+                    mobile_number=num,
+                    status=SMSLog.Status.ERROR,
+                    comment=str(e),
+                    **log_defaults,
+                )
             raise ValidationError(f"SMS send request failed: {e}")
 
         data = resp.json()
         if data.get("status") != "success":
+            api_data = data.get("data") or {}
+            for num in mobile_numbers:
+                SMSLog.objects.create(
+                    mobile_number=num,
+                    status=SMSLog.Status.FAILED,
+                    err_code=str(data.get("errCode") or ""),
+                    comment=data.get("comment", ""),
+                    **log_defaults,
+                )
             raise ValidationError(
                 f"SMS send failed: {data.get('comment', 'Unknown error')} "
                 f"(errCode={data.get('errCode')})"
+            )
+
+        api_data = data.get("data") or {}
+        for num in mobile_numbers:
+            SMSLog.objects.create(
+                mobile_number=num,
+                status=SMSLog.Status.SUCCESS,
+                campaign_id=api_data.get("campaignId"),
+                campaign_cost=api_data.get("campaignCost"),
+                wallet_balance=str(api_data.get("walletBalance") or ""),
+                duplicates_removed=api_data.get("duplicatesRemoved", 0),
+                invalid_numbers=api_data.get("invalidNumbers", 0),
+                mask_blocked_numbers=api_data.get("mask_blocked_numbers", 0),
+                err_code=str(data.get("errCode") or ""),
+                comment=data.get("comment", ""),
+                **log_defaults,
             )
 
         return data
@@ -160,6 +207,8 @@ class SMSService:
                     [mobile],
                     message,
                     template.source_address or None,
+                    template=template,
+                    template_type=template.template_type,
                 )
                 results.append({"mobile": mobile, "status": "sent", "result": result})
             except Exception as e:

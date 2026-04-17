@@ -1535,3 +1535,37 @@ class SMSTemplate(models.Model):
 
     def __str__(self):
         return f"{self.get_template_type_display()} ({'active' if self.active else 'inactive'})"
+
+
+class SMSLog(models.Model):
+    class Status(models.TextChoices):
+        SUCCESS = 'success', 'Success'
+        FAILED  = 'failed',  'Failed'
+        ERROR   = 'error',   'Error'
+
+    mobile_number  = models.CharField(max_length=15)
+    message        = models.TextField()
+    source_address = models.CharField(max_length=11, null=True, blank=True)
+    template       = models.ForeignKey(SMSTemplate, null=True, blank=True, on_delete=models.SET_NULL, related_name='logs')
+    template_type  = models.CharField(max_length=30, null=True, blank=True)
+
+    transaction_id = models.BigIntegerField(null=True, blank=True)
+
+    status               = models.CharField(max_length=10, choices=Status.choices, default=Status.ERROR)
+    campaign_id          = models.BigIntegerField(null=True, blank=True)
+    campaign_cost        = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True)
+    wallet_balance       = models.CharField(max_length=20, null=True, blank=True)
+    duplicates_removed   = models.IntegerField(default=0)
+    invalid_numbers      = models.IntegerField(default=0)
+    mask_blocked_numbers = models.IntegerField(default=0)
+
+    err_code = models.CharField(max_length=20, null=True, blank=True)
+    comment  = models.TextField(null=True, blank=True)
+
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-sent_at']
+
+    def __str__(self):
+        return f"SMS to {self.mobile_number} [{self.status}] at {self.sent_at}"

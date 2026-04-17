@@ -23,7 +23,7 @@ from .models import (
     UserBranch,ExpenseMainCategory, ExpenseSubCategory,LensStockHistory,
     DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus,FrameImage,
     DoctorBranchChannelFees,OrderFeedback,HearingItem,HearingItemStock,HearingOrderItemService,PaymentMethodBanks,ExpenseReturn,
-    SMSTemplate
+    SMSTemplate, SMSLog
 )
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -1796,3 +1796,15 @@ class SMSTemplateSerializer(serializers.ModelSerializer):
                     "Deactivate it first, or set active=false on this template."
                 )
         return data
+
+
+class SMSLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = SMSLog
+        fields = [
+            'id', 'mobile_number', 'message', 'source_address', 'template_type',
+            'transaction_id', 'status', 'campaign_id', 'campaign_cost',
+            'wallet_balance', 'duplicates_removed', 'invalid_numbers',
+            'mask_blocked_numbers', 'err_code', 'comment', 'sent_at',
+        ]
+        read_only_fields = fields
