@@ -22,13 +22,20 @@ from .models import (
     OtherItemStock,Expense,OtherIncome,OtherIncomeCategory,
     UserBranch,ExpenseMainCategory, ExpenseSubCategory,LensStockHistory,
     DoctorClaimInvoice,DoctorClaimChannel,MntOrder,OrderProgress,OrderAuditLog,OrderItemWhatsAppLog,ArrivalStatus,FrameImage,
-    DoctorBranchChannelFees,OrderFeedback,HearingItem,HearingItemStock,HearingOrderItemService,PaymentMethodBanks,ExpenseReturn
+    DoctorBranchChannelFees,OrderFeedback,HearingItem,HearingItemStock,HearingOrderItemService,PaymentMethodBanks,ExpenseReturn,
+    SMSTemplate, SMSLog
 )
 
 class BranchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Branch
-        fields = '__all__'
+        fields = ['id', 'branch_name', 'location', 'address', 'contact_one', 'contact_two', 'created_at', 'updated_at']
+
+
+class BranchContactUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Branch
+        fields = ['address', 'contact_one', 'contact_two']
 
 
 class BankAccountSerializer(serializers.ModelSerializer):
@@ -1757,3 +1764,47 @@ class PaymentReportSerializer(serializers.Serializer):
     total_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     payment_method = serializers.CharField()
     refraction_id = serializers.IntegerField(source='order__refraction_id', allow_null=True)
+
+
+class SMSSendSerializer(serializers.Serializer):
+    mobile_numbers = serializers.ListField(
+        child=serializers.CharField(max_length=15),
+        min_length=1
+    )
+    message = serializers.CharField()
+    source_address = serializers.CharField(max_length=11, required=False, allow_blank=True)
+
+
+class SMSTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = SMSTemplate
+        fields = ['id', 'template_type', 'template', 'source_address', 'active',
+                  'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
+
+    def validate(self, data):
+        template_type = data.get('template_type', getattr(self.instance, 'template_type', None))
+        active        = data.get('active',        getattr(self.instance, 'active', False))
+
+        if active:
+            qs = SMSTemplate.objects.filter(template_type=template_type, active=True)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    f"An active template for '{template_type}' already exists. "
+                    "Deactivate it first, or set active=false on this template."
+                )
+        return data
+
+
+class SMSLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = SMSLog
+        fields = [
+            'id', 'mobile_number', 'message', 'source_address', 'template_type',
+            'transaction_id', 'status', 'campaign_id', 'campaign_cost',
+            'wallet_balance', 'duplicates_removed', 'invalid_numbers',
+            'mask_blocked_numbers', 'err_code', 'comment', 'sent_at',
+        ]
+        read_only_fields = fields

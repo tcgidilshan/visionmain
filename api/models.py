@@ -25,6 +25,9 @@ class Item(models.Model):
 class Branch(models.Model):
     branch_name = models.CharField(max_length=255)  # Name of the branch
     location = models.TextField()  # Branch location (address or details)
+    address = models.TextField(blank=True, null=True)
+    contact_one = models.CharField(max_length=20, blank=True, null=True)
+    contact_two = models.CharField(max_length=20, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)  # Auto-created timestamp
     updated_at = models.DateTimeField(auto_now=True)  # Auto-updated timestamp
 
@@ -1489,3 +1492,80 @@ class BirthdayReminder(models.Model):
 
     def __str__(self):
         return f"Birthday Reminder for {self.patient.name} on {self.called_at}"
+
+
+class SMSToken(models.Model):
+    token = models.TextField()
+    refresh_token = models.TextField(null=True, blank=True)
+    expiration_seconds = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_valid(self):
+        elapsed = (timezone.now() - self.created_at).total_seconds()
+        return elapsed < self.expiration_seconds
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"SMSToken created={self.created_at}"
+
+
+class SMSTemplate(models.Model):
+    class TemplateType(models.TextChoices):
+        BIRTHDAY              = 'birthday',              'Birthday'
+        ISSUE_TO_CUSTOMER     = 'issue_to_customer',     'Issue to Customer'
+        RECEIVED_FROM_FACTORY = 'received_from_factory', 'Received from Factory'
+        ORDER_CREATE          = 'order_create',          'Order Create'
+
+    template_type  = models.CharField(max_length=30, choices=TemplateType.choices)
+    template       = models.TextField()
+    source_address = models.CharField(max_length=11, blank=True, null=True)
+    active         = models.BooleanField(default=False)
+    created_at     = models.DateTimeField(auto_now_add=True)
+    updated_at     = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if self.active:
+            SMSTemplate.objects.filter(
+                template_type=self.template_type,
+                active=True
+            ).exclude(pk=self.pk).update(active=False)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.get_template_type_display()} ({'active' if self.active else 'inactive'})"
+
+
+class SMSLog(models.Model):
+    class Status(models.TextChoices):
+        SUCCESS = 'success', 'Success'
+        FAILED  = 'failed',  'Failed'
+        ERROR   = 'error',   'Error'
+
+    mobile_number  = models.CharField(max_length=15)
+    message        = models.TextField()
+    source_address = models.CharField(max_length=11, null=True, blank=True)
+    template       = models.ForeignKey(SMSTemplate, null=True, blank=True, on_delete=models.SET_NULL, related_name='logs')
+    template_type  = models.CharField(max_length=30, null=True, blank=True)
+
+    transaction_id = models.BigIntegerField(null=True, blank=True)
+
+    status               = models.CharField(max_length=10, choices=Status.choices, default=Status.ERROR)
+    campaign_id          = models.BigIntegerField(null=True, blank=True)
+    campaign_cost        = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True)
+    wallet_balance       = models.CharField(max_length=20, null=True, blank=True)
+    duplicates_removed   = models.IntegerField(default=0)
+    invalid_numbers      = models.IntegerField(default=0)
+    mask_blocked_numbers = models.IntegerField(default=0)
+
+    err_code = models.CharField(max_length=20, null=True, blank=True)
+    comment  = models.TextField(null=True, blank=True)
+
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-sent_at']
+
+    def __str__(self):
+        return f"SMS to {self.mobile_number} [{self.status}] at {self.sent_at}"

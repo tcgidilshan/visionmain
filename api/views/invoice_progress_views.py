@@ -1,11 +1,11 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from api.models import Invoice,Order,OrderItemWhatsAppLog
-from api.serializers import InvoiceSerializer,BulkWhatsAppLogCreateSerializer
+from api.models import Invoice, Order, OrderItemWhatsAppLog, OrderProgress
+from api.serializers import InvoiceSerializer, BulkWhatsAppLogCreateSerializer
+from api.services.send_sms_service import SMSService
 from django.utils import timezone
 from django.db import transaction
-from api.models import OrderProgress
 
 class InvoiceProgressUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -64,11 +64,16 @@ class BulkUpdateOrderProgressStatus(APIView):
             return Response({"detail": "order_ids and progress_status required."}, status=400)
 
         results = []
+        updated_orders = []
+
         with transaction.atomic():
-            # Lock the orders to prevent concurrent issues
-            orders = Order.objects.select_for_update().filter(id__in=order_ids, is_deleted=False)
+            orders = (
+                Order.objects
+                .select_related('customer', 'branch')
+                .select_for_update()
+                .filter(id__in=order_ids, is_deleted=False)
+            )
             for order in orders:
-                # Fetch the latest OrderProgress record for this order
                 last_progress = (
                     OrderProgress.objects
                     .filter(order=order)
@@ -79,15 +84,51 @@ class BulkUpdateOrderProgressStatus(APIView):
                     results.append({"order_id": order.id, "status": "already_set"})
                     continue
 
-                # Create a new progress record
                 OrderProgress.objects.create(
                     order=order,
                     progress_status=progress_status,
                     changed_at=timezone.now()
                 )
                 results.append({"order_id": order.id, "status": "created"})
+                updated_orders.append(order)
 
-        return Response({"results": results}, status=200)
+        # SMS is sent outside the transaction so a failure never rolls back the progress update
+        sms_results = []
+        if progress_status == "received_from_factory" and updated_orders:
+            invoice_map = {
+                inv.order_id: inv
+                for inv in Invoice.objects.filter(order_id__in=[o.id for o in updated_orders])
+            }
+
+            recipients = []
+            for order in updated_orders:
+                mobile = getattr(order.customer, 'phone_number', None)
+                if not mobile:
+                    continue
+                invoice = invoice_map.get(order.id)
+                recipients.append({
+                    "mobile": mobile,
+                    "customer_name": getattr(order.customer, 'name', ''),
+                    "branch_name": getattr(order.branch, 'branch_name', ''),
+                    "branch_address": getattr(order.branch, 'address', '') or '',
+                    "branch_contact_number": getattr(order.branch, 'contact_one', '') or '',
+                    "invoice_number": getattr(invoice, 'invoice_number', ''),
+                })
+
+            if recipients:
+                try:
+                    sms_results = SMSService.send_sms_by_template_type(
+                        template_type="received_from_factory",
+                        recipients=recipients,
+                    )
+                except Exception as e:
+                    sms_results = [{"status": "error", "error": str(e)}]
+
+        response_data = {"results": results}
+        if sms_results:
+            response_data["sms_results"] = sms_results
+
+        return Response(response_data, status=200)
 
 class BulkOrderWhatsAppLogView(APIView):
     def post(self, request, *args, **kwargs):

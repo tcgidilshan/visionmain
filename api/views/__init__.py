@@ -1,4 +1,4 @@
-from .branch_views import BranchListCreateAPIView, BranchRetrieveUpdateDestroyAPIView
+from .branch_views import BranchListCreateAPIView, BranchRetrieveUpdateDestroyAPIView, BranchContactUpdateAPIView
 from .auth_views import LoginView, AdminOnlyView, SuperAdminOnlyView, UserRegistrationView, AdminRegistrationView, IsAdminOrSuperAdmin, IsSuperAdmin, AdminRegistrationView, LogoutView, SuperuserRegistrationView, AdminProRegistrationView
 from .refraction_views import RefractionCreateAPIView, RefractionListAPIView, RefractionUpdateAPIView, RefractionDeleteAPIView,RefractionOrderView,PatientOrderCountView
 from .refraction_detail_views import RefractionDetailCreateAPIView,RefractionDetailRetrieveUpdateDeleteView
@@ -79,3 +79,4 @@ from .invoice_tracking_report import InvoiceTrackingReportView
 from .city_sales_report import CitySalesReportView
 from .birthday_report_view import BirthdayReportView, BirthdayReminderCreateView
 from .cross_branch_payment_view import CrossBranchPaymentReportView
+from .sms_views import SendSMSView, SMSTemplateListCreateView, SMSTemplateRetrieveUpdateDeleteView, SMSLogListView
