@@ -10,6 +10,7 @@ from ..serializers import OrderSerializer  # Optional if you want to return full
 from decimal import Decimal
 from datetime import date
 from ..models import Order
+from ..services.send_sms_service import SMSService
 
 class FrameOnlyOrderCreateView(APIView):
     """
@@ -56,8 +57,34 @@ class FrameOnlyOrderCreateView(APIView):
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({"detail": f"An unexpected error occurred: {str(e)}"}, 
+            return Response({"detail": f"An unexpected error occurred: {str(e)}"},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # SMS is sent outside the transaction so a failure never rolls back the order
+        try:
+            patient = getattr(order, 'customer', None)
+            mobile = getattr(patient, 'phone_number', None)
+            print(f"[SMS DEBUG] patient={getattr(patient, 'id', None)}, mobile={mobile}")
+            if mobile:
+                invoice = getattr(order, 'invoice', None)
+                recipient = {
+                    "mobile": mobile,
+                    "customer_name": getattr(patient, 'name', ''),
+                    "branch_name": getattr(order.branch, 'branch_name', ''),
+                    "branch_address": getattr(order.branch, 'address', '') or '',
+                    "branch_contact_number": getattr(order.branch, 'contact_one', '') or '',
+                    "invoice_number": getattr(invoice, 'invoice_number', ''),
+                }
+                print(f"[SMS DEBUG] sending order_create SMS, recipient={recipient}")
+                result = SMSService.send_sms_by_template_type(
+                    template_type="order_create",
+                    recipients=[recipient],
+                )
+                print(f"[SMS DEBUG] result={result}")
+            else:
+                print("[SMS DEBUG] skipped — no phone number on patient")
+        except Exception as e:
+            print(f"[SMS DEBUG] exception: {e}")  # SMS failure must never affect order creation
 
         output_serializer = OrderSerializer(order)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
