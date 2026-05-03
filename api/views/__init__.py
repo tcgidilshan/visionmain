@@ -67,7 +67,7 @@ from .order_hearing_view import HearingOrderCreateView,HearingOrderUpdateView
 from .hearing_order_report_view import HearingOrderReportView,HearingOrderReminderReportView,HearingOrderReportByOrderDateView
 from .order_item_view import OrderItemUpdateView
 from .hearing_order_service_view import HearingOrderServiceView
-from .reset_auth_data import RestPasswordView,ResetPasswordConfirmView
+from .reset_auth_data import RestPasswordView,ResetPasswordConfirmView,VerifyOTPView
 from .payment_method_banks import PaymentMethodBanksView, PaymentMethodBanksDetailView
 from .order_payment_bank_report import OrderPaymentBankReportViewSet
 from .expence_return import ExpenceReturnAPIView

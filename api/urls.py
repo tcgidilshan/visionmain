@@ -73,7 +73,7 @@ from .views import (
     FrameHistoryReportView,FrameSaleReportView,LensSaleReportView,OrderImageListCreateView, OrderImageDetailView,OtherIncomeReportView,SafeTransactionReportView,SolderingOrderReportView,
     PaymentSummaryReportView,DoctorBranchChannelFeesCreateView,DoctorBranchChannelFeesListView,DoctorBranchChannelFeesUpdateView,OrderFeedbackCreateView,
     LensHistoryReportView,FrameBrandReportView,BranchWiseFrameBrandReportView,HearingItemListCreateView,HearingItemRetrieveUpdateDeleteView,HearingOrderCreateView,HearingOrderUpdateView,HearingOrderReportView,OrderItemUpdateView,HearingOrderServiceView,HearingOrderReminderReportView,
-    RestPasswordView,ResetPasswordConfirmView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
+    RestPasswordView,ResetPasswordConfirmView,VerifyOTPView,RefractionOrderView,CreatePatientView,PatientOrderCountView,PaymentMethodBanksDetailView,PaymentMethodBanksView,LogoutView,
     HearingOrderReportByOrderDateView,OrderPaymentBankReportViewSet,ExpenceReturnAPIView,ExpenceSummeryReportView,EarningReportView,HearingOrderReportView,FactoryOrderStatusSummaryView,SafeTransactionSummaryView,
     COOrderReportView,BranchTimeReportView,AppointmentArrivalMarkView,InvoiceTrackingReportView,BirthdayReportView,BirthdayReminderCreateView,
     SendSMSView, SMSTemplateListCreateView, SMSTemplateRetrieveUpdateDeleteView, SMSLogListView
@@ -103,6 +103,7 @@ urlpatterns = [
     path('branches/<int:pk>/', BranchRetrieveUpdateDestroyAPIView.as_view(), name='branch-detail'),
     path('branches/<int:pk>/contact/', BranchContactUpdateAPIView.as_view(), name='branch-contact-update'),
     path('rest-password/', RestPasswordView.as_view(), name='rest-password'),
+    path('rest-password/verify-otp/', VerifyOTPView.as_view(), name='rest-password-verify-otp'),
     path('rest-password/confirm/', ResetPasswordConfirmView.as_view(), name='rest-password-confirm'),
 
     #bank
