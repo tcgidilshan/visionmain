@@ -1,15 +1,19 @@
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.generics import ListAPIView
+from rest_framework.filters import OrderingFilter, SearchFilter
 from ..models import Frame, FrameStock, Branch, FrameStockHistory,FrameImage
 from ..serializers import FrameSerializer, FrameStockSerializer
 from django.db import transaction
 from ..services.branch_protection_service import BranchProtectionsService
+from ..services.pagination_service import PaginationService
 import json
 import os
-from django.db.models import Sum
+from django.db.models import Sum, Exists, OuterRef, F
 from collections import defaultdict
 from django.db.models import Prefetch
+from django_filters.rest_framework import DjangoFilterBackend, FilterSet, CharFilter, ChoiceFilter
 # List and Create Frames (with stock)
 
 class FrameListCreateView(generics.ListCreateAPIView):
@@ -488,3 +492,84 @@ class BulkFrameImageUploadView(APIView):
             "image_url": image_url,
             "frame_ids": list(frame_ids)
         }, status=status.HTTP_201_CREATED)
+
+
+class FrameListFilter(FilterSet):
+    brand_name = CharFilter(field_name='brand__name', lookup_expr='icontains')
+    code_name = CharFilter(field_name='code__name', lookup_expr='icontains')
+    color_name = CharFilter(field_name='color__name', lookup_expr='icontains')
+    species = CharFilter(lookup_expr='icontains')
+    brand_type = ChoiceFilter(choices=Frame.BRAND_CHOICES)
+
+    class Meta:
+        model = Frame
+        fields = ['brand_name', 'code_name', 'color_name', 'species', 'brand_type']
+
+
+class FramePaginatedListView(ListAPIView):
+    serializer_class = FrameSerializer
+    pagination_class = PaginationService
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = FrameListFilter
+    search_fields = ['brand__name', 'code__name', 'color__name']
+    ordering_fields = ['brand__name', 'code__name', 'color__name', 'price', 'is_low_stock']
+    ordering = ['-is_low_stock']
+
+    def get_queryset(self):
+        branch_id = self.request.query_params.get('branch_id')
+        store_id = self.request.query_params.get('store_id')
+        branch = store_id or branch_id
+
+        qs = Frame.objects.filter(is_active=True).select_related('brand', 'code', 'color')
+
+        if store_id:
+            qs = qs.filter(stocks__branch_id=store_id, stocks__qty__gt=0).distinct()
+        elif branch_id:
+            qs = qs.filter(stocks__branch_id=branch_id).distinct()
+
+        if branch:
+            low_stock_sq = FrameStock.objects.filter(
+                frame=OuterRef('pk'),
+                branch_id=branch,
+                qty__lte=F('limit')
+            )
+            qs = qs.annotate(is_low_stock=Exists(low_stock_sq))
+
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        branch_id = request.query_params.get('branch_id')
+        store_id = request.query_params.get('store_id')
+
+        if not (branch_id or store_id):
+            return Response(
+                {"error": "Either branch_id or store_id parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        branch = store_id or branch_id
+        queryset = self.filter_queryset(self.get_queryset()).prefetch_related(
+            Prefetch(
+                'stocks',
+                queryset=FrameStock.objects.filter(branch_id=branch),
+                to_attr='filtered_stocks'
+            )
+        )
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            data = self._build_response(page, request)
+            return self.get_paginated_response(data)
+
+        data = self._build_response(queryset, request)
+        return Response(data)
+
+    def _build_response(self, frames, request):
+        context = {'request': request}
+        result = []
+        for frame in frames:
+            frame_data = FrameSerializer(frame, context=context).data
+            stocks = getattr(frame, 'filtered_stocks', [])
+            frame_data['stock'] = FrameStockSerializer(stocks, many=True).data
+            result.append(frame_data)
+        return result
