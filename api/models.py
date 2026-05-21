@@ -35,7 +35,7 @@ class Branch(models.Model):
         return self.branch_name
     
 class BankAccount(models.Model):
-    account_number = models.CharField(max_length=255, unique=True)
+    account_number = models.CharField(max_length=255, unique=False)
     bank_name = models.CharField(max_length=255)
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE)  # Linking bank account to branch
     
