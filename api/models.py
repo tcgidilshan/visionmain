@@ -87,17 +87,24 @@ class Refraction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     def save(self, *args, **kwargs):
-        # Generate refraction_number per branch if not set
         if not self.refraction_number and self.branch:
-            last_refraction = Refraction.objects.filter(branch=self.branch).order_by('-id').first()
-            
-            if last_refraction and last_refraction.refraction_number.isdigit():
-                last_number = int(last_refraction.refraction_number)
-                self.refraction_number = str(last_number + 1).zfill(3)
-            else:
-                self.refraction_number = "001"
-
-        super().save(*args, **kwargs)
+            from django.db import transaction
+            with transaction.atomic():
+                last_refraction = (
+                    Refraction.objects
+                    .select_for_update()
+                    .filter(branch=self.branch)
+                    .order_by('-id')
+                    .first()
+                )
+                if last_refraction and last_refraction.refraction_number.isdigit():
+                    last_number = int(last_refraction.refraction_number)
+                    self.refraction_number = str(last_number + 1).zfill(3)
+                else:
+                    self.refraction_number = "001"
+                super().save(*args, **kwargs)
+        else:
+            super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.customer_full_name} - Refraction ID: {self.id} - {self.refraction_number} - Patient: {self.patient.name if self.patient else 'No Patient'}"
