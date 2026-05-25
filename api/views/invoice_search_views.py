@@ -188,7 +188,16 @@ class FactoryInvoiceExternalLenseSearchView(generics.ListAPIView):
             except ValueError:
                 pass
 
-        return queryset
+        # Deduplicate by order_id — keep only the first item per order
+        from django.db.models import Min
+        min_ids = queryset.values('order_id').annotate(_min_id=Min('id')).values('_min_id')
+        return OrderItem.all_objects.filter(
+            id__in=min_ids,
+            external_lens__isnull=False,
+            is_deleted=False,
+        ).select_related(
+            'order__invoice', 'order__branch', 'external_lens__brand'
+        ).order_by('-order__invoice__invoice_date')
 
 class InvoiceNumberSearchView(APIView):
     """
