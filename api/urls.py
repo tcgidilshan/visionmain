@@ -39,6 +39,7 @@ from .views import (
     DoctorRetrieveUpdateDeleteView,
     PatientListView,
     PatientUpdateView,
+    AllPatientAuditLogListView, PatientAuditLogListView,
     ChannelAppointmentView,
     ChannelListView,RefundChannelView,
     DoctorAppointmentTimeListView,
@@ -246,6 +247,8 @@ urlpatterns = [
     path('patients/', PatientListView.as_view(), name='patient-list'),
     path('patients/<int:pk>/', PatientUpdateView.as_view(), name='patient-update'),
     path('patients/create/', CreatePatientView.as_view(), name='patient-create'),
+    path('patients/audit-logs/', AllPatientAuditLogListView.as_view(), name='patient-audit-logs'),
+    path('patients/<int:pk>/audit-logs/', PatientAuditLogListView.as_view(), name='patient-single-audit-logs'),
     path('channel/', ChannelAppointmentView.as_view(), name='channel-appointment'),
     path('channels/', ChannelListView.as_view(), name='channel-list'),
     path('channels/time-slots/', DoctorAppointmentTimeListView.as_view(), name='doctor-appointment-time-list'),#time slots

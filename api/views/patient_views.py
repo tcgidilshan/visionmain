@@ -7,6 +7,7 @@ from ..models import Patient, PatientAuditLog,CustomUser
 from ..serializers import PatientSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 from ..services.pagination_service import PaginationService
+from ..services.time_zone_convert_service import TimezoneConverterService
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
@@ -16,7 +17,7 @@ def log_patient_changes(patient, old_data, new_data, user):
     """
     Helper function to log changes to patient fields in PatientAuditLog table
     """
-    fields_to_track = ['name', 'phone_number', 'nic', 'date_of_birth', 'address', 'extra_phone_number', 'patient_note']
+    fields_to_track = ['name', 'phone_number', 'nic', 'date_of_birth', 'address', 'extra_phone_number', 'patient_note', 'city']
     
     for field in fields_to_track:
         old_value = old_data.get(field) if old_data else None
@@ -89,6 +90,7 @@ class PatientUpdateView(RetrieveUpdateAPIView):
             'address': instance.address,
             'extra_phone_number': instance.extra_phone_number,
             'patient_note': instance.patient_note,
+            'city': instance.city,
         }
         
         phone_number = self.request.data.get("phone_number", instance.phone_number)
@@ -128,6 +130,114 @@ class PatientUpdateView(RetrieveUpdateAPIView):
         }
         
         log_patient_changes(updated_patient, old_data, new_data,user)
+
+class PatientAuditLogListView(ListAPIView):
+    """
+    GET /api/patients/<pk>/audit-logs/
+    Returns audit log entries for a single patient, newest first.
+
+    Optional query params:
+        date_from  – YYYY-MM-DD  (inclusive)
+        date_to    – YYYY-MM-DD  (inclusive)
+        field_name – filter by a specific field (e.g. ?field_name=nic)
+    """
+    permission_classes = [IsAuthenticated]
+    pagination_class = PaginationService
+
+    def get_queryset(self):
+        patient_id = self.kwargs['pk']
+        qs = PatientAuditLog.objects.filter(patient_id=patient_id).order_by('-created_at')
+
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+        field_name = self.request.query_params.get('field_name')
+
+        if date_from or date_to:
+            start_dt, end_dt = TimezoneConverterService.format_date_with_timezone(date_from, date_to)
+            if start_dt and end_dt:
+                qs = qs.filter(created_at__gte=start_dt, created_at__lte=end_dt)
+
+        if field_name:
+            qs = qs.filter(field_name=field_name)
+
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        data = [
+            {
+                'id': log.id,
+                'field_name': log.field_name,
+                'old_value': log.old_value,
+                'new_value': log.new_value,
+                'changed_by': log.user.username if log.user else None,
+                'changed_by_id': log.user.id if log.user else None,
+                'created_at': log.created_at,
+            }
+            for log in (page if page is not None else qs)
+        ]
+        if page is not None:
+            return self.get_paginated_response(data)
+        return Response(data)
+
+
+class AllPatientAuditLogListView(ListAPIView):
+    """
+    GET /api/patients/audit-logs/
+    Returns audit log entries across all patients, newest first.
+
+    Optional query params:
+        name       – filter by patient name (case-insensitive contains)
+        date_from  – YYYY-MM-DD (inclusive)
+        date_to    – YYYY-MM-DD (inclusive)
+        field_name – filter by a specific field (e.g. ?field_name=nic)
+    """
+    permission_classes = [IsAuthenticated]
+    pagination_class = PaginationService
+
+    def get_queryset(self):
+        qs = PatientAuditLog.objects.select_related('patient', 'user').order_by('-created_at')
+
+        name = self.request.query_params.get('name')
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+        field_name = self.request.query_params.get('field_name')
+
+        if name:
+            qs = qs.filter(patient__name__icontains=name)
+
+        if date_from or date_to:
+            start_dt, end_dt = TimezoneConverterService.format_date_with_timezone(date_from, date_to)
+            if start_dt and end_dt:
+                qs = qs.filter(created_at__gte=start_dt, created_at__lte=end_dt)
+
+        if field_name:
+            qs = qs.filter(field_name=field_name)
+
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        data = [
+            {
+                'id': log.id,
+                'patient_id': log.patient.id if log.patient else None,
+                'patient_name': log.patient.name if log.patient else None,
+                'field_name': log.field_name,
+                'old_value': log.old_value,
+                'new_value': log.new_value,
+                'changed_by': log.user.username if log.user else None,
+                'changed_by_id': log.user.id if log.user else None,
+                'created_at': log.created_at,
+            }
+            for log in (page if page is not None else qs)
+        ]
+        if page is not None:
+            return self.get_paginated_response(data)
+        return Response(data)
+
 
 class CreatePatientView(APIView):
     """

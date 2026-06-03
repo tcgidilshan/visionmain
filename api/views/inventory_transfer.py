@@ -390,18 +390,6 @@ class LensTransferView(APIView):
             defaults={'qty': 0, 'initial_count': 0}
         )
         
-        # //!# Prevent transfers to Frame & Lens store (branch_id=4) if initial_branch is not set
-        # if to_branch_id == 4 and not lens.initial_branch_id:
-        #     raise ValueError("This item does not belong to Frame & Lens store")
-            
-        # Check if the destination branch is the initial branch and if stock exists there
-        if lens.initial_branch_id and to_branch_id == lens.initial_branch_id and not LensStock.objects.filter(
-            lens=lens, 
-            branch_id=to_branch_id,
-            qty__gt=0
-        ).exists():
-            raise ValueError("Cannot transfer to frame store as there is no stock available")
-        
         # Update quantities
         from_stock.qty -= quantity
         to_stock.qty += quantity

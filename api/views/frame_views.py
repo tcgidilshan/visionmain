@@ -523,7 +523,10 @@ class FramePaginatedListView(ListAPIView):
         qs = Frame.objects.filter(is_active=True).select_related('brand', 'code', 'color')
 
         if store_id:
-            qs = qs.filter(initial_branch_id=store_id)
+            frame_ids_with_stock = FrameStock.objects.filter(
+                branch_id=store_id
+            ).values_list('frame_id', flat=True)
+            qs = qs.filter(id__in=frame_ids_with_stock)
 
         if branch:
             low_stock_sq = FrameStock.objects.filter(
