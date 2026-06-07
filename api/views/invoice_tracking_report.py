@@ -24,6 +24,7 @@ class InvoiceTrackingReportView(APIView):
         end_date = request.query_params.get('end_date')
         branch_id = request.query_params.get('branch_id')
         invoice_number = request.query_params.get('invoice_number')
+        lens_type = request.query_params.get('lens_type', 'all')
 
         # Validate required parameters
         if not branch_id:
@@ -50,14 +51,22 @@ class InvoiceTrackingReportView(APIView):
                     return Response({
                         "error": "start_date and end_date are required when invoice_number is not provided."
                     }, status=status.HTTP_400_BAD_REQUEST)
-                
+
                 # Convert dates to timezone-aware datetime
                 start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
                 filters['invoice_date__gte'] = start_datetime
                 filters['invoice_date__lt'] = end_datetime
 
+            # Apply lens type filter
+            if lens_type == 'stock':
+                filters['order__order_items__lens__isnull'] = False
+                filters['order__order_items__is_deleted'] = False
+            elif lens_type == 'external':
+                filters['order__order_items__external_lens__isnull'] = False
+                filters['order__order_items__is_deleted'] = False
+
             # Fetch invoices with related data
-            invoices = Invoice.objects.filter(**filters).select_related(
+            invoices = Invoice.objects.filter(**filters).distinct().select_related(
                 'order__customer',
                 'order__refraction',
                 'order__sales_staff_code',
@@ -182,6 +191,7 @@ class InvoiceTrackingReportView(APIView):
         try:
             details = refraction.refraction_details
             return {
+                'number': refraction.refraction_number,
                 'created_at': details.created_at.isoformat() if details.created_at else None,
                 'user': details.user.username if details.user else None,
             }

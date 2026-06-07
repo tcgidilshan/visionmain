@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Sum, Q, F
-from api.models import Branch, OrderPayment, ChannelPayment, SolderingPayment
+from api.models import Branch, OrderPayment, ChannelPayment, SolderingPayment, OtherIncome
 from api.services.time_zone_convert_service import TimezoneConverterService
 from datetime import timedelta
 from datetime import datetime
@@ -81,7 +81,6 @@ class PaymentSummaryReportView(APIView):
                         day_totals[sp['payment_method']] += float(sp['total'] or 0)
 
                     # OtherIncome
-                    from api.models import OtherIncome
                     other_income = OtherIncome.objects.filter(
                         branch=branch,
                         date__date=current_date
@@ -135,7 +134,15 @@ class PaymentSummaryReportView(APIView):
             for sp in soldering_payments:
                 branch_totals[sp['payment_method']] += float(sp['total'] or 0)
 
-            branch_total = sum(branch_totals.values())
+            # OtherIncome
+            branch_other_income = float(
+                OtherIncome.objects.filter(
+                    branch=branch,
+                    date__range=(start_datetime, end_datetime)
+                ).aggregate(total=Sum('amount'))['total'] or 0
+            )
+
+            branch_total = sum(branch_totals.values()) + branch_other_income
             sub_total_payments += branch_total
 
             payments_data.append({
@@ -144,6 +151,7 @@ class PaymentSummaryReportView(APIView):
                 'total_cash': branch_totals['cash'],
                 'total_card': branch_totals['credit_card'],
                 'total_online_transfer': branch_totals['online_transfer'],
+                'total_other_income': branch_other_income,
             })
 
         return Response({
