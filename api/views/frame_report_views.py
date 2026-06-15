@@ -41,10 +41,12 @@ class FrameBrandReportView(APIView):
             # Get parameters from query
             initial_branch_id = request.query_params.get('initial_branch')
             brand_name = request.query_params.get('brand_name')
-            
+            branch_id = request.query_params.get('branch_id') or request.query_params.get('store_id')
+
             report_data = generate_brand_wise_report(
                 initial_branch_id=initial_branch_id,
-                brand_name=brand_name
+                brand_name=brand_name,
+                branch_id=branch_id,
             )
             return Response({
                 "data": report_data

@@ -556,6 +556,14 @@ class FramePaginatedListView(ListAPIView):
             )
             qs = qs.annotate(is_low_stock=Exists(low_stock_sq))
 
+        qs = qs.annotate(
+            sold_count=Coalesce(
+                Sum('order_items__quantity', filter=Q(order_items__is_deleted=False)),
+                Value(0),
+                output_field=IntegerField()
+            )
+        )
+
         return qs
 
     def list(self, request, *args, **kwargs):
@@ -592,5 +600,6 @@ class FramePaginatedListView(ListAPIView):
             frame_data = FrameSerializer(frame, context=context).data
             stocks = getattr(frame, 'filtered_stocks', [])
             frame_data['stock'] = FrameStockSerializer(stocks, many=True).data
+            frame_data['total_sold'] = getattr(frame, 'sold_count', 0)
             result.append(frame_data)
         return result
