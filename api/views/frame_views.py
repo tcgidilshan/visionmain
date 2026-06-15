@@ -3,14 +3,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
 from rest_framework.filters import OrderingFilter, SearchFilter
-from ..models import Frame, FrameStock, Branch, FrameStockHistory,FrameImage
+from ..models import Frame, FrameStock, Branch, FrameStockHistory, FrameImage
 from ..serializers import FrameSerializer, FrameStockSerializer
 from django.db import transaction
 from ..services.branch_protection_service import BranchProtectionsService
 from ..services.pagination_service import PaginationService
 import json
 import os
-from django.db.models import Sum, Exists, OuterRef, F
+from django.db.models import Sum, Exists, OuterRef, F, Value, IntegerField, Q
+from django.db.models.functions import Coalesce
 from collections import defaultdict
 from django.db.models import Prefetch
 from django_filters.rest_framework import DjangoFilterBackend, FilterSet, CharFilter, ChoiceFilter
@@ -326,6 +327,17 @@ class FrameFilterView(APIView):
                 'stocks',
                 queryset=FrameStock.objects.filter(branch_id=branch_id),
                 to_attr='filtered_stocks'
+            ),
+            Prefetch(
+                'stocks',
+                queryset=FrameStock.objects.all(),
+                to_attr='all_stocks'
+            )
+        ).annotate(
+            sold_count=Coalesce(
+                Sum('order_items__quantity', filter=Q(order_items__is_deleted=False)),
+                Value(0),
+                output_field=IntegerField()
             )
         ).filter(is_active=True)
 
@@ -340,6 +352,7 @@ class FrameFilterView(APIView):
                 continue  # skip frames that have no stock entry for this branch
 
             stock_qty = frame.filtered_stocks[0].qty  # Only one stock per frame per branch
+            all_branches_qty = sum(s.qty for s in frame.all_stocks)
             brand_name = frame.brand.name
             code_name = frame.code.name
             key = (brand_name, code_name)
@@ -355,12 +368,16 @@ class FrameFilterView(APIView):
                     "species": frame.species,
                     "image_url": image_url,
                     "total_qty": 0,
+                    "total_available": 0,
+                    "total_sold": 0,
                     "color_ids": set(),
                     "frames": []
                 }
 
             grouped[key]["color_ids"].add(frame.color.id)
             grouped[key]["total_qty"] += stock_qty
+            grouped[key]["total_available"] += all_branches_qty
+            grouped[key]["total_sold"] += frame.sold_count
             grouped[key]["frames"].append({
                 "id": frame.id,
                 "brand": frame.brand.id,
@@ -372,10 +389,11 @@ class FrameFilterView(APIView):
                 "size": frame.size,
                 "species": frame.species,
                 "brand_type": frame.get_brand_type_display(),
-                "image_url": image_url,  # Use the URL from serializer
+                "image_url": image_url,
                 "is_active": frame.is_active,
                 "initial_branch": frame.initial_branch.id if frame.initial_branch else None,
                 "stock_qty": stock_qty,
+                "total_sold": frame.sold_count,
                 "stock": [
                     {
                         "branch_id": stock.branch_id,
@@ -395,6 +413,8 @@ class FrameFilterView(APIView):
                 "species": group["species"],
                 "total_color": len(group["color_ids"]),
                 "total_qty": group["total_qty"],
+                "total_available": group["total_available"],
+                "total_sold": group["total_sold"],
                 "frames": group["frames"]
             })
 
