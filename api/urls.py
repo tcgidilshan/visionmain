@@ -5,7 +5,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from .views.inventory_transfer import LensTransferView
 from .views import (
-    BranchListCreateAPIView,OrderRefundView,FactoryOrderReportView,
+    BranchListCreateAPIView,OrderRefundView,FactoryOrderReportView,FactoryOrderSummaryView,
     BranchRetrieveUpdateDestroyAPIView,BranchContactUpdateAPIView,NormalOrderReportView,
     RefractionCreateAPIView,ChannelOrderReportView,
     RefractionListAPIView,BranchAppointmentCountView,
@@ -325,6 +325,7 @@ urlpatterns = [
     path('report/lens-sale/',LensSaleReportView.as_view(), name='report-lens-sale'),
     #reports
     path('reports/factory-orders/', FactoryOrderReportView.as_view(), name='factory-order-report'),
+    path('reports/factory-orders/summary/', FactoryOrderSummaryView.as_view(), name='factory-order-summary'),
     path('reports/normal-orders/', NormalOrderReportView.as_view(), name='normal-order-report'),
     path('reports/channel-orders/', ChannelOrderReportView.as_view(), name='channel-order-report'),
     path('reports/soldering-orders/', SolderingOrderReportView.as_view(), name='soldering-order-report'),

@@ -365,6 +365,44 @@ class InvoiceReportService:
         }
         #desing how you need refudn ,delete handle 
     @staticmethod
+    def get_factory_repayments(start_date_str, end_date_str, branch_id):
+        """
+        Returns payments made on the given date range for factory orders
+        whose invoice was created BEFORE that date range (i.e. repayments on old orders).
+        """
+        start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(
+            start_date_str, end_date_str
+        )
+
+        # Order IDs whose factory invoice falls within the date range (already counted in main report)
+        same_period_order_ids = Invoice.all_objects.filter(
+            invoice_type='factory',
+            invoice_date__range=(start_datetime, end_datetime),
+            order__branch_id=branch_id,
+        ).values_list('order_id', flat=True)
+
+        # All factory order IDs for this branch
+        all_factory_order_ids = Invoice.all_objects.filter(
+            invoice_type='factory',
+            order__branch_id=branch_id,
+        ).values_list('order_id', flat=True)
+
+        # Payments made in the date range for OLD factory orders (not in same period)
+        repayments = OrderPayment.objects.filter(
+            payment_date__range=(start_datetime, end_datetime),
+            order_id__in=all_factory_order_ids,
+            is_edited=False,
+        ).exclude(order_id__in=same_period_order_ids)
+
+        repayment_count = repayments.values('order_id').distinct().count()
+        repayment_paid = repayments.aggregate(total=Sum('amount'))['total'] or 0
+
+        return {
+            'repayment_count': repayment_count,
+            'repayment_paid_amount': float(repayment_paid),
+        }
+
+    @staticmethod
     def get_normal_order_report(start_date_str, end_date_str, branch_id):
         """
         Generate a detailed normal order report filtered by date range and branch.
