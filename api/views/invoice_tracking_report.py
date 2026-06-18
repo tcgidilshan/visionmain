@@ -143,10 +143,13 @@ class InvoiceTrackingReportView(APIView):
                         'status': order.fitting_status,
                         'updated_date': order.fitting_status_updated_date.isoformat() if order.fitting_status_updated_date else None,
                     },
-                    
+
+                    # Issue to customer date from progress stages
+                    'issue_to_customer_date': self._get_issue_to_customer_date(order),
+
                     # Order Feedback
                     'feedback': self._get_order_feedback(order),
-                    
+
                     # Progress Stages
                     'progress_stages': self._get_progress_stages(order),
                     
@@ -224,6 +227,14 @@ class InvoiceTrackingReportView(APIView):
             'stage': stage.get_progress_status_display(),
             'changed_at': stage.changed_at.isoformat() if stage.changed_at else None,
         } for stage in stages]
+
+    def _get_issue_to_customer_date(self, order):
+        stage = order.order_progress_status.filter(
+            progress_status='issue_to_customer'
+        ).order_by('-changed_at').first()
+        if stage:
+            return stage.changed_at.isoformat()
+        return None
 
     def _get_arrival_status(self, order):
         statuses = order.arrival_status.all()
