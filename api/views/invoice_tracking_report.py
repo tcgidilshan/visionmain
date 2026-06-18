@@ -4,12 +4,13 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Prefetch
 from ..models import (
-    Invoice, Order, Patient, Refraction, RefractionDetails, 
-    OrderItem, OrderPayment, OrderProgress, ArrivalStatus, 
+    Invoice, Order, Patient, Refraction, RefractionDetails,
+    OrderItem, OrderPayment, OrderProgress, ArrivalStatus,
     MntOrder, OrderFeedback, OrderItemWhatsAppLog, Expense,
     CustomUser, Frame, Lens, ExternalLens, PaymentMethodBanks
 )
 from ..services.time_zone_convert_service import TimezoneConverterService
+from ..services.pagination_service import PaginationService
 
 
 class InvoiceTrackingReportView(APIView):
@@ -66,7 +67,7 @@ class InvoiceTrackingReportView(APIView):
                 filters['order__order_items__is_deleted'] = False
 
             # Fetch invoices with related data
-            invoices = Invoice.objects.filter(**filters).distinct().select_related(
+            invoices_qs = Invoice.objects.filter(**filters).distinct().select_related(
                 'order__customer',
                 'order__refraction',
                 'order__sales_staff_code',
@@ -93,9 +94,12 @@ class InvoiceTrackingReportView(APIView):
                 'order__expense_refunds'
             ).order_by('-invoice_date')
 
+            paginator = PaginationService()
+            page_qs = paginator.paginate_queryset(invoices_qs, request)
+
             result = []
 
-            for invoice in invoices:
+            for invoice in page_qs:
                 order = invoice.order
                 customer = order.customer
                 refraction = order.refraction
@@ -167,9 +171,16 @@ class InvoiceTrackingReportView(APIView):
                 
                 result.append(invoice_data)
 
+            total_count = paginator.page.paginator.count
+            total_pages = paginator.page.paginator.num_pages
+            current_page = paginator.page.number
+
             return Response({
                 'invoices': result,
-                'total_count': len(result)
+                'total_count': total_count,
+                'total_pages': total_pages,
+                'page': current_page,
+                'page_size': paginator.get_page_size(request),
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
