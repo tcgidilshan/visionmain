@@ -49,15 +49,19 @@ def generate_frames_report(start_date=None, end_date=None):
     
     return response_data
 
-def generate_brand_wise_report(initial_branch_id=None, brand_name=None, branch_id=None):
+def generate_brand_wise_report(initial_branch_id=None, brand_name=None, branch_id=None, start_date=None, end_date=None):
     """
     Brand-wise frame report.
     Returns per brand:
       - branch_stock    : qty in the current branch (branch_id)
-      - total_sold      : all-time units sold
+      - total_sold      : units sold, optionally filtered by date range
       - total_available : qty summed across ALL branches
+      - store_stock     : qty in the frame store branch (branch_id=4)
     """
     from django.db.models import Sum
+    from ..services.time_zone_convert_service import TimezoneConverterService
+
+    start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
 
     frame_brands = Brand.objects.filter(brand_type='frame')
     if brand_name:
@@ -67,6 +71,7 @@ def generate_brand_wise_report(initial_branch_id=None, brand_name=None, branch_i
     summary_branch_stock = 0
     summary_total_sold = 0
     summary_total_available = 0
+    summary_store_stock = 0
 
     for brand in frame_brands:
         frames_query = Frame.objects.filter(brand=brand, is_active=True)
@@ -75,7 +80,6 @@ def generate_brand_wise_report(initial_branch_id=None, brand_name=None, branch_i
         if not frames_query.exists():
             continue
 
-        # Stock in the requested branch
         branch_stock = 0
         if branch_id:
             branch_stock = FrameStock.objects.filter(
@@ -83,25 +87,34 @@ def generate_brand_wise_report(initial_branch_id=None, brand_name=None, branch_i
                 branch_id=branch_id
             ).aggregate(total=Sum('qty'))['total'] or 0
 
-        # Stock across ALL branches
         total_available = FrameStock.objects.filter(
             frame__in=frames_query
         ).aggregate(total=Sum('qty'))['total'] or 0
 
-        # Total sold (all time)
-        total_sold = OrderItem.objects.filter(
-            frame__in=frames_query
-        ).aggregate(total=Sum('quantity'))['total'] or 0
+        store_stock = FrameStock.objects.filter(
+            frame__in=frames_query,
+            branch_id=FRAME_STORE_BRANCH_ID
+        ).aggregate(total=Sum('qty'))['total'] or 0
+
+        sold_qs = OrderItem.objects.filter(frame__in=frames_query)
+        if start_datetime and end_datetime:
+            sold_qs = sold_qs.filter(
+                order__order_date__gte=start_datetime,
+                order__order_date__lte=end_datetime
+            )
+        total_sold = sold_qs.aggregate(total=Sum('quantity'))['total'] or 0
 
         summary_branch_stock += branch_stock
         summary_total_sold += total_sold
         summary_total_available += total_available
+        summary_store_stock += store_stock
 
         report_data.append({
             'brand_name': brand.name,
             'branch_stock': branch_stock,
             'total_sold': total_sold,
             'total_available': total_available,
+            'store_stock': store_stock,
         })
 
     return {
@@ -110,6 +123,7 @@ def generate_brand_wise_report(initial_branch_id=None, brand_name=None, branch_i
             'total_branch_stock': summary_branch_stock,
             'total_sold': summary_total_sold,
             'total_available': summary_total_available,
+            'total_store_stock': summary_store_stock,
         }
     }
 

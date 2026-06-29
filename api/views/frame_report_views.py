@@ -37,16 +37,19 @@ class FrameBrandReportView(APIView):
     def get(self, request, *args, **kwargs):
         try:
             from ..services.frame_report_service import generate_brand_wise_report
-            
-            # Get parameters from query
+
             initial_branch_id = request.query_params.get('initial_branch')
             brand_name = request.query_params.get('brand_name')
             branch_id = request.query_params.get('branch_id') or request.query_params.get('store_id')
+            start_date = request.query_params.get('start_date')
+            end_date = request.query_params.get('end_date')
 
             report_data = generate_brand_wise_report(
                 initial_branch_id=initial_branch_id,
                 brand_name=brand_name,
                 branch_id=branch_id,
+                start_date=start_date,
+                end_date=end_date,
             )
             return Response({
                 "data": report_data
