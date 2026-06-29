@@ -72,17 +72,21 @@ class BranchWiseFrameBrandReportView(APIView):
             # Get branch_id from query parameters
             branch_id = request.query_params.get('branch_id')
             brand_name = request.query_params.get('brand_name')
-            
+            start_date = request.query_params.get('start_date')
+            end_date = request.query_params.get('end_date')
+
             if not branch_id:
                 return Response(
                     {"detail": "branch_id query parameter is required."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
+
             # Generate the report
             report_data = generate_branch_wise_frame_brand_report(
                 branch_id=branch_id,
-                brand_name=brand_name
+                brand_name=brand_name,
+                start_date=start_date,
+                end_date=end_date,
             )
             
             return Response({
