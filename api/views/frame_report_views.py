@@ -77,6 +77,8 @@ class BranchWiseFrameBrandReportView(APIView):
             brand_name = request.query_params.get('brand_name')
             start_date = request.query_params.get('start_date')
             end_date = request.query_params.get('end_date')
+            sort_by = request.query_params.get('sort_by')
+            sort_order = request.query_params.get('sort_order', 'asc')
 
             if not branch_id:
                 return Response(
@@ -90,6 +92,8 @@ class BranchWiseFrameBrandReportView(APIView):
                 brand_name=brand_name,
                 start_date=start_date,
                 end_date=end_date,
+                sort_by=sort_by,
+                sort_order=sort_order,
             )
             
             return Response({

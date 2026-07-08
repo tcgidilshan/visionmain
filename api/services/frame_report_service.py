@@ -3,6 +3,7 @@
 from datetime import datetime
 from django.db.models import Sum
 from ..models import OrderItem, Brand, Frame, FrameStock
+from ..constants import FRAME_STORE_BRANCH_ID
 
 def generate_frames_report(start_date=None, end_date=None):
     """
@@ -127,20 +128,31 @@ def generate_brand_wise_report(initial_branch_id=None, brand_name=None, branch_i
         }
     }
 
-FRAME_STORE_BRANCH_ID = 4
-
-def generate_branch_wise_frame_brand_report(branch_id, brand_name=None, start_date=None, end_date=None):
+def generate_branch_wise_frame_brand_report(branch_id, brand_name=None, start_date=None, end_date=None,
+                                             sort_by=None, sort_order='asc'):
     """
     Per-brand report for the given branch:
       - branch_stock      : qty in the requested branch
       - total_sold        : units sold (orders from this branch, optionally filtered by date)
       - total_available   : qty summed across ALL branches
       - store_stock       : qty in the frame store branch (branch_id=4)
+      - other_branches_stock : qty available in all branches except the requested branch_id
+                                and the frame store branch (branch_id=4)
+
+    sort_by: one of 'brand_name', 'branch_stock', 'store_stock', 'total_sold',
+             'total_available', 'all_stock', 'other_branches_stock'. Defaults to no
+             sorting (insertion order).
+    sort_order: 'asc' or 'desc'.
+
+    If neither start_date nor end_date is provided, total_sold is the
+    all-time count of OrderItems for the given branch_id (no date filter).
     """
     from django.db.models import Sum
     from ..services.time_zone_convert_service import TimezoneConverterService
 
-    start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
+    start_datetime, end_datetime = (None, None)
+    if start_date or end_date:
+        start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
 
     frame_brands = Brand.objects.filter(brand_type='frame')
     if brand_name:
@@ -151,6 +163,7 @@ def generate_branch_wise_frame_brand_report(branch_id, brand_name=None, start_da
     summary_total_sold = 0
     summary_total_available = 0
     summary_store_stock = 0
+    summary_other_branches_stock = 0
 
     for brand in frame_brands:
         frames = Frame.objects.filter(brand=brand, is_active=True)
@@ -171,6 +184,12 @@ def generate_branch_wise_frame_brand_report(branch_id, brand_name=None, start_da
             branch_id=FRAME_STORE_BRANCH_ID
         ).aggregate(total=Sum('qty'))['total'] or 0
 
+        other_branches_stock = FrameStock.objects.filter(
+            frame__in=frames
+        ).exclude(
+            branch_id__in={branch_id, FRAME_STORE_BRANCH_ID}
+        ).aggregate(total=Sum('qty'))['total'] or 0
+
         sold_qs = OrderItem.objects.filter(
             frame__in=frames,
             order__branch_id=branch_id
@@ -186,6 +205,7 @@ def generate_branch_wise_frame_brand_report(branch_id, brand_name=None, start_da
         summary_total_sold += total_sold
         summary_total_available += total_available
         summary_store_stock += store_stock
+        summary_other_branches_stock += other_branches_stock
 
         report_data.append({
             'brand_name': brand.name,
@@ -193,7 +213,22 @@ def generate_branch_wise_frame_brand_report(branch_id, brand_name=None, start_da
             'total_sold': total_sold,
             'total_available': total_available,
             'store_stock': store_stock,
+            'other_branches_stock': other_branches_stock,
         })
+
+    if sort_by:
+        sort_key_map = {
+            'brand_name': lambda item: (item['brand_name'] or '').lower(),
+            'branch_stock': lambda item: item['branch_stock'],
+            'store_stock': lambda item: item['store_stock'],
+            'total_sold': lambda item: item['total_sold'],
+            'total_available': lambda item: item['total_available'],
+            'all_stock': lambda item: item['store_stock'] + item['total_available'],
+            'other_branches_stock': lambda item: item['other_branches_stock'],
+        }
+        key_func = sort_key_map.get(sort_by)
+        if key_func:
+            report_data.sort(key=key_func, reverse=(sort_order == 'desc'))
 
     return {
         'brands': report_data,
@@ -202,5 +237,6 @@ def generate_branch_wise_frame_brand_report(branch_id, brand_name=None, start_da
             'total_sold': summary_total_sold,
             'total_available': summary_total_available,
             'total_store_stock': summary_store_stock,
+            'total_other_branches_stock': summary_other_branches_stock,
         }
     }
