@@ -43,6 +43,8 @@ class FrameBrandReportView(APIView):
             branch_id = request.query_params.get('branch_id') or request.query_params.get('store_id')
             start_date = request.query_params.get('start_date')
             end_date = request.query_params.get('end_date')
+            sort_by = request.query_params.get('sort_by')
+            sort_order = request.query_params.get('sort_order', 'asc')
 
             report_data = generate_brand_wise_report(
                 initial_branch_id=initial_branch_id,
@@ -50,6 +52,8 @@ class FrameBrandReportView(APIView):
                 branch_id=branch_id,
                 start_date=start_date,
                 end_date=end_date,
+                sort_by=sort_by,
+                sort_order=sort_order,
             )
             return Response({
                 "data": report_data

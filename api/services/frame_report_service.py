@@ -50,7 +50,8 @@ def generate_frames_report(start_date=None, end_date=None):
     
     return response_data
 
-def generate_brand_wise_report(initial_branch_id=None, brand_name=None, branch_id=None, start_date=None, end_date=None):
+def generate_brand_wise_report(initial_branch_id=None, brand_name=None, branch_id=None, start_date=None, end_date=None,
+                                sort_by=None, sort_order='asc'):
     """
     Brand-wise frame report.
     Returns per brand:
@@ -62,7 +63,9 @@ def generate_brand_wise_report(initial_branch_id=None, brand_name=None, branch_i
     from django.db.models import Sum
     from ..services.time_zone_convert_service import TimezoneConverterService
 
-    start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
+    start_datetime, end_datetime = (None, None)
+    if start_date or end_date:
+        start_datetime, end_datetime = TimezoneConverterService.format_date_with_timezone(start_date, end_date)
 
     frame_brands = Brand.objects.filter(brand_type='frame')
     if brand_name:
@@ -90,6 +93,8 @@ def generate_brand_wise_report(initial_branch_id=None, brand_name=None, branch_i
 
         total_available = FrameStock.objects.filter(
             frame__in=frames_query
+        ).exclude(
+            branch_id=FRAME_STORE_BRANCH_ID
         ).aggregate(total=Sum('qty'))['total'] or 0
 
         store_stock = FrameStock.objects.filter(
@@ -100,8 +105,8 @@ def generate_brand_wise_report(initial_branch_id=None, brand_name=None, branch_i
         sold_qs = OrderItem.objects.filter(frame__in=frames_query)
         if start_datetime and end_datetime:
             sold_qs = sold_qs.filter(
-                order__order_date__gte=start_datetime,
-                order__order_date__lte=end_datetime
+                order__invoice__invoice_date__gte=start_datetime,
+                order__invoice__invoice_date__lte=end_datetime
             )
         total_sold = sold_qs.aggregate(total=Sum('quantity'))['total'] or 0
 
@@ -117,6 +122,19 @@ def generate_brand_wise_report(initial_branch_id=None, brand_name=None, branch_i
             'total_available': total_available,
             'store_stock': store_stock,
         })
+
+    if sort_by:
+        sort_key_map = {
+            'brand_name': lambda item: (item['brand_name'] or '').lower(),
+            'branch_stock': lambda item: item['branch_stock'],
+            'total_sold': lambda item: item['total_sold'],
+            'total_available': lambda item: item['total_available'],
+            'store_stock': lambda item: item['store_stock'],
+            'all_stock': lambda item: item['store_stock'] + item['total_available'],
+        }
+        key_func = sort_key_map.get(sort_by)
+        if key_func:
+            report_data.sort(key=key_func, reverse=(sort_order == 'desc'))
 
     return {
         'brands': report_data,
