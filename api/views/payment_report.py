@@ -83,7 +83,7 @@ class PaymentSummaryReportView(APIView):
                     # OtherIncome
                     other_income = OtherIncome.objects.filter(
                         branch=branch,
-                        date__date=current_date
+                        date__range=(day_start, day_end)
                     ).aggregate(total=Sum('amount'))['total'] or 0
 
                     total = day_totals['online_transfer'] + day_totals['cash'] + day_totals['credit_card'] + float(other_income)

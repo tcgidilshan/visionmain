@@ -74,6 +74,10 @@ class BulkUpdateOrderProgressStatus(APIView):
                 .filter(id__in=order_ids, is_deleted=False)
             )
             for order in orders:
+                if progress_status == "issue_to_customer" and order.fitting_on_collection:
+                    order.fitting_on_collection = False
+                    order.save(update_fields=['fitting_on_collection'])
+
                 last_progress = (
                     OrderProgress.objects
                     .filter(order=order)

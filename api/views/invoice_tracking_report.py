@@ -130,6 +130,10 @@ class InvoiceTrackingReportView(APIView):
                         'discount': float(order.discount) if order.discount else 0,
                         'sales_staff': order.sales_staff_code.username if order.sales_staff_code else None,
                         'order_date': order.order_date.isoformat() if order.order_date else None,
+                        'fitting_on_collection': order.fitting_on_collection,
+                        'co_order': order.co_order,
+                        'urgent': order.urgent,
+                        'on_hold': order.on_hold,
                     },
                     
                     # Issued By Information
