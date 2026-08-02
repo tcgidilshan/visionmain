@@ -297,7 +297,8 @@ class InvoiceReportService:
         refund_amount = Expense.objects.filter(
             created_at__range=(start_datetime, end_datetime),
             order_refund__isnull=False,
-            order_refund__invoice__invoice_type='factory'
+            order_refund__invoice__invoice_type='factory',
+            order_refund__branch_id=branch_id
         ).aggregate(Sum('amount'))['amount__sum'] or 0
         total_refund_paid_amount += float(refund_amount)
         print(f"Refund amount in date range: {refund_amount}")
