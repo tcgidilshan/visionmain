@@ -84,7 +84,9 @@ class OrderAuditHistoryView(APIView):
         order_expenses = Expense.objects.none()
         refraction_logs = []
         if order_id:
-            order_items = order_items.filter(order_id=order_id)
+            # Show all items for this order (active + deleted), not just deleted ones,
+            # so newly-added items also appear in the single-order audit trail.
+            order_items = OrderItem.all_objects.filter(order_id=order_id)
             order_payments = order_payments.filter(order_id=order_id)
             order_logs = order_logs.filter(order_id=order_id)
             order_expenses = Expense.objects.filter(order_refund_id=order_id, is_refund=True).order_by('-created_at')
