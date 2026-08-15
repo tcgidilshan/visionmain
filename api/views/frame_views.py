@@ -10,7 +10,7 @@ from ..services.branch_protection_service import BranchProtectionsService
 from ..services.pagination_service import PaginationService
 import json
 import os
-from django.db.models import Sum, Exists, OuterRef, F, Value, IntegerField, Q
+from django.db.models import Sum, Exists, OuterRef, F, Value, IntegerField, Q, Subquery
 from django.db.models.functions import Coalesce
 from collections import defaultdict
 from django.db.models import Prefetch
@@ -532,7 +532,7 @@ class FramePaginatedListView(ListAPIView):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = FrameListFilter
     search_fields = ['brand__name', 'code__name', 'color__name']
-    ordering_fields = ['brand__name', 'code__name', 'color__name', 'price', 'is_low_stock']
+    ordering_fields = ['brand__name', 'code__name', 'color__name', 'price', 'is_low_stock', 'stock_qty']
     ordering = ['-is_low_stock']
 
     def get_queryset(self):
@@ -554,7 +554,14 @@ class FramePaginatedListView(ListAPIView):
                 branch_id=branch,
                 qty__lte=F('limit')
             )
-            qs = qs.annotate(is_low_stock=Exists(low_stock_sq))
+            stock_qty_sq = FrameStock.objects.filter(
+                frame=OuterRef('pk'),
+                branch_id=branch
+            ).values('qty')[:1]
+            qs = qs.annotate(
+                is_low_stock=Exists(low_stock_sq),
+                stock_qty=Subquery(stock_qty_sq, output_field=IntegerField())
+            )
 
         qs = qs.annotate(
             sold_count=Coalesce(
